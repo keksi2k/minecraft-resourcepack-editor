@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+logs
+.env
+*.log
+release
+.mc
