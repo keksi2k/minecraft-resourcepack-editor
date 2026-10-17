@@ -20,6 +20,7 @@ function addDir(src, target) {
 
 addDir('dist', dir);
 dir.file('serve.mjs', readFileSync('scripts/serve.mjs'));
+dir.file('Start.bat', readFileSync('Start.bat'));
 dir.file('LICENSE', readFileSync('LICENSE'));
 dir.file(
   'START.txt',
@@ -27,7 +28,11 @@ dir.file(
 
 Voraussetzung: Node.js 18.18 oder neuer (https://nodejs.org)
 
-Starten:
+Starten unter Windows:
+  Doppelklick auf Start.bat (öffnet den Browser automatisch).
+  Anderer Port: Start.bat 3000
+
+Starten unter macOS/Linux (oder manuell unter Windows):
   1. Dieses ZIP entpacken.
   2. Im entpackten Ordner ein Terminal öffnen.
   3. node serve.mjs

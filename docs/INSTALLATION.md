@@ -109,16 +109,10 @@ Zum **Beenden** im Terminal `Strg + C` drücken (macOS: `Control + C`).
 
 Statt der Optionen kannst du auch die Umgebungsvariablen `PORT`, `HOST` und `DIR` setzen.
 
-### Schneller starten (optional)
+### Schneller starten
 
-- **Windows:** Lege im Ordner eine Datei `Start.bat` an mit dem Inhalt
-  ```bat
-  @echo off
-  cd /d "%~dp0"
-  start "" cmd /c "timeout /t 2 >nul & start http://127.0.0.1:8080"
-  node serve.mjs
-  ```
-  Ein Doppelklick startet dann Server und Browser zusammen.
+- **Windows:** Im Ordner liegt eine **`Start.bat`**. Ein Doppelklick prüft, ob Node.js installiert ist, startet den Server und öffnet den Browser. Mit `Start.bat 3000` wählst du einen anderen Port. Bei einem Fehler bleibt das Fenster offen, damit du die Meldung lesen kannst.
+  > Beim ersten Start zeigt Windows eventuell *„Der Computer wurde durch Windows geschützt“* (SmartScreen), weil die Datei aus dem Internet stammt. Mit *Weitere Informationen → Trotzdem ausführen* geht es weiter. Alternativ vorher Rechtsklick auf die Datei → *Eigenschaften* → *Zulassen* anhaken.
 - **macOS/Linux:** Lege eine Datei `start.sh` an mit
   ```sh
   #!/bin/sh
@@ -145,7 +139,9 @@ npm ci            # installiert die Abhängigkeiten genau wie in package-lock.js
 npm run dev
 ```
 
-Öffne **http://localhost:5173**. Im Dev-Modus werden Änderungen am Code sofort im Browser sichtbar. Den Sound-Proxy liefert der Dev-Server automatisch mit.
+Öffne **http://localhost:5173**. Unter Windows geht es auch ohne Terminal: Ein Doppelklick auf **`Start.bat`** im Repo-Ordner installiert beim ersten Mal die Abhängigkeiten, baut die App und startet sie auf http://127.0.0.1:8080. Nach einem `git pull` den Ordner `dist` löschen, damit neu gebaut wird.
+
+Im Dev-Modus werden Änderungen am Code sofort im Browser sichtbar. Den Sound-Proxy liefert der Dev-Server automatisch mit.
 
 ### Produktions-Build
 
