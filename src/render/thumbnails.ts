@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
 import type { ItemEntry } from '../models/items';
 import type { MobDef } from '../entities/catalog';
+import type { SpecialOptions } from '../entities/specials';
+import { texturePath } from '../models/resourceLocation';
+import { subscribeTicks } from './animation';
 import { buildItemObject, disposeObject } from './buildMesh';
 import { buildMobObject, mobDeps } from './entityMesh';
 import { loadTexture } from './textures';
@@ -52,8 +55,8 @@ async function composite2D(store: AssetStore, item: ItemEntry, size: number): Pr
   return out.toDataURL();
 }
 
-async function render3D(store: AssetStore, item: ItemEntry, size: number): Promise<string> {
-  const obj = await buildItemObject(store, item.models, 'gui');
+async function render3D(store: AssetStore, item: ItemEntry, size: number, options?: SpecialOptions): Promise<string> {
+  const obj = await buildItemObject(store, item.models, 'gui', options);
   const scene = new THREE.Scene();
   scene.add(obj);
   const r = getRenderer();
@@ -64,20 +67,70 @@ async function render3D(store: AssetStore, item: ItemEntry, size: number): Promi
   return url;
 }
 
-/** Inventory-style render of an item as a data URL ('' if the item has nothing to draw). */
-export function itemThumbnail(store: AssetStore, item: ItemEntry, size = 128): Promise<string> {
-  const key = `${item.id}|${item.depsKey}|${size}`;
+/**
+ * Inventory-style render of an item as a data URL ('' if the item has nothing to draw).
+ * `options` feed special models (banner patterns …) like item components do in game.
+ */
+export function itemThumbnail(store: AssetStore, item: ItemEntry, size = 128, options?: SpecialOptions): Promise<string> {
+  const key = `${item.id}|${item.depsKey}|${size}|${options ? JSON.stringify(options) : ''}`;
   let p = cache.get(key);
   if (!p) {
     if (item.models.length === 0) p = Promise.resolve('');
-    else if (item.models.every((m) => m.model.kind === 'generated')) p = composite2D(store, item, size);
+    else if (!options && item.models.every((m) => m.model.kind === 'generated')) p = composite2D(store, item, size);
     else {
-      p = queue.then(() => render3D(store, item, size));
+      p = queue.then(() => render3D(store, item, size, options));
       queue = p.catch(() => {});
     }
     cache.set(key, p);
   }
   return p;
+}
+
+/** Whether any texture of the item has an `.mcmeta` (and so may be animated). */
+export function hasAnimatedTextures(store: AssetStore, item: ItemEntry): boolean {
+  return item.textures.some((t) => store.has(`${texturePath(t)}.mcmeta`));
+}
+
+/**
+ * Live inventory render into `canvas`: re-rendered whenever one of the item's animated textures
+ * shows a new frame. Returns a function that stops it.
+ */
+export function animateThumbnail(store: AssetStore, item: ItemEntry, canvas: HTMLCanvasElement, size = 128): () => void {
+  let stopped = false;
+  let cleanup = () => {};
+  void buildItemObject(store, item.models, 'gui').then((obj) => {
+    if (stopped) return disposeObject(obj);
+    const scene = new THREE.Scene();
+    scene.add(obj);
+    const maps = new Set<THREE.Texture>();
+    obj.traverse((o) => {
+      const map = o instanceof THREE.Mesh ? (o.material as THREE.MeshBasicMaterial).map : null;
+      if (map) maps.add(map);
+    });
+    canvas.width = canvas.height = size;
+    const g = canvas.getContext('2d')!;
+    let shown = -1;
+    const unsubscribe = subscribeTicks(() => {
+      // texture listeners run first and bump `version` when their frame changes
+      let version = 0;
+      for (const m of maps) version += m.version;
+      if (version === shown) return;
+      shown = version;
+      const r = getRenderer();
+      r.setSize(size, size, false);
+      r.render(scene, camera);
+      g.clearRect(0, 0, size, size);
+      g.drawImage(r.domElement, 0, 0);
+    });
+    cleanup = () => {
+      unsubscribe();
+      disposeObject(obj);
+    };
+  });
+  return () => {
+    stopped = true;
+    cleanup();
+  };
 }
 
 /** Orthographic camera from the front-right and slightly above, framed tightly around the object. */

@@ -84,6 +84,21 @@ export interface LayerSpec {
   texture: string;
   tint?: number;
   emissive?: boolean;
+  /** Only draw this child part (and its children). */
+  part?: string;
+  /** Overrides for the root part's pose, as a model's setupAnim would set them. */
+  rootPose?: Partial<Record<(typeof POSE_FIELDS)[number], number>>;
+}
+
+const POSE_FIELDS = ['x', 'y', 'z', 'xRot', 'yRot', 'zRot'] as const;
+
+function withRootPose(root: PartJson, override: LayerSpec['rootPose']): PartJson {
+  if (!override) return root;
+  const pose = [...root.pose];
+  POSE_FIELDS.forEach((f, i) => {
+    if (override[f] !== undefined) pose[i] = override[f]!;
+  });
+  return { ...root, pose };
 }
 
 /**
@@ -102,7 +117,9 @@ export async function buildLayerMesh(
   const tex = await loadTexture(store, layer.texture);
   const outerNormal = new THREE.Matrix3().getNormalMatrix(outer);
   const batch = new MeshBatch();
-  walk(model.root, new THREE.Matrix4(), '', pose, ({ verts, uvs, normal }) => {
+  const inPart = (name: string) => !layer.part || name === layer.part || name.startsWith(`${layer.part}/`);
+  walk(withRootPose(model.root, layer.rootPose), new THREE.Matrix4(), '', pose, ({ part, verts, uvs, normal }) => {
+    if (!inPart(part)) return;
     const s = layer.emissive ? 1 : shade(normal.clone().applyMatrix3(outerNormal).normalize());
     // Minecraft's quad order (0,1,2,3) is the reverse of MeshBatch's corner order.
     const order = [0, 3, 2, 1];

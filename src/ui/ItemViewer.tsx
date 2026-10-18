@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
+import type { SpecialOptions } from '../entities/specials';
 import type { ItemEntry } from '../models/items';
 import { resolveItemModels } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
@@ -54,12 +55,17 @@ export function ObjectViewer({ build, buildKey, fit }: { build: () => Promise<TH
   );
 }
 
-export function ItemViewer({ store, item, context }: { store: AssetStore; item: ItemEntry; context: DisplayContext }) {
+export function ItemViewer({ store, item, context, options }: {
+  store: AssetStore;
+  item: ItemEntry;
+  context: DisplayContext;
+  options?: SpecialOptions;
+}) {
   return (
     <ObjectViewer
-      buildKey={`${item.id}|${item.depsKey}|${context}`}
+      buildKey={`${item.id}|${item.depsKey}|${context}|${JSON.stringify(options ?? {})}`}
       // GUI-context resolution may differ from in-hand (e.g. trident), so resolve per context.
-      build={() => buildItemObject(store, resolveItemModels(store, item.id, context === 'none' ? 'gui' : context), context)}
+      build={() => buildItemObject(store, resolveItemModels(store, item.id, context === 'none' ? 'gui' : context), context, options)}
     />
   );
 }

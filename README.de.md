@@ -8,8 +8,9 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 
 ## Funktionen
 
-- **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel. Truhen, Banner, Schilde, Köpfe und Betten werden ebenfalls mit ihren echten Modellen gezeichnet, und animierte Texturen (Wasser, Lava, Feuer, Portale …) laufen im 3D-Viewer und in der Texturvorschau.
+- **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel. Truhen, Shulkerkisten, Banner, Schilde, Köpfe, Betten, verzierte Krüge, Aquisitoren, Dreizacke und Kupfergolem-Statuen werden ebenfalls mit ihren echten Modellen gezeichnet, und animierte Texturen (Wasser, Lava, Feuer, Portale …) laufen im Grid, im 3D-Viewer und in der Texturvorschau.
 - **3D-Viewer** pro Item, drehbar, mit den Display-Ansichten des Spiels (Inventar, Hand 1st/3rd Person, Boden, Rahmen, Kopf). Render als PNG herunterladbar.
+- **Muster-Vorschau** für Banner und Schilde (Musterebenen und Farben) sowie Töpferscherben für verzierte Krüge, damit du deine Mustertexturen am echten Modell prüfen kannst.
 - **61 Mobs in 3D** (Creeper, Zombie, Skelett, Spinne, Schwein, Kuh, Schaf, Fuchs, Axolotl, Spieler-Skins … inkl. Varianten und 23 Babys) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört.
 - **Texturen-Browser** für alle ~4000 Texturen (Blöcke, Items, Entities, GUI …).
 - **Sounds**: alle ~2000 Sound-Events durchsuchen und abspielen, einzelne Dateien ersetzen, **eigene Sounds zu Events hinzufügen** (z. B. weitere Schrittgeräusche), **Lautstärke und Tonhöhe pro Variante** einstellen oder die Vanilla-Varianten komplett ersetzen.
@@ -97,7 +98,7 @@ Auch die Doku lässt sich übersetzen: `README.<code>.md` und `docs/INSTALLATION
 | Rendering | `src/render/`: three.js mit Minecraft-Flächenschattierung. `item/generated` wird zum extrudierten 1-px-Sprite. Thumbnails laufen über einen geteilten Offscreen-Renderer. |
 | Mobs | Mob-Modelle stehen im Java-Code des Spiels, nicht im Pack. `scripts/DumpEntityModels.java` lässt die Modell-Builder des Spiels laufen und schreibt die Geometrie nach `src/entities/entityModels.json`. `catalog.ts` ordnet Mobs Layer und Texturen zu. |
 | Sounds | Vanilla-Sounds liegen auf `resources.download.minecraft.net`, das **kein CORS** sendet. `vite.config.ts` (Dev) und `scripts/serve.mjs` (Produktion) leiten `/mcres/<hash>` dorthin weiter. Alternativ geht ein lokaler `.minecraft/assets`-Ordner. |
-| Spezialmodelle | Item-Definitionen beschreiben Truhen, Banner, Schilde und Köpfe als `minecraft:special`-Modelle, die per `transformation` platziert werden. `src/entities/specials.ts` ordnet sie den Modell-Layern und Texturen des Spiels zu. |
+| Spezialmodelle | Item-Definitionen beschreiben Truhen, Shulkerkisten, Banner, Schilde, Köpfe, Krüge und mehr als `minecraft:special`-Modelle, die per `transformation` platziert werden. `src/entities/specials.ts` ordnet sie den Modell-Layern und Texturen des Spiels zu, inklusive Banner-/Schildmustern und Krugscherben. |
 | Automatisch speichern | `src/state/session.ts`: Das Original-ZIP und deine Änderungen liegen in IndexedDB und werden auf der Startseite zum Fortsetzen angeboten. |
 | Sprachen | `src/i18n/`: Texte pro Sprache, typgeprüfte Schlüssel, Plurale über `Intl.PluralRules`. Item- und Mob-Namen kommen aus Minecrafts Sprachdatei (über denselben Proxy wie die Sounds, mit Englisch als Rückfall). |
 
@@ -122,8 +123,7 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 ## Grenzen
 
 - Mobs stehen in einer statischen Pose ohne Animation. Rüstung, Sattel, Halsband, Villager-Berufe und Mooshroom-Pilze fehlen noch.
-- Einige Spezialmodelle erscheinen noch als Würfel mit Partikeltextur (Shulkerboxen, verzierte Krüge, Aquisitoren, Kupfergolem-Statuen …). Banner- und Schildmuster werden noch nicht angezeigt.
-- Vorschaubilder in den Grids zeigen das erste Bild animierter Texturen; 3D-Viewer und Texturvorschau sind animiert.
+- Bannermuster und Töpferscherben sind nur eine Vorschau: Im Spiel stehen sie am Item und gehören deshalb nicht zum exportierten Pack (ihre Texturen schon).
 - Dynamische Item-Zustände (Bogen spannen, Kompass …) zeigen den Ruhezustand.
 - Die Zuordnung Item ↔ Sounds ist eine Namensheuristik, weil Minecraft sie im Code festlegt.
 - Bedrock Edition wird nicht unterstützt.

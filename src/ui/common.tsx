@@ -51,6 +51,19 @@ export function useInView<T extends Element>(): [React.RefObject<T>, boolean] {
   return [ref, seen];
 }
 
+/** Like useInView, but follows the element in and out of view. */
+export function useVisible<T extends Element>(): [React.RefObject<T>, boolean] {
+  const ref = useRef<T>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!ref.current) return;
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting));
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, []);
+  return [ref, visible];
+}
+
 export function downloadBytes(bytes: Uint8Array, path: string) {
   downloadBlob(new Blob([bytes]), basename(path));
 }

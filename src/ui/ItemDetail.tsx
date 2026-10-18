@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
-import { specialLayers } from '../entities/specials';
+import { availablePatterns, availableSherds, DYE, PATTERNED, POT_SIDES, specialLayers, type SpecialOptions } from '../entities/specials';
 import type { ItemEntry } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, texturePath } from '../models/resourceLocation';
@@ -29,9 +29,19 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
   const t = useT();
   const [context, setContext] = useState<DisplayContext>('gui');
   const sounds = useMemo(() => soundsForItem(soundEvents, item.id), [soundEvents, item.id]);
+  const patterned = item.models.find((m) => m.ref.special && PATTERNED.has(m.ref.special.type))?.ref.special;
+  const [options, setOptions] = useState<SpecialOptions>({});
+  useEffect(() => setOptions({}), [item.id]);
+  const opts = patterned ? options : undefined;
+  // pattern textures in use belong to the item's textures while previewed
+  const textures = useMemo(() => {
+    if (!patterned) return item.textures;
+    const extra = specialLayers(patterned, options)?.map((l) => l.texture) ?? [];
+    return [...new Set([...item.textures, ...extra])];
+  }, [item.textures, patterned, options]);
 
   const downloadRender = async () => {
-    const url = await itemThumbnail(store, item, 512);
+    const url = await itemThumbnail(store, item, 512, opts);
     if (url) downloadBlob(await (await fetch(url)).blob(), `${item.id.split(':')[1]}.png`);
   };
 
@@ -53,7 +63,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
 
       <div className="px-3">
         <div className="h-72">
-          <ItemViewer store={store} item={item} context={context} />
+          <ItemViewer store={store} item={item} context={context} options={opts} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1">
           {CONTEXTS.map((id) => (
@@ -73,9 +83,19 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
         </div>
       </div>
 
-      <Section title={t('items.textures', { count: item.textures.length })}>
+      {patterned?.type === 'decorated_pot' ? (
+        <Section title={t('items.sherds')}>
+          <SherdEditor store={store} value={options} onChange={setOptions} />
+        </Section>
+      ) : patterned ? (
+        <Section title={t('items.patterns')}>
+          <PatternEditor store={store} kind={patterned.type as 'banner' | 'shield'} value={options} onChange={setOptions} />
+        </Section>
+      ) : null}
+
+      <Section title={t('items.textures', { count: textures.length })}>
         <div className="flex flex-col gap-2">
-          {item.textures.map((t) => {
+          {textures.map((t) => {
             const path = texturePath(t);
             return (
               <div key={t} className="flex items-center gap-2">
@@ -98,7 +118,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
               </div>
             );
           })}
-          {item.textures.length === 0 && <div className="text-xs text-neutral-500">{t('items.noTextures')}</div>}
+          {textures.length === 0 && <div className="text-xs text-neutral-500">{t('items.noTextures')}</div>}
         </div>
       </Section>
 
@@ -130,6 +150,119 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+const COLORS = Object.keys(DYE);
+const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
+
+function ColorSelect({ value, onChange, none }: { value: string | undefined; onChange: (c: string | undefined) => void; none?: string }) {
+  const names = useApp((s) => s.names);
+  return (
+    <span className="flex items-center gap-1">
+      <span className="inline-block h-3 w-3 rounded-sm ring-1 ring-neutral-600" style={{ background: value ? hex(DYE[value]) : 'transparent' }} />
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)} className="rounded bg-neutral-800 px-1 py-0.5 text-xs">
+        {none && <option value="">{none}</option>}
+        {COLORS.map((c) => (
+          <option key={c} value={c}>
+            {names[`color.minecraft.${c}`] ?? c.replace(/_/g, ' ')}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/** Preview-only pattern layers for banners and shields (in game they come from item components). */
+function PatternEditor({ store, kind, value, onChange }: {
+  store: AssetStore;
+  kind: 'banner' | 'shield';
+  value: SpecialOptions;
+  onChange: (o: SpecialOptions) => void;
+}) {
+  const t = useT();
+  const names = useApp((s) => s.names);
+  const all = useMemo(() => availablePatterns(store.list(`assets/minecraft/textures/entity/${kind}/`), kind), [store, kind]);
+  const layers = value.patterns ?? [];
+  const setLayers = (patterns: NonNullable<SpecialOptions['patterns']>) => onChange({ ...value, patterns });
+  const update = (i: number, change: Partial<(typeof layers)[number]>) => setLayers(layers.map((x, j) => (j === i ? { ...x, ...change } : x)));
+  const move = (i: number, d: number) => {
+    const next = [...layers];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    setLayers(next);
+  };
+  const small = 'rounded bg-neutral-800 px-1.5 hover:bg-neutral-700 disabled:opacity-30';
+
+  return (
+    <div className="flex flex-col gap-2 text-xs">
+      <p className="text-neutral-400">{t('items.patternsInfo')}</p>
+      {kind === 'shield' && (
+        <label className="flex items-center gap-2">
+          <span className="text-neutral-400">{t('items.baseColor')}</span>
+          <ColorSelect value={value.baseColor} onChange={(baseColor) => onChange({ ...value, baseColor })} none={t('items.noBaseColor')} />
+        </label>
+      )}
+      {layers.map((l, i) => (
+        <div key={i} className="flex flex-wrap items-center gap-1.5" title={names[`block.minecraft.banner.${l.pattern}.${l.color}`]}>
+          <span className="w-4 text-right text-neutral-500">{i + 1}</span>
+          <select value={l.pattern} onChange={(e) => update(i, { pattern: e.target.value })} className="max-w-40 rounded bg-neutral-800 px-1 py-0.5">
+            {all.map((p) => (
+              <option key={p} value={p}>
+                {p.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+          <ColorSelect value={l.color} onChange={(color) => update(i, { color: color ?? 'white' })} />
+          <button className={small} disabled={i === 0} onClick={() => move(i, -1)} title={t('items.moveUp')}>
+            ↑
+          </button>
+          <button className={small} disabled={i === layers.length - 1} onClick={() => move(i, 1)} title={t('items.moveDown')}>
+            ↓
+          </button>
+          <button className={small} onClick={() => setLayers(layers.filter((_, j) => j !== i))} title={t('items.removePattern')}>
+            ✕
+          </button>
+        </div>
+      ))}
+      <div>
+        <Btn
+          onClick={() => setLayers([...layers, { pattern: all.includes('creeper') ? 'creeper' : all[0], color: 'black' }])}
+          disabled={all.length === 0 || layers.length >= 16}
+        >
+          {t('items.addPattern')}
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+/** Preview-only pottery sherds per side of a decorated pot. */
+function SherdEditor({ store, value, onChange }: { store: AssetStore; value: SpecialOptions; onChange: (o: SpecialOptions) => void }) {
+  const t = useT();
+  const names = useApp((s) => s.names);
+  const all = useMemo(() => availableSherds(store.list('assets/minecraft/textures/entity/decorated_pot/')), [store]);
+  const label = (p: string) => names[`item.minecraft.${p.replace(/_pattern$/, '_sherd')}`] ?? p.replace(/_/g, ' ');
+  return (
+    <div className="flex flex-col gap-2 text-xs">
+      <p className="text-neutral-400">{t('items.sherdsInfo')}</p>
+      {POT_SIDES.map((side) => (
+        <label key={side} className="flex items-center gap-2">
+          <span className="w-14 text-neutral-400">{t(`items.side.${side}`)}</span>
+          <select
+            value={value.sherds?.[side] ?? ''}
+            onChange={(e) => onChange({ ...value, sherds: { ...value.sherds, [side]: e.target.value || undefined } })}
+            className="max-w-56 rounded bg-neutral-800 px-1 py-0.5"
+          >
+            <option value="">{t('items.plainSide')}</option>
+            {all.map((p) => (
+              <option key={p} value={p}>
+                {label(p)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
     </div>
   );
 }

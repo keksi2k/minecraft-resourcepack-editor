@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
-import { specialLayers, type SpecialLayer } from '../entities/specials';
+import { specialLayers, type SpecialLayer, type SpecialOptions } from '../entities/specials';
 import type { ResolvedItemModel } from '../models/items';
 import {
   resolveFaceTexture,
@@ -234,12 +234,13 @@ export async function buildModelObject(
   store: AssetStore,
   { ref, model }: ResolvedItemModel,
   context: DisplayContext,
+  options?: SpecialOptions,
 ): Promise<THREE.Object3D> {
   const wrapper = new THREE.Group();
   let inner: THREE.Group;
   let display = context === 'none' ? undefined : model.display[context];
   const chain = chainMatrix(ref.transforms);
-  const special = ref.special && specialLayers(ref.special);
+  const special = ref.special && specialLayers(ref.special, options);
   if (special) {
     inner = await buildSpecial(store, special, chain);
   } else {
@@ -266,9 +267,10 @@ export async function buildItemObject(
   store: AssetStore,
   models: ResolvedItemModel[],
   context: DisplayContext,
+  options?: SpecialOptions,
 ): Promise<THREE.Group> {
   const root = new THREE.Group();
-  for (const m of models) root.add(await buildModelObject(store, m, context));
+  for (const m of models) root.add(await buildModelObject(store, m, context, options));
   return root;
 }
 

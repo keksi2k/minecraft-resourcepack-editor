@@ -4,9 +4,9 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { AssetStore } from '../assets/AssetStore';
 import { MOBS } from '../entities/catalog';
-import { specialLayers } from '../entities/specials';
+import { availablePatterns, availableSherds, specialLayers } from '../entities/specials';
 import { ENTITY_MODELS } from '../render/entityMesh';
-import { listItems } from '../models/items';
+import { listItems, resolveItemModels } from '../models/items';
 import { texturePath } from '../models/resourceLocation';
 
 const jarPath = process.env.MC_JAR;
@@ -47,6 +47,24 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
       layers.filter((l) => !ENTITY_MODELS[l.model] || !store.has(texturePath(l.texture))).map((l) => `${id}: ${l.model} ${l.texture}`),
     );
     expect(broken).toEqual([]);
+
+    // every special model in vanilla is drawn, in every display context
+    const unsupported = new Set<string>();
+    for (const item of items) {
+      for (const context of ['gui', 'thirdperson_righthand', 'ground'] as const) {
+        for (const m of resolveItemModels(store, item.id, context)) {
+          if (m.ref.special && !specialLayers(m.ref.special)) unsupported.add(m.ref.special.type);
+        }
+      }
+    }
+    expect([...unsupported]).toEqual([]);
+
+    // every pattern exists for banners and shields
+    const paths = store.list('assets/minecraft/textures/entity/');
+    const bannerPatterns = availablePatterns(paths, 'banner');
+    expect(bannerPatterns.length).toBeGreaterThan(30);
+    expect(availablePatterns(paths, 'shield')).toEqual(bannerPatterns);
+    expect(availableSherds(paths).length).toBeGreaterThan(15);
 
     const bed = items.find((i) => i.id === 'minecraft:red_bed')!;
     expect(bed.models.map((m) => m.ref.transforms?.length ?? 0)).toEqual([0, 1]);

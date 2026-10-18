@@ -1,15 +1,38 @@
-import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import type { ItemEntry } from '../models/items';
-import { itemThumbnail } from '../render/thumbnails';
+import { animateThumbnail, hasAnimatedTextures, itemThumbnail } from '../render/thumbnails';
 import { useLocale, useT } from '../i18n';
 import { useApp } from '../state/appStore';
-import { useInView } from './common';
+import { useInView, useVisible } from './common';
 import { ItemDetail } from './ItemDetail';
 
 type Filter = 'all' | 'changed' | 'edited';
 
 export function ItemThumb({ store, item, className = 'h-12 w-12' }: { store: AssetStore; item: ItemEntry; className?: string }) {
+  return hasAnimatedTextures(store, item) ? (
+    <AnimatedItemThumb store={store} item={item} className={className} />
+  ) : (
+    <StaticItemThumb store={store} item={item} className={className} />
+  );
+}
+
+/** Items with animated textures render live while they are on screen. */
+function AnimatedItemThumb({ store, item, className }: { store: AssetStore; item: ItemEntry; className: string }) {
+  const [ref, visible] = useVisible<HTMLDivElement>();
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!visible || !canvas.current) return;
+    return animateThumbnail(store, item, canvas.current);
+  }, [visible, store, item]);
+  return (
+    <div ref={ref} className={`flex items-center justify-center ${className}`}>
+      <canvas ref={canvas} className="pixelated h-full w-full object-contain" />
+    </div>
+  );
+}
+
+function StaticItemThumb({ store, item, className }: { store: AssetStore; item: ItemEntry; className: string }) {
   const [ref, inView] = useInView<HTMLDivElement>();
   const [url, setUrl] = useState<string>();
   useEffect(() => {

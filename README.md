@@ -8,8 +8,9 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 
 ## Features
 
-- **Every item** (~1650 in 26.3) with an inventory-style render: blocks isometric, flat items as sprites, tints (leaves, grass, potions …) like in game. Chests, banners, shields, heads and beds are drawn with their real models too, and animated textures (water, lava, fire, portals …) play in the 3D viewer and texture preview.
+- **Every item** (~1650 in 26.3) with an inventory-style render: blocks isometric, flat items as sprites, tints (leaves, grass, potions …) like in game. Chests, shulker boxes, banners, shields, heads, beds, decorated pots, conduits, tridents and copper golem statues are drawn with their real models too, and animated textures (water, lava, fire, portals …) play in the grid, the 3D viewer and the texture preview.
 - **3D viewer** for each item, orbitable, with the game's display contexts (inventory, 1st/3rd person hand, ground, item frame, head). Renders can be downloaded as PNG.
+- **Pattern preview** for banners and shields (pattern layers and colours) and pottery sherds for decorated pots, so you can check your pattern textures on the real model.
 - **61 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants and 23 babies) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on.
 - **Texture browser** for all ~4000 textures (blocks, items, entities, GUI …).
 - **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely.
@@ -97,7 +98,7 @@ The docs can be translated too: add `README.<code>.md` and `docs/INSTALLATION.<c
 | Rendering | `src/render/`: three.js with Minecraft's face shading. `item/generated` becomes an extruded 1 px sprite. Thumbnails use one shared offscreen renderer. |
 | Mobs | Mob models live in the game's Java code, not in packs. `scripts/DumpEntityModels.java` runs the game's model builders and writes the geometry to `src/entities/entityModels.json`. `catalog.ts` maps mobs to layers and textures. |
 | Sounds | Vanilla sounds live on `resources.download.minecraft.net`, which sends **no CORS** headers. `vite.config.ts` (dev) and `scripts/serve.mjs` (production) forward `/mcres/<hash>` there. A local `.minecraft/assets` folder works as an alternative. |
-| Special models | Item definitions describe chests, banners, shields and heads as `minecraft:special` models placed with a `transformation`. `src/entities/specials.ts` maps them to the game's model layers and textures. |
+| Special models | Item definitions describe chests, shulker boxes, banners, shields, heads, pots and more as `minecraft:special` models placed with a `transformation`. `src/entities/specials.ts` maps them to the game's model layers and textures, including banner/shield pattern layers and pot sherds. |
 | Autosave | `src/state/session.ts`: the original pack ZIP and your edits are kept in IndexedDB and offered for resuming on the start page. |
 | Languages | `src/i18n/`: messages per language, type-checked keys, plurals via `Intl.PluralRules`. Item and mob names come from Minecraft's language file (through the same proxy as sounds, falling back to English). |
 
@@ -122,8 +123,7 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 ## Limitations
 
 - Mobs are shown in a static pose without animation. Armour, saddles, collars, villager professions and mooshroom mushrooms are missing for now.
-- A few special models are still drawn as a cube with their particle texture (shulker boxes, decorated pots, conduits, copper golem statues …). Banner and shield patterns aren't shown yet.
-- Thumbnails in the grids show the first frame of animated textures; the 3D viewer and texture preview animate.
+- Banner patterns and pottery sherds are a preview only: in game they are stored on the item, so they aren't part of the exported pack (their textures are).
 - Dynamic item states (drawing a bow, compass …) show the resting state.
 - Matching sounds to items is a name heuristic, because Minecraft defines it in code.
 - Bedrock Edition is not supported.

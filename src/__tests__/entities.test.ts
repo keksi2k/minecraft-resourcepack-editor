@@ -51,10 +51,53 @@ describe('special models', () => {
     ]);
     expect(specialLayers({ type: 'head', kind: 'piglin' })?.[0]).toEqual({ model: 'minecraft:piglin_head#main', texture: 'minecraft:entity/piglin/piglin' });
     expect(specialLayers({ type: 'banner', color: 'red' })?.[2]).toMatchObject({ texture: 'minecraft:entity/banner/base', tint: 0xb02e26 });
-    expect(specialLayers({ type: 'decorated_pot' })).toBeUndefined();
-    for (const s of [{ type: 'chest' }, { type: 'shield' }, { type: 'banner' }, { type: 'player_head' }, { type: 'head', kind: 'dragon' }]) {
+    expect(specialLayers({ type: 'shulker_box', texture: 'minecraft:shulker_red' })?.[0].texture).toBe('minecraft:entity/shulker/shulker_red');
+    expect(specialLayers({ type: 'copper_golem_statue', pose: 'star', texture: 'minecraft:textures/entity/copper_golem/copper_golem_oxidized.png' })).toEqual([
+      { model: 'minecraft:copper_golem_star#main', texture: 'minecraft:entity/copper_golem/copper_golem_oxidized', rootPose: { y: 0, zRot: Math.PI } },
+    ]);
+    expect(specialLayers({ type: 'bell' })).toBeUndefined();
+    const all = [
+      { type: 'chest' }, { type: 'shield' }, { type: 'banner' }, { type: 'player_head' }, { type: 'head', kind: 'dragon' },
+      { type: 'shulker_box' }, { type: 'decorated_pot' }, { type: 'conduit' }, { type: 'trident' },
+      ...['standing', 'sitting', 'running', 'star'].map((pose) => ({ type: 'copper_golem_statue', pose, texture: 'minecraft:textures/entity/copper_golem/copper_golem.png' })),
+    ];
+    for (const s of all) {
       for (const l of specialLayers(s)!) expect(ENTITY_MODELS[l.model], l.model).toBeDefined();
     }
+  });
+
+  it('adds banner and shield pattern layers on top of the base colour', async () => {
+    const { specialLayers, availablePatterns } = await import('../entities/specials');
+    const patterns = [{ pattern: 'creeper', color: 'black' }, { pattern: 'border', color: 'red' }];
+    const banner = specialLayers({ type: 'banner', color: 'blue' }, { patterns })!;
+    expect(banner.slice(2).map((l) => [l.texture, l.tint])).toEqual([
+      ['minecraft:entity/banner/base', 0x3c44aa],
+      ['minecraft:entity/banner/creeper', 0x1d1d21],
+      ['minecraft:entity/banner/border', 0xb02e26],
+    ]);
+    // plain shield, then patterned shield: base plate texture changes and patterns only cover the plate
+    expect(specialLayers({ type: 'shield' })!.map((l) => l.texture)).toEqual(['minecraft:entity/shield/shield_base_nopattern']);
+    const shield = specialLayers({ type: 'shield' }, { patterns })!;
+    expect(shield[0].texture).toBe('minecraft:entity/shield/shield_base');
+    expect(shield.slice(1).map((l) => [l.texture, l.part])).toEqual([
+      ['minecraft:entity/shield/base', 'plate'],
+      ['minecraft:entity/shield/creeper', 'plate'],
+      ['minecraft:entity/shield/border', 'plate'],
+    ]);
+    expect(specialLayers({ type: 'shield' }, { baseColor: 'lime' })![1]).toMatchObject({ tint: 0x80c71f });
+    const files = ['base', 'banner_base', 'creeper', 'border', 'flow'].map((p) => `assets/minecraft/textures/entity/banner/${p}.png`);
+    expect(availablePatterns([...files, 'assets/minecraft/textures/entity/banner/x.png.mcmeta'], 'banner')).toEqual(['border', 'creeper', 'flow']);
+  });
+
+  it('puts pottery sherds on the matching pot sides', async () => {
+    const { specialLayers } = await import('../entities/specials');
+    const pot = specialLayers({ type: 'decorated_pot' }, { sherds: { back: 'skull_pottery_pattern' } })!;
+    expect(pot.slice(1).map((l) => [l.part, l.texture])).toEqual([
+      ['front', 'minecraft:entity/decorated_pot/decorated_pot_side'],
+      ['back', 'minecraft:entity/decorated_pot/skull_pottery_pattern'],
+      ['left', 'minecraft:entity/decorated_pot/decorated_pot_side'],
+      ['right', 'minecraft:entity/decorated_pot/decorated_pot_side'],
+    ]);
   });
 
   it('turns a transformation into a matrix (head: 180° about X, then moved to the block centre)', async () => {
