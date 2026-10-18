@@ -6,7 +6,9 @@ import { fetchAssetIndex, VanillaObjects } from '../mojang/soundAssets';
 import { fetchManifest, fetchVersionJson, type VersionJson, type VersionManifest } from '../mojang/versions';
 import { gameNames, listItems, type ItemEntry } from '../models/items';
 import { loadPackZip, type LoadedPack, type PackMeta } from '../pack/loadPack';
-import { clearSession, debounce, loadSession, loadSessionMeta, saveEdits, startSession, type SessionMeta } from './session';
+import { clearSession, debounce, loadSession, loadSessionMeta, saveEdits, saveFunny, startSession, type SessionMeta } from './session';
+import { computeFunny, type FunnySettings } from '../funny/funny';
+import type { FunnyRecord } from '../funny/record';
 import {
   addSoundToEvent,
   adoptEvent,
@@ -22,7 +24,7 @@ import {
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
 
-export type Tab = 'items' | 'mobs' | 'textures' | 'sounds';
+export type Tab = 'items' | 'mobs' | 'textures' | 'sounds' | 'funny';
 
 interface AppState {
   phase: 'start' | 'loading' | 'ready';
@@ -57,6 +59,8 @@ interface AppState {
   resumable?: SessionMeta;
   selectedItem?: string;
   selectedMob?: string;
+  /** The applied funny changes (shuffle, colours), if any. */
+  funny?: FunnyRecord;
 
   loadManifest(): Promise<void>;
   open(pack: LoadedPack | null, versionId: string, restoredEdits?: [string, Uint8Array | null][]): Promise<void>;
@@ -71,6 +75,10 @@ interface AppState {
   setSoundAttributes(eventId: string, ref: SoundFileRef, attrs: SoundAttributes): void;
   /** Copies an event's vanilla variants into the pack (replace: true) so they become editable. */
   adoptEvent(eventId: string): void;
+  /** Replaces any earlier funny changes with new ones computed from `settings`. */
+  applyFunny(settings: FunnySettings, onProgress?: (done: number, total: number) => void): Promise<void>;
+  /** Puts every file the funny changes touched back the way it was. */
+  removeFunny(): void;
   addLocalAssetsFolder(files: FileList): number;
   loadSounds(): Promise<void>;
   /** (Re)loads item/mob names for the current UI language. */
@@ -136,6 +144,7 @@ export const useApp = create<AppState>((set, get) => ({
         objects: undefined,
         vanillaSounds: undefined,
         resumable: undefined,
+        funny: undefined,
       });
       if (restoredEdits) {
         for (const [path, data] of restoredEdits) store.setEdit(path, data);
@@ -188,6 +197,7 @@ export const useApp = create<AppState>((set, get) => ({
     const pack = saved.zip ? await loadPackZip(saved.zip, saved.meta.packName) : null;
     if (pack) pack.name = saved.meta.packName;
     await get().open(pack, saved.meta.versionId, saved.edits);
+    if (saved.funny && get().store) set({ funny: saved.funny });
   },
 
   async discardSession() {
@@ -248,6 +258,39 @@ export const useApp = create<AppState>((set, get) => ({
     writeJson(jsonPath, adoptEvent(get().store!.json<SoundsJsonFile>(jsonPath) ?? {}, eventId, ev.files, ev.refs));
   },
 
+  async applyFunny(settings, onProgress) {
+    const store = get().store!;
+    restoreFiles(store, get().funny?.before ?? []);
+    set({ funny: undefined });
+    let result;
+    try {
+      const events = mergeSounds(get().vanillaSounds, packSoundFiles(store));
+      result = await computeFunny(store, events, settings, onProgress);
+    } catch (e) {
+      refreshDerived();
+      persistEdits();
+      void saveFunny(undefined);
+      throw e;
+    }
+    const before: FunnyRecord['before'] = [...result.changes.keys()].map((p) => [p, store.edits.has(p) ? store.edits.get(p)! : undefined]);
+    for (const [path, data] of result.changes) store.setEdit(path, data);
+    const funny: FunnyRecord = { settings, stats: result.stats, before };
+    set({ funny });
+    refreshDerived();
+    persistEdits();
+    void saveFunny(funny).catch((e) => console.warn('Could not save funny changes', e));
+  },
+
+  removeFunny() {
+    const store = get().store;
+    if (!store) return;
+    restoreFiles(store, get().funny?.before ?? []);
+    set({ funny: undefined });
+    refreshDerived();
+    persistEdits();
+    void saveFunny(undefined);
+  },
+
   addLocalAssetsFolder(files) {
     const objects = get().objects;
     if (!objects) return 0;
@@ -264,7 +307,7 @@ export const useApp = create<AppState>((set, get) => ({
     const icon = get().packIcon;
     if (icon) URL.revokeObjectURL(icon);
     void clearSession();
-    set({ phase: 'start', store: undefined, items: [], soundEvents: [], packIcon: undefined, selectedItem: undefined });
+    set({ phase: 'start', store: undefined, items: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, funny: undefined });
   },
 }));
 
@@ -290,6 +333,14 @@ function afterEdit(path: string) {
   useApp.setState(patch);
   if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
   persistEdits();
+}
+
+/** Puts files back to a recorded edit state (`undefined` = not edited). */
+function restoreFiles(store: AssetStore, before: FunnyRecord['before']) {
+  for (const [path, data] of before) {
+    if (data === undefined) store.clearEdit(path);
+    else store.setEdit(path, data);
+  }
 }
 
 /** Recomputes everything derived from the store (after restoring a session). */

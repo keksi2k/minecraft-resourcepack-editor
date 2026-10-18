@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useApp } from '../state/appStore';
 import { Header } from './Header';
+import { FunnyView } from './FunnyView';
 import { ItemsView } from './ItemsView';
 import { LoadScreen } from './LoadScreen';
 import { MobsView } from './MobsView';
@@ -22,6 +23,7 @@ export function App() {
         {tab === 'mobs' && <MobsView />}
         {tab === 'textures' && <TexturesView />}
         {tab === 'sounds' && <SoundsView />}
+        {tab === 'funny' && <FunnyView />}
       </main>
     </div>
   );

@@ -9,6 +9,7 @@ import { ENTITY_MODELS } from '../render/entityMesh';
 import type { ItemState } from '../models/itemDefinition';
 import { itemStateSwitches, listItems, resolveItemModels } from '../models/items';
 import { texturePath } from '../models/resourceLocation';
+import { textureGroups } from '../funny/shuffle';
 
 const jarPath = process.env.MC_JAR;
 
@@ -88,6 +89,23 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     const pull = itemStateSwitches(store, 'minecraft:bow', bowInUse)[1];
     expect(resolveItemModels(store, 'minecraft:bow', 'gui', { ...bowInUse, [pull.key]: pull.options.at(-1)!.value })[0].ref.model).toBe('minecraft:item/bow_pulling_2');
     expect(itemStateSwitches(store, 'minecraft:compass', {}).map((s) => s.property)).toEqual(['has_component', 'compass']);
+
+    // funny shuffle: textures only swap with ones of the same layout
+    const groups = textureGroups(store, { scopes: ['item', 'block', 'entity', 'gui'] });
+    const groupOf = (id: string) => groups.find((g) => g.includes(`assets/minecraft/textures/${id}.png`))?.map((p) => p.slice(26, -4)) ?? [];
+    expect(groupOf('entity/zombie/zombie')).toContain('entity/zombie/husk');
+    expect(groupOf('entity/zombie/zombie')).not.toContain('entity/zombie/zombie_baby');
+    expect(groupOf('entity/skeleton/skeleton')).toContain('entity/skeleton/stray');
+    expect(groupOf('entity/player/wide/steve')).toContain('entity/player/wide/alex');
+    expect(groupOf('entity/player/wide/steve')).not.toContain('entity/player/slim/alex');
+    expect(groupOf('entity/chest/normal')).toContain('entity/chest/christmas');
+    expect(groupOf('entity/chest/normal')).not.toContain('entity/chest/normal_left');
+    expect(groupOf('entity/horse/horse_white')).not.toContain('entity/horse/horse_white_baby');
+    expect(groupOf('entity/iron_golem/iron_golem')).toEqual([]);
+    expect(groupOf('block/water_still')).toContain('block/nether_portal');
+    expect(groupOf('block/water_still')).not.toContain('block/stone');
+    expect(groupOf('item/diamond_sword')).toContain('item/carrot');
+    console.log({ shuffleGroups: groups.length, shuffleTextures: groups.reduce((n, g) => n + g.length, 0) });
 
     // every pattern exists for banners and shields
     const paths = store.list('assets/minecraft/textures/entity/');

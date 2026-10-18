@@ -1,4 +1,5 @@
-import { del, get, setMany } from 'idb-keyval';
+import { del, get, set, setMany } from 'idb-keyval';
+import type { FunnyRecord } from '../funny/record';
 import type { PackMeta } from '../pack/loadPack';
 
 /**
@@ -14,12 +15,13 @@ export interface SessionMeta {
   savedAt: number;
 }
 
-const KEY = { meta: 'session:v1:meta', zip: 'session:v1:zip', edits: 'session:v1:edits' };
+const KEY = { meta: 'session:v1:meta', zip: 'session:v1:zip', edits: 'session:v1:edits', funny: 'session:v1:funny' };
 
 export interface StoredSession {
   meta: SessionMeta;
   zip?: Blob;
   edits: [string, Uint8Array | null][];
+  funny?: FunnyRecord;
 }
 
 export async function startSession(meta: SessionMeta, zip: Blob | undefined): Promise<void> {
@@ -38,6 +40,11 @@ export async function saveEdits(meta: SessionMeta, edits: Map<string, Uint8Array
   ]);
 }
 
+/** The applied funny changes and what the files were before, so they can be undone after a reload. */
+export async function saveFunny(record: FunnyRecord | undefined): Promise<void> {
+  await (record ? set(KEY.funny, record) : del(KEY.funny));
+}
+
 export function loadSessionMeta(): Promise<SessionMeta | undefined> {
   return get<SessionMeta>(KEY.meta).catch(() => undefined);
 }
@@ -45,8 +52,12 @@ export function loadSessionMeta(): Promise<SessionMeta | undefined> {
 export async function loadSession(): Promise<StoredSession | undefined> {
   const meta = await loadSessionMeta();
   if (!meta) return undefined;
-  const [zip, edits] = await Promise.all([get<Blob | null>(KEY.zip), get<[string, Uint8Array | null][]>(KEY.edits)]);
-  return { meta, zip: zip ?? undefined, edits: edits ?? [] };
+  const [zip, edits, funny] = await Promise.all([
+    get<Blob | null>(KEY.zip),
+    get<[string, Uint8Array | null][]>(KEY.edits),
+    get<FunnyRecord>(KEY.funny).catch(() => undefined),
+  ]);
+  return { meta, zip: zip ?? undefined, edits: edits ?? [], funny };
 }
 
 export async function clearSession(): Promise<void> {

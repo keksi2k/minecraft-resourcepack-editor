@@ -4,7 +4,7 @@ import { useT } from '../i18n';
 import { useApp, type Tab } from '../state/appStore';
 import { Btn, LanguageSelect } from './common';
 
-const TABS: Tab[] = ['items', 'mobs', 'textures', 'sounds'];
+const TABS: Tab[] = ['items', 'mobs', 'textures', 'sounds', 'funny'];
 
 export function Header() {
   const { packName, packMeta, packIcon, version, gameFormat, tab, setTab, store, close, revision } = useApp();
