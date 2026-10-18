@@ -1,4 +1,5 @@
 import type { AssetStore, Source } from '../assets/AssetStore';
+import { specialLayers } from '../entities/specials';
 import { legacyTints, resolveItemModel, type ModelRef } from './itemDefinition';
 import { modelTextures, resolveModel, type DisplayContext, type ResolvedModel } from './modelResolver';
 import { itemDefinitionPath, modelPath, parseRL, texturePath } from './resourceLocation';
@@ -47,7 +48,14 @@ const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 
 function buildEntry(store: AssetStore, id: string, defPath: string, lang: Record<string, string>): ItemEntry {
   const models = resolveItemModels(store, id);
-  const textures = [...new Set(models.flatMap((m) => modelTextures(m.model)))];
+  const textures = [
+    ...new Set(
+      models.flatMap((m) => {
+        const special = m.ref.special && specialLayers(m.ref.special);
+        return special ? special.map((l) => l.texture) : modelTextures(m.model);
+      }),
+    ),
+  ];
   const deps = [defPath, ...models.flatMap((m) => m.model.chain.map(modelPath))];
   for (const t of textures) deps.push(texturePath(t), `${texturePath(t)}.mcmeta`);
 

@@ -1,17 +1,19 @@
 # Minecraft Resource Pack Editor
 
+[![CI](https://github.com/keksi2k/minecraft-resourcepack-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/keksi2k/minecraft-resourcepack-editor/actions/workflows/ci.yml)
+
 [English](README.md) · **Deutsch**
 
 Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft. Pack laden, alle Items und Mobs in 3D ansehen, Sounds anhören, Texturen und Sounds herunterladen oder ersetzen, eigene Sounds hinzufügen und das Pack wieder als ZIP exportieren.
 
 ## Funktionen
 
-- **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel.
+- **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel. Truhen, Banner, Schilde, Köpfe und Betten werden ebenfalls mit ihren echten Modellen gezeichnet, und animierte Texturen (Wasser, Lava, Feuer, Portale …) laufen im 3D-Viewer und in der Texturvorschau.
 - **3D-Viewer** pro Item, drehbar, mit den Display-Ansichten des Spiels (Inventar, Hand 1st/3rd Person, Boden, Rahmen, Kopf). Render als PNG herunterladbar.
-- **38 Mobs in 3D** (Creeper, Zombie, Skelett, Spinne, Schwein, Kuh, Schaf, Fuchs, Axolotl, Spieler-Skins … inkl. Varianten) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört.
+- **61 Mobs in 3D** (Creeper, Zombie, Skelett, Spinne, Schwein, Kuh, Schaf, Fuchs, Axolotl, Spieler-Skins … inkl. Varianten und 23 Babys) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört.
 - **Texturen-Browser** für alle ~4000 Texturen (Blöcke, Items, Entities, GUI …).
-- **Sounds**: alle ~2000 Sound-Events durchsuchen und abspielen, einzelne Dateien ersetzen, **eigene Sounds zu Events hinzufügen** (z. B. weitere Schrittgeräusche) oder die Vanilla-Varianten komplett ersetzen.
-- **Bearbeiten ohne Risiko**: Jede Datei zeigt, ob sie aus Vanilla, dem Pack oder einer eigenen Änderung stammt. Änderungen lassen sich einzeln verwerfen oder auf Vanilla zurücksetzen.
+- **Sounds**: alle ~2000 Sound-Events durchsuchen und abspielen, einzelne Dateien ersetzen, **eigene Sounds zu Events hinzufügen** (z. B. weitere Schrittgeräusche), **Lautstärke und Tonhöhe pro Variante** einstellen oder die Vanilla-Varianten komplett ersetzen.
+- **Bearbeiten ohne Risiko**: Jede Datei zeigt, ob sie aus Vanilla, dem Pack oder einer eigenen Änderung stammt. Änderungen lassen sich einzeln verwerfen oder auf Vanilla zurücksetzen. Deine Arbeit wird **automatisch im Browser gespeichert**; nach einem Neuladen oder Absturz machst du dort weiter, wo du aufgehört hast.
 - **Export** als neues Pack-ZIP mit Originaldateien und Änderungen. Ohne Pack startest du mit „Neues Pack erstellen“ auf Vanilla-Basis.
 - **Mehrsprachig**: Oberfläche auf Deutsch und Englisch, umschaltbar oben rechts. Item- und Mob-Namen kommen aus Minecrafts eigenen Sprachdateien (z. B. „Diamantschwert“). Weitere Sprachen lassen sich leicht ergänzen (siehe [Sprachen](#sprachen)).
 - **Privat**: Dein Pack verlässt den Rechner nicht. Die Vanilla-Dateien kommen direkt von Mojangs Servern und werden pro Version im Browser gespeichert.
@@ -95,6 +97,8 @@ Auch die Doku lässt sich übersetzen: `README.<code>.md` und `docs/INSTALLATION
 | Rendering | `src/render/`: three.js mit Minecraft-Flächenschattierung. `item/generated` wird zum extrudierten 1-px-Sprite. Thumbnails laufen über einen geteilten Offscreen-Renderer. |
 | Mobs | Mob-Modelle stehen im Java-Code des Spiels, nicht im Pack. `scripts/DumpEntityModels.java` lässt die Modell-Builder des Spiels laufen und schreibt die Geometrie nach `src/entities/entityModels.json`. `catalog.ts` ordnet Mobs Layer und Texturen zu. |
 | Sounds | Vanilla-Sounds liegen auf `resources.download.minecraft.net`, das **kein CORS** sendet. `vite.config.ts` (Dev) und `scripts/serve.mjs` (Produktion) leiten `/mcres/<hash>` dorthin weiter. Alternativ geht ein lokaler `.minecraft/assets`-Ordner. |
+| Spezialmodelle | Item-Definitionen beschreiben Truhen, Banner, Schilde und Köpfe als `minecraft:special`-Modelle, die per `transformation` platziert werden. `src/entities/specials.ts` ordnet sie den Modell-Layern und Texturen des Spiels zu. |
+| Automatisch speichern | `src/state/session.ts`: Das Original-ZIP und deine Änderungen liegen in IndexedDB und werden auf der Startseite zum Fortsetzen angeboten. |
 | Sprachen | `src/i18n/`: Texte pro Sprache, typgeprüfte Schlüssel, Plurale über `Intl.PluralRules`. Item- und Mob-Namen kommen aus Minecrafts Sprachdatei (über denselben Proxy wie die Sounds, mit Englisch als Rückfall). |
 
 ## Entwicklung
@@ -107,6 +111,8 @@ npm run serve     # dist/ inkl. Sound-Proxy ausliefern (Port 8080)
 npm run package   # Release-ZIP nach release/
 ```
 
+Jeder Push prüft Typen, Tests und Build auf Node 20 und 22 (siehe [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) und lässt den Resolver-Test gegen die echte client.jar laufen. Einmal pro Woche läuft derselbe Test gegen die neueste Minecraft-Version, damit Spiel-Updates, die etwas kaputtmachen, früh auffallen.
+
 Den Resolver gegen eine echte client.jar prüfen:
 
 ```sh
@@ -116,8 +122,8 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 ## Grenzen
 
 - Mobs stehen in einer statischen Pose ohne Animation. Rüstung, Sattel, Halsband, Villager-Berufe und Mooshroom-Pilze fehlen noch.
-- Spezialmodelle, die das Spiel per Code zeichnet (Truhen, Banner, Köpfe, Schilde, Shulkerboxen, Betten …), erscheinen als Würfel mit Partikeltextur.
-- Animierte Texturen zeigen nur den ersten Frame.
+- Einige Spezialmodelle erscheinen noch als Würfel mit Partikeltextur (Shulkerboxen, verzierte Krüge, Aquisitoren, Kupfergolem-Statuen …). Banner- und Schildmuster werden noch nicht angezeigt.
+- Vorschaubilder in den Grids zeigen das erste Bild animierter Texturen; 3D-Viewer und Texturvorschau sind animiert.
 - Dynamische Item-Zustände (Bogen spannen, Kompass …) zeigen den Ruhezustand.
 - Die Zuordnung Item ↔ Sounds ist eine Namensheuristik, weil Minecraft sie im Code festlegt.
 - Bedrock Edition wird nicht unterstützt.

@@ -12,6 +12,8 @@ export interface LoadedPack {
   name: string;
   files: Map<string, Uint8Array>;
   meta?: PackMeta;
+  /** The original ZIP, kept for restoring the session after a reload. */
+  source?: Blob;
 }
 
 /** Packs are often zipped with an enclosing folder; find the folder that holds pack.mcmeta / assets. */
@@ -52,7 +54,7 @@ export function parsePackMeta(bytes: Uint8Array | undefined): PackMeta | undefin
   }
 }
 
-export async function loadPackZip(file: File): Promise<LoadedPack> {
+export async function loadPackZip(file: Blob, name = file instanceof File ? file.name : 'pack'): Promise<LoadedPack> {
   const zip = await JSZip.loadAsync(file);
   const entries = Object.values(zip.files).filter((f) => !f.dir && !f.name.startsWith('__MACOSX/'));
   const root = findPackRoot(entries.map((e) => e.name));
@@ -62,5 +64,5 @@ export async function loadPackZip(file: File): Promise<LoadedPack> {
       .filter((e) => e.name.startsWith(root))
       .map(async (e) => files.set(e.name.slice(root.length), await e.async('uint8array'))),
   );
-  return { name: file.name.replace(/\.zip$/i, ''), files, meta: parsePackMeta(files.get('pack.mcmeta')) };
+  return { name: name.replace(/\.zip$/i, ''), files, meta: parsePackMeta(files.get('pack.mcmeta')), source: file };
 }

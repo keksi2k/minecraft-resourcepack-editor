@@ -271,6 +271,7 @@ Browsers may only load data from other servers if those servers allow it with CO
 3. **Open pack:** the first time per version, the browser downloads the client.jar (~40 MB). Depending on your connection that takes 10–60 seconds. After that it's in browser storage and starting takes only seconds.
 4. Without a pack of your own: **“Create new pack”** starts with an empty pack on top of vanilla.
 5. **Language:** switch between English and German at the top right. On first start the browser's language is used.
+6. **Autosave:** your changes are saved in the browser as you go. If you reload the page or the browser crashes, the start page offers *“Continue”*. *“Close”* in the header discards the session, so export first.
 
 Colour meaning: **blue frame/“Pack”** = changed by the loaded pack, **orange/“Edited”** = changed by you, **“Vanilla”** = original.
 
@@ -296,7 +297,7 @@ Tip: if the pack is already in the folder, `F3 + T` in game reloads it after you
   npm run build   # if you use serve
   ```
 
-> Unsaved changes in the app are lost when the page reloads. Export your pack before updating.
+> Changes are saved in the browser and survive a reload, but they're bound to that browser and its address (e.g. `127.0.0.1:8080`). Export your pack before updating to be safe.
 
 ## 10. Generating mob models for a new Minecraft version
 

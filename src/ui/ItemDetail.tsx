@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
+import { specialLayers } from '../entities/specials';
 import type { ItemEntry } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, texturePath } from '../models/resourceLocation';
@@ -107,8 +108,8 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           {item.models.map(({ ref, model }, i) => (
             <div key={i} className="rounded bg-neutral-900 p-2">
               <div className="mb-1 text-xs">
-                {t(`items.kind.${model.kind}`)}
-                {ref.special && <span className="text-neutral-400"> ({ref.special})</span>}
+                {ref.special && specialLayers(ref.special) ? t('items.kind.special') : t(`items.kind.${model.kind}`)}
+                {ref.special && <span className="text-neutral-400"> ({ref.special.type})</span>}
               </div>
               {model.chain.map((m) => (
                 <FileRow key={m} store={store} path={modelPath(m)} label={m} />

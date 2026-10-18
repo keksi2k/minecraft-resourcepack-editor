@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
+import { specialLayers, type SpecialLayer } from '../entities/specials';
 import type { ResolvedItemModel } from '../models/items';
 import {
   resolveFaceTexture,
@@ -10,7 +11,9 @@ import {
   type ResolvedModel,
   type Vec3,
 } from '../models/modelResolver';
+import { buildLayerMesh } from './entityMesh';
 import { loadTexture, threeTexture, type TexInfo } from './textures';
+import { chainMatrix } from './transformation';
 
 /** Minecraft's fixed per-face shading (no dynamic lights needed for the classic look). */
 const SHADE: Record<FaceDir, number> = { up: 1, down: 0.5, north: 0.8, south: 0.8, east: 0.6, west: 0.6 };
@@ -210,6 +213,23 @@ export function applyDisplay(obj: THREE.Object3D, t: DisplayTransform | undefine
   obj.scale.set(sx, sy, sz);
 }
 
+const HALF = new THREE.Matrix4().makeTranslation(0.5, 0.5, 0.5);
+const MINUS_HALF = new THREE.Matrix4().makeTranslation(-0.5, -0.5, -0.5);
+
+/** Special models are drawn by code from entity model layers, placed with the item's `transformation`. */
+async function buildSpecial(store: AssetStore, layers: SpecialLayer[], chain: THREE.Matrix4): Promise<THREE.Group> {
+  // item space is 0..1 around the block; the layers are in pixels
+  const outer = chain.clone().multiply(new THREE.Matrix4().makeScale(1 / 16, 1 / 16, 1 / 16));
+  const group = new THREE.Group();
+  group.matrixAutoUpdate = false;
+  group.matrix.copy(MINUS_HALF.clone().multiply(outer));
+  for (let i = 0; i < layers.length; i++) {
+    const mesh = await buildLayerMesh(store, layers[i], i, outer);
+    if (mesh) group.add(mesh);
+  }
+  return group;
+}
+
 export async function buildModelObject(
   store: AssetStore,
   { ref, model }: ResolvedItemModel,
@@ -218,13 +238,24 @@ export async function buildModelObject(
   const wrapper = new THREE.Group();
   let inner: THREE.Group;
   let display = context === 'none' ? undefined : model.display[context];
-  if (model.kind === 'generated') {
-    inner = await buildGenerated(store, model.layers, ref.tints);
-  } else if (model.kind === 'elements') {
-    inner = await buildElements(store, model, ref.tints);
+  const chain = chainMatrix(ref.transforms);
+  const special = ref.special && specialLayers(ref.special);
+  if (special) {
+    inner = await buildSpecial(store, special, chain);
   } else {
-    inner = await buildElements(store, placeholderModel(model), []);
-    if (context === 'gui' && !display) display = DEFAULT_BLOCK_GUI;
+    if (model.kind === 'generated') {
+      inner = await buildGenerated(store, model.layers, ref.tints);
+    } else if (model.kind === 'elements') {
+      inner = await buildElements(store, model, ref.tints);
+    } else {
+      inner = await buildElements(store, placeholderModel(model), []);
+      if (context === 'gui' && !display) display = DEFAULT_BLOCK_GUI;
+    }
+    if (ref.transforms?.length) {
+      // Geometry is centred on the origin; transformations apply in 0..1 block space.
+      inner.matrixAutoUpdate = false;
+      inner.matrix.copy(MINUS_HALF.clone().multiply(chain).multiply(HALF));
+    }
   }
   wrapper.add(inner);
   applyDisplay(wrapper, display);

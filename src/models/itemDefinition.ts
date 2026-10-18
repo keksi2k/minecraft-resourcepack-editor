@@ -1,12 +1,34 @@
 import type { DisplayContext } from './modelResolver';
 import { normalizeRL } from './resourceLocation';
 
+/**
+ * Minecraft's `transformation` on item model nodes: either a 4×4 matrix (16 numbers, row-major)
+ * or translation · left_rotation · scale · right_rotation, rotations as quaternions [x, y, z, w]
+ * or axis-angle objects.
+ */
+export type TransformationJson =
+  | number[]
+  | {
+      translation?: number[];
+      left_rotation?: number[] | { axis: number[]; angle: number };
+      scale?: number[];
+      right_rotation?: number[] | { axis: number[]; angle: number };
+    };
+
+/** A `minecraft:special` model: rendered by code in-game (chests, banners, heads, shields …). */
+export interface SpecialModel {
+  /** e.g. `chest`, `head`, `banner`, `shield` (namespace stripped). */
+  type: string;
+  [key: string]: unknown;
+}
+
 /** One model to draw for an item, with the tint colour per `tintindex`. */
 export interface ModelRef {
   model: string;
   tints: number[];
-  /** Set for `minecraft:special` models (chests, banners, heads …) that are rendered by code in-game. */
-  special?: string;
+  special?: SpecialModel;
+  /** Transformations of the enclosing nodes, outermost first. */
+  transforms?: TransformationJson[];
 }
 
 type Json = Record<string, any>;
@@ -41,37 +63,51 @@ export function tintColor(tint: Json): number {
   }
 }
 
-const stripNs = (t: unknown) => (typeof t === 'string' ? t.replace(/^minecraft:/, '') : '');
+export const stripNs = (t: unknown) => (typeof t === 'string' ? t.replace(/^minecraft:/, '') : '');
 
 /**
  * Picks the models to show for an item definition (assets/<ns>/items/<id>.json, 1.21.4+).
  * Dynamic switches (conditions, selects, ranges) fall back to their resting state;
  * `display_context` selects honour the requested context so e.g. the trident shows its GUI icon.
  */
-export function resolveItemModel(node: Json | undefined, context: DisplayContext = 'gui'): ModelRef[] {
+export function resolveItemModel(
+  node: Json | undefined,
+  context: DisplayContext = 'gui',
+  inherited: TransformationJson[] = [],
+): ModelRef[] {
   if (!node || typeof node !== 'object') return [];
+  const transforms = node.transformation ? [...inherited, node.transformation as TransformationJson] : inherited;
+  const withTransforms = (ref: ModelRef): ModelRef => (transforms.length ? { ...ref, transforms } : ref);
+  const child = (n: Json | undefined) => resolveItemModel(n, context, transforms);
+
   switch (stripNs(node.type)) {
     case 'model':
       return typeof node.model === 'string'
-        ? [{ model: normalizeRL(node.model), tints: (node.tints ?? []).map(tintColor) }]
+        ? [withTransforms({ model: normalizeRL(node.model), tints: (node.tints ?? []).map(tintColor) })]
         : [];
     case 'composite':
-      return (node.models ?? []).flatMap((m: Json) => resolveItemModel(m, context));
+      return (node.models ?? []).flatMap((m: Json) => child(m));
     case 'condition':
-      return resolveItemModel(node.on_false ?? node.on_true, context);
+      return child(node.on_false ?? node.on_true);
     case 'select': {
       const cases: Json[] = node.cases ?? [];
       if (stripNs(node.property) === 'display_context') {
         const hit = cases.find((c) => [c.when].flat().includes(context));
-        if (hit) return resolveItemModel(hit.model, context);
+        if (hit) return child(hit.model);
       }
-      return resolveItemModel(node.fallback ?? cases[0]?.model, context);
+      return child(node.fallback ?? cases[0]?.model);
     }
     case 'range_dispatch':
-      return resolveItemModel(node.fallback ?? node.entries?.[0]?.model, context);
+      return child(node.fallback ?? node.entries?.[0]?.model);
     case 'special':
       return typeof node.base === 'string'
-        ? [{ model: normalizeRL(node.base), tints: [], special: stripNs(node.model?.type) || 'special' }]
+        ? [
+            withTransforms({
+              model: normalizeRL(node.base),
+              tints: [],
+              special: { ...(node.model ?? {}), type: stripNs(node.model?.type) || 'special' },
+            }),
+          ]
         : [];
     default:
       // empty, bundle/selected_item, unknown

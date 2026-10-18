@@ -53,7 +53,11 @@ export function Header() {
         ))}
       </nav>
       <div className="ml-auto flex items-center gap-2">
-        {edits > 0 && <span className="text-xs text-amber-400">{t('header.edits', { count: edits })}</span>}
+        {edits > 0 && (
+          <span className="text-xs text-amber-400" title={t('header.autosaved')}>
+            ✓ {t('header.edits', { count: edits })}
+          </span>
+        )}
         <LanguageSelect />
         <Btn tone="primary" onClick={() => void doExport()} disabled={exporting}>
           {exporting ? t('header.exporting') : t('header.export')}

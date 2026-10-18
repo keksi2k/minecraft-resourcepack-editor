@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { suggestVersion } from '../mojang/versions';
 import { loadPackZip, type LoadedPack } from '../pack/loadPack';
-import { useT } from '../i18n';
+import { useLocale, useT } from '../i18n';
 import { useApp } from '../state/appStore';
 import { Btn, LanguageSelect } from './common';
 
 export function LoadScreen() {
-  const { manifest, phase, status, progress, error, open } = useApp();
+  const { manifest, phase, status, progress, error, open, resumable, resume, discardSession } = useApp();
   const t = useT();
+  const locale = useLocale((s) => s.locale);
   const [pack, setPack] = useState<LoadedPack | null>(null);
   const [packError, setPackError] = useState<string>();
   const [versionId, setVersionId] = useState('');
@@ -57,6 +58,26 @@ export function LoadScreen() {
         <LanguageSelect />
       </div>
       <p className="text-sm text-neutral-400">{t('app.tagline')}</p>
+
+      {resumable && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-800 bg-emerald-950/60 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">{t('load.resumeTitle')}</div>
+            <div className="text-xs text-neutral-300">
+              {t('load.resumeInfo', {
+                name: resumable.packName,
+                version: resumable.versionId,
+                edits: t('header.edits', { count: resumable.editCount }),
+                date: new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(resumable.savedAt),
+              })}
+            </div>
+          </div>
+          <Btn tone="primary" disabled={!manifest} onClick={() => void resume()}>
+            {t('load.resume')}
+          </Btn>
+          <Btn onClick={() => void discardSession()}>{t('load.discardSession')}</Btn>
+        </div>
+      )}
 
       <label
         onDragOver={(e) => {

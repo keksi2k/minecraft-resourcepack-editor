@@ -11,6 +11,62 @@ export function soundsJsonPath(eventId: string): string {
   return `assets/${parseRL(eventId).ns}/sounds.json`;
 }
 
+/** Whether a sounds.json entry (written relative to the event's namespace) refers to `soundName`. */
+function sameSound(e: SoundEntry, eventId: string, soundName: string): boolean {
+  const n = entryName(e);
+  return n === soundName || `${parseRL(eventId).ns}:${n}` === soundName || n === parseRL(soundName).path;
+}
+
+export interface SoundAttributes {
+  volume?: number;
+  pitch?: number;
+}
+
+/**
+ * Sets volume/pitch of a sound entry. Entries become `{ name, volume, pitch }` objects when needed
+ * and plain strings again once every attribute is back at its default (1).
+ */
+export function setSoundAttributes(json: SoundsJsonFile, eventId: string, soundName: string, attrs: SoundAttributes): SoundsJsonFile {
+  const key = parseRL(eventId).path;
+  const ev = json[key];
+  if (!ev) return json;
+  const sounds = (ev.sounds ?? []).map((e) => {
+    if (typeof e !== 'string' && e.type === 'event') return e;
+    if (!sameSound(e, eventId, soundName)) return e;
+    const obj: Record<string, unknown> = typeof e === 'string' ? { name: e } : { ...e };
+    for (const k of ['volume', 'pitch'] as const) {
+      if (!(k in attrs)) continue;
+      const v = attrs[k];
+      if (v === undefined || v === 1) delete obj[k];
+      else obj[k] = v;
+    }
+    return Object.keys(obj).length === 1 ? (obj.name as string) : (obj as SoundEntry);
+  });
+  return { ...json, [key]: { ...ev, sounds } };
+}
+
+/**
+ * Copies the event's current variants into the pack with `replace: true`, so vanilla variants can be
+ * edited (a pack can't change vanilla entries otherwise). Keeps the variants' volume and pitch.
+ */
+export function adoptEvent(
+  json: SoundsJsonFile,
+  eventId: string,
+  files: { name: string; volume?: number; pitch?: number }[],
+  eventRefs: string[] = [],
+): SoundsJsonFile {
+  const key = parseRL(eventId).path;
+  const ev = json[key] ?? {};
+  const sounds: SoundEntry[] = files.map((f) => {
+    const obj: Record<string, unknown> = { name: f.name };
+    if (f.volume !== undefined && f.volume !== 1) obj.volume = f.volume;
+    if (f.pitch !== undefined && f.pitch !== 1) obj.pitch = f.pitch;
+    return Object.keys(obj).length === 1 ? f.name : (obj as SoundEntry);
+  });
+  for (const r of eventRefs) sounds.push({ name: r, type: 'event' });
+  return { ...json, [key]: { ...ev, replace: true, sounds } };
+}
+
 /** Appends a sound file to an event in a pack's sounds.json (returns a new object). */
 export function addSoundToEvent(json: SoundsJsonFile, eventId: string, soundName: string): SoundsJsonFile {
   const key = parseRL(eventId).path;
@@ -23,12 +79,7 @@ export function removeSoundFromEvent(json: SoundsJsonFile, eventId: string, soun
   const key = parseRL(eventId).path;
   const ev = json[key];
   if (!ev) return json;
-  const { ns } = parseRL(eventId);
-  const matches = (e: SoundEntry) => {
-    const n = entryName(e);
-    return n === soundName || `${ns}:${n}` === soundName || n === parseRL(soundName).path;
-  };
-  const sounds = (ev.sounds ?? []).filter((e) => !matches(e));
+  const sounds = (ev.sounds ?? []).filter((e) => !sameSound(e, eventId, soundName));
   const out = { ...json };
   if (sounds.length === 0 && !ev.replace && !ev.subtitle) delete out[key];
   else out[key] = { ...ev, sounds };

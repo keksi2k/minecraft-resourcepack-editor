@@ -3,13 +3,16 @@
 //
 //   node scripts/fetch-minecraft.mjs            -> latest release
 //   node scripts/fetch-minecraft.mjs 26.3
+//   node scripts/fetch-minecraft.mjs 26.3 --jar-only   -> client.jar only (enough for the vanilla test)
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 const manifest = await (await fetch('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')).json();
-const id = process.argv[2] ?? manifest.latest.release;
+const args = process.argv.slice(2);
+const jarOnly = args.includes('--jar-only');
+const id = args.find((a) => !a.startsWith('--')) ?? manifest.latest.release;
 const entry = manifest.versions.find((v) => v.id === id);
 if (!entry) {
   console.error(`Unknown version "${id}". Latest release: ${manifest.latest.release}`);
@@ -34,7 +37,7 @@ console.log(`client.jar ${id} (${(client.size / 1048576).toFixed(1)} MB) …`);
 await download(client.url, client.sha1, join(dir, 'client.jar'));
 
 // Natives (rules) and LWJGL aren't needed to build model geometry.
-const libs = version.libraries.filter((l) => l.downloads?.artifact && !l.rules && !l.name.startsWith('org.lwjgl'));
+const libs = jarOnly ? [] : version.libraries.filter((l) => l.downloads?.artifact && !l.rules && !l.name.startsWith('org.lwjgl'));
 let n = 0;
 for (const l of libs) {
   const a = l.downloads.artifact;

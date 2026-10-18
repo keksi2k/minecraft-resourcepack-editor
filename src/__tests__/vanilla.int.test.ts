@@ -4,6 +4,8 @@ import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { AssetStore } from '../assets/AssetStore';
 import { MOBS } from '../entities/catalog';
+import { specialLayers } from '../entities/specials';
+import { ENTITY_MODELS } from '../render/entityMesh';
 import { listItems } from '../models/items';
 import { texturePath } from '../models/resourceLocation';
 
@@ -36,5 +38,17 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
 
     const mobTextures = MOBS.flatMap((m) => m.layers.map((l) => l.texture)).filter((t) => !store.has(texturePath(t)));
     expect(mobTextures).toEqual([]);
+
+    // supported special models must reference existing layers and textures
+    const specials = items.flatMap((i) => i.models.filter((m) => m.ref.special && specialLayers(m.ref.special)).map((m) => ({ id: i.id, layers: specialLayers(m.ref.special!)! })));
+    console.log({ supportedSpecials: specials.length });
+    expect(specials.length).toBeGreaterThan(30);
+    const broken = specials.flatMap(({ id, layers }) =>
+      layers.filter((l) => !ENTITY_MODELS[l.model] || !store.has(texturePath(l.texture))).map((l) => `${id}: ${l.model} ${l.texture}`),
+    );
+    expect(broken).toEqual([]);
+
+    const bed = items.find((i) => i.id === 'minecraft:red_bed')!;
+    expect(bed.models.map((m) => m.ref.transforms?.length ?? 0)).toEqual([0, 1]);
   }, 120_000);
 });

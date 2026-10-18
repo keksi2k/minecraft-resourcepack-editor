@@ -79,35 +79,61 @@ function shade(n: THREE.Vector3): number {
   return Math.min(1, n.x * n.x * 0.6 + n.y * n.y * ((3 + n.y) / 4) + n.z * n.z * 0.8);
 }
 
-export async function buildMobObject(store: AssetStore, mob: MobDef): Promise<THREE.Group> {
-  // Entity space is y-down with the feet at y = 24 and the face towards -z;
-  // flip it into world space so the mob stands on y = 0 looking at +z.
-  const root = new THREE.Group();
-  root.scale.set(1 / 16, -1 / 16, -1 / 16);
-  root.position.y = 1.5;
+export interface LayerSpec {
+  model: string;
+  texture: string;
+  tint?: number;
+  emissive?: boolean;
+}
 
+/**
+ * Mesh for one model layer in its own (pixel) space. `outer` is the transform the mesh will be
+ * placed under; shading is computed for normals as they end up after it, like in game.
+ */
+export async function buildLayerMesh(
+  store: AssetStore,
+  layer: LayerSpec,
+  index: number,
+  outer: THREE.Matrix4,
+  pose?: MobDef['pose'],
+): Promise<THREE.Mesh | undefined> {
+  const model = ENTITY_MODELS[layer.model];
+  if (!model) return undefined;
+  const tex = await loadTexture(store, layer.texture);
+  const outerNormal = new THREE.Matrix3().getNormalMatrix(outer);
+  const batch = new MeshBatch();
+  walk(model.root, new THREE.Matrix4(), '', pose, ({ verts, uvs, normal }) => {
+    const s = layer.emissive ? 1 : shade(normal.clone().applyMatrix3(outerNormal).normalize());
+    // Minecraft's quad order (0,1,2,3) is the reverse of MeshBatch's corner order.
+    const order = [0, 3, 2, 1];
+    batch.quad(
+      order.map((i) => verts[i]),
+      order.map((i) => [uvs[i][0], 1 - uvs[i][1]] as [number, number]),
+      vertexColor(s, layer.tint ?? 0xffffff),
+    );
+  });
+  const mesh = batch.toMesh(tex, THREE.FrontSide, index);
+  if (layer.emissive) {
+    const mat = mesh.material as THREE.MeshBasicMaterial;
+    mat.blending = THREE.AdditiveBlending;
+    mat.transparent = true;
+    mat.depthWrite = false;
+  }
+  mesh.renderOrder = index;
+  return mesh;
+}
+
+/** Entity space is y-down with the feet at y = 24 and the face towards -z. */
+const MOB_ROOT = new THREE.Matrix4().makeTranslation(0, 1.5, 0).multiply(new THREE.Matrix4().makeScale(1 / 16, -1 / 16, -1 / 16));
+
+export async function buildMobObject(store: AssetStore, mob: MobDef): Promise<THREE.Group> {
+  // Flip into world space so the mob stands on y = 0 looking at +z.
+  const root = new THREE.Group();
+  root.matrixAutoUpdate = false;
+  root.matrix.copy(MOB_ROOT);
   for (let li = 0; li < mob.layers.length; li++) {
-    const layer = mob.layers[li];
-    const model = ENTITY_MODELS[layer.model];
-    if (!model) continue;
-    const tex = await loadTexture(store, layer.texture);
-    const batch = new MeshBatch();
-    walk(model.root, new THREE.Matrix4(), '', mob.pose, ({ verts, uvs, normal }) => {
-      // Model-space y/z are flipped by the root transform, so flip the normal the same way for shading.
-      const s = layer.emissive ? 1 : shade(new THREE.Vector3(normal.x, -normal.y, -normal.z));
-      // Minecraft's quad order (0,1,2,3) is the reverse of MeshBatch's corner order.
-      const order = [0, 3, 2, 1];
-      batch.quad(order.map((i) => verts[i]), order.map((i) => [uvs[i][0], 1 - uvs[i][1]] as [number, number]), vertexColor(s, 0xffffff));
-    });
-    const mesh = batch.toMesh(tex, THREE.FrontSide, li);
-    if (layer.emissive) {
-      const mat = mesh.material as THREE.MeshBasicMaterial;
-      mat.blending = THREE.AdditiveBlending;
-      mat.transparent = true;
-      mat.depthWrite = false;
-    }
-    mesh.renderOrder = li;
-    root.add(mesh);
+    const mesh = await buildLayerMesh(store, mob.layers[li], li, MOB_ROOT, mob.pose);
+    if (mesh) root.add(mesh);
   }
   const wrapper = new THREE.Group();
   wrapper.add(root);

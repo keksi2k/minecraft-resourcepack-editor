@@ -5,10 +5,14 @@ import { loadVanillaAssets } from '../mojang/clientJar';
 import { fetchAssetIndex, VanillaObjects } from '../mojang/soundAssets';
 import { fetchManifest, fetchVersionJson, type VersionJson, type VersionManifest } from '../mojang/versions';
 import { gameNames, listItems, type ItemEntry } from '../models/items';
-import type { LoadedPack, PackMeta } from '../pack/loadPack';
+import { loadPackZip, type LoadedPack, type PackMeta } from '../pack/loadPack';
+import { clearSession, debounce, loadSession, loadSessionMeta, saveEdits, startSession, type SessionMeta } from './session';
 import {
   addSoundToEvent,
+  adoptEvent,
   inspectOgg,
+  setSoundAttributes,
+  type SoundAttributes,
   newSoundName,
   removeSoundFromEvent,
   setEventReplace,
@@ -49,17 +53,24 @@ interface AppState {
   soundsError?: string;
 
   tab: Tab;
+  /** A saved session from before a reload, offered on the start screen. */
+  resumable?: SessionMeta;
   selectedItem?: string;
   selectedMob?: string;
 
   loadManifest(): Promise<void>;
-  open(pack: LoadedPack | null, versionId: string): Promise<void>;
+  open(pack: LoadedPack | null, versionId: string, restoredEdits?: [string, Uint8Array | null][]): Promise<void>;
+  resume(): Promise<void>;
+  discardSession(): Promise<void>;
   setFile(path: string, data: Uint8Array | null): void;
   resetFile(path: string): void;
   /** Adds an uploaded .ogg as a new variant of a sound event. Returns a warning, if any. */
   addEventSound(eventId: string, file: File): Promise<string | undefined>;
   removeEventSound(eventId: string, ref: SoundFileRef): void;
   setEventReplace(eventId: string, replace: boolean): void;
+  setSoundAttributes(eventId: string, ref: SoundFileRef, attrs: SoundAttributes): void;
+  /** Copies an event's vanilla variants into the pack (replace: true) so they become editable. */
+  adoptEvent(eventId: string): void;
   addLocalAssetsFolder(files: FileList): number;
   loadSounds(): Promise<void>;
   /** (Re)loads item/mob names for the current UI language. */
@@ -90,6 +101,7 @@ export const useApp = create<AppState>((set, get) => ({
   tab: 'items',
 
   async loadManifest() {
+    void loadSessionMeta().then((resumable) => set({ resumable }));
     try {
       set({ manifest: await fetchManifest() });
     } catch (e) {
@@ -97,7 +109,7 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
-  async open(pack, versionId) {
+  async open(pack, versionId, restoredEdits) {
     const entry = get().manifest?.versions.find((v) => v.id === versionId);
     if (!entry) return set({ error: t('load.unknownVersion', { version: versionId }) });
     set({ phase: 'loading', error: undefined, status: t('load.statusVersionInfo'), progress: undefined });
@@ -123,7 +135,14 @@ export const useApp = create<AppState>((set, get) => ({
         soundEvents: [],
         objects: undefined,
         vanillaSounds: undefined,
+        resumable: undefined,
       });
+      if (restoredEdits) {
+        for (const [path, data] of restoredEdits) store.setEdit(path, data);
+        refreshDerived();
+      } else {
+        void startSession(sessionMeta(), pack?.source).catch((e) => console.warn('Could not save session', e));
+      }
       void get().loadSounds();
     } catch (e) {
       console.error(e);
@@ -161,6 +180,19 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().store !== store) return;
     const names = gameNames(store, translated);
     set({ names, items: listItems(store, names) });
+  },
+
+  async resume() {
+    const saved = await loadSession();
+    if (!saved) return set({ resumable: undefined });
+    const pack = saved.zip ? await loadPackZip(saved.zip, saved.meta.packName) : null;
+    if (pack) pack.name = saved.meta.packName;
+    await get().open(pack, saved.meta.versionId, saved.edits);
+  },
+
+  async discardSession() {
+    await clearSession();
+    set({ resumable: undefined });
   },
 
   setFile(path, data) {
@@ -204,6 +236,18 @@ export const useApp = create<AppState>((set, get) => ({
     writeJson(jsonPath, setEventReplace(get().store!.json<SoundsJsonFile>(jsonPath) ?? {}, eventId, replace));
   },
 
+  setSoundAttributes(eventId, ref, attrs) {
+    const jsonPath = soundsJsonPath(eventId);
+    writeJson(jsonPath, setSoundAttributes(get().store!.json<SoundsJsonFile>(jsonPath) ?? {}, eventId, ref.name, attrs));
+  },
+
+  adoptEvent(eventId) {
+    const ev = get().soundEvents.find((e) => e.id === eventId);
+    if (!ev) return;
+    const jsonPath = soundsJsonPath(eventId);
+    writeJson(jsonPath, adoptEvent(get().store!.json<SoundsJsonFile>(jsonPath) ?? {}, eventId, ev.files, ev.refs));
+  },
+
   addLocalAssetsFolder(files) {
     const objects = get().objects;
     if (!objects) return 0;
@@ -219,6 +263,7 @@ export const useApp = create<AppState>((set, get) => ({
   close() {
     const icon = get().packIcon;
     if (icon) URL.revokeObjectURL(icon);
+    void clearSession();
     set({ phase: 'start', store: undefined, items: [], soundEvents: [], packIcon: undefined, selectedItem: undefined });
   },
 }));
@@ -227,6 +272,16 @@ function writeJson(path: string, json: unknown) {
   useApp.getState().setFile(path, new TextEncoder().encode(JSON.stringify(json, null, 2)));
 }
 
+function sessionMeta(): SessionMeta {
+  const s = useApp.getState();
+  return { versionId: s.version!.id, packName: s.packName, packMeta: s.packMeta, editCount: s.store?.editCount ?? 0, savedAt: Date.now() };
+}
+
+const persistEdits = debounce(() => {
+  const { store, phase } = useApp.getState();
+  if (store && phase === 'ready') void saveEdits(sessionMeta(), store.edits).catch((e) => console.warn('Could not save edits', e));
+}, 400);
+
 function afterEdit(path: string) {
   const { store, vanillaSounds, revision } = useApp.getState();
   if (!store) return;
@@ -234,6 +289,14 @@ function afterEdit(path: string) {
   if (path.endsWith('sounds.json')) patch.soundEvents = mergeSounds(vanillaSounds, packSoundFiles(store));
   useApp.setState(patch);
   if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
+  persistEdits();
+}
+
+/** Recomputes everything derived from the store (after restoring a session). */
+function refreshDerived() {
+  const { store, vanillaSounds, revision, names } = useApp.getState();
+  if (!store) return;
+  useApp.setState({ revision: revision + 1, items: listItems(store, names), soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
 }
 
 // Item and mob names follow the UI language.

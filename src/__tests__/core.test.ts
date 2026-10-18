@@ -82,7 +82,7 @@ describe('item definitions', () => {
     };
     expect(resolveItemModel(def)).toEqual([
       { model: 'minecraft:item/bow', tints: [] },
-      { model: 'minecraft:item/chest', tints: [], special: 'chest' },
+      { model: 'minecraft:item/chest', tints: [], special: { type: 'chest', texture: 'minecraft:normal' } },
     ]);
   });
   it('honours display_context selects', () => {
@@ -95,6 +95,13 @@ describe('item definitions', () => {
     expect(resolveItemModel(def, 'gui')[0].model).toBe('minecraft:item/trident');
     expect(resolveItemModel(def, 'firstperson_righthand')[0].model).toBe('minecraft:item/trident_in_hand');
   });
+  it('collects transformations from outer to inner nodes', () => {
+    const t1 = { translation: [0, 0, 1] };
+    const t2 = { scale: [2, 2, 2] };
+    const def = { type: 'composite', transformation: t1, models: [{ type: 'model', model: 'block/a' }, { type: 'model', model: 'block/b', transformation: t2 }] };
+    expect(resolveItemModel(def).map((r) => r.transforms)).toEqual([[t1], [t1, t2]]);
+  });
+
   it('decodes tint colours', () => {
     expect(colorValue(-12012264)).toBe(0x48b518);
     expect(colorValue([1, 0, 0.5])).toBe(0xff0080);

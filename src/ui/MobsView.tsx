@@ -17,7 +17,8 @@ const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 /** Mob name from Minecraft's language files (in the UI language), plus the translated variant. */
 export function mobName(names: Record<string, string>, mob: MobDef, t: TFunction): string {
   const base = names[`entity.minecraft.${mob.entity}`] ?? (mob.entity === 'player' ? t('mobs.player') : mob.entity.replace(/_/g, ' '));
-  return mob.variant ? `${base} (${t(`mobs.variant.${mob.variant}`)})` : base;
+  const extras = [mob.variant && t(`mobs.variant.${mob.variant}`), mob.babyOf && t('mobs.baby')].filter(Boolean);
+  return extras.length ? `${base} (${extras.join(', ')})` : base;
 }
 
 function mobSource(store: AssetStore, mob: MobDef): Source {
@@ -52,15 +53,16 @@ export function MobsView() {
   const { store, revision, names, selectedMob, selectMob } = useApp();
   const t = useT();
   const [query, setQuery] = useState('');
+  const [babies, setBabies] = useState(true);
   const q = useDeferredValue(query.trim().toLowerCase());
   const mobs = useMemo(
     () =>
       store
-        ? MOBS.map((m) => ({ mob: m, name: mobName(names, m, t), source: mobSource(store, m) })).filter(
-            (m) => !q || m.name.toLowerCase().includes(q) || m.mob.id.includes(q),
-          )
+        ? MOBS.filter((m) => babies || !m.babyOf)
+            .map((m) => ({ mob: m, name: mobName(names, m, t), source: mobSource(store, m) }))
+            .filter((m) => !q || m.name.toLowerCase().includes(q) || m.mob.id.includes(q))
         : [],
-    [store, revision, q, names, t],
+    [store, revision, q, names, t, babies],
   );
   const current = MOBS.find((m) => m.id === selectedMob);
   if (!store) return null;
@@ -75,6 +77,10 @@ export function MobsView() {
             placeholder={t('mobs.search')}
             className="w-64 rounded bg-neutral-800 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
           />
+          <label className="flex items-center gap-1 text-xs">
+            <input type="checkbox" checked={babies} onChange={(e) => setBabies(e.target.checked)} />
+            {t('mobs.showBabies')}
+          </label>
           <span className="ml-auto text-xs text-neutral-500">{t('mobs.count', { count: mobs.length })}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">

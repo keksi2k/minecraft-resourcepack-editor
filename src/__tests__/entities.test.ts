@@ -42,3 +42,26 @@ describe('UV rects', () => {
     }
   });
 });
+
+describe('special models', () => {
+  it('maps special item models to layers and textures', async () => {
+    const { specialLayers } = await import('../entities/specials');
+    expect(specialLayers({ type: 'chest', texture: 'minecraft:trapped' })).toEqual([
+      { model: 'minecraft:chest#main', texture: 'minecraft:entity/chest/trapped' },
+    ]);
+    expect(specialLayers({ type: 'head', kind: 'piglin' })?.[0]).toEqual({ model: 'minecraft:piglin_head#main', texture: 'minecraft:entity/piglin/piglin' });
+    expect(specialLayers({ type: 'banner', color: 'red' })?.[2]).toMatchObject({ texture: 'minecraft:entity/banner/base', tint: 0xb02e26 });
+    expect(specialLayers({ type: 'decorated_pot' })).toBeUndefined();
+    for (const s of [{ type: 'chest' }, { type: 'shield' }, { type: 'banner' }, { type: 'player_head' }, { type: 'head', kind: 'dragon' }]) {
+      for (const l of specialLayers(s)!) expect(ENTITY_MODELS[l.model], l.model).toBeDefined();
+    }
+  });
+
+  it('turns a transformation into a matrix (head: 180° about X, then moved to the block centre)', async () => {
+    const THREE = await import('three');
+    const { transformationMatrix } = await import('../render/transformation');
+    const m = transformationMatrix({ left_rotation: [1, 0, 0, 0], translation: [0.5, 0, 0.5] });
+    const p = new THREE.Vector3(0, -1, 0).applyMatrix4(m);
+    expect([p.x, p.y, p.z].map((v) => Math.round(v * 1000) / 1000)).toEqual([0.5, 1, 0.5]);
+  });
+});

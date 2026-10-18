@@ -1,7 +1,9 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import { mobsForTexture } from '../entities/catalog';
 import { useT } from '../i18n';
+import { drawAnimationFrame, subscribeTicks } from '../render/animation';
+import { loadTexture } from '../render/textures';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { mobName } from './MobsView';
@@ -9,7 +11,45 @@ import { UVOverlay } from './UVOverlay';
 
 const PAGE = 400;
 
+/** Plays an animated texture (with a .mcmeta) on a canvas, in step with the shared tick clock. */
+function AnimatedThumb({ store, path, className }: { store: AssetStore; path: string; className: string }) {
+  const [ref, inView] = useInView<HTMLDivElement>();
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const rev = `${store.rev(path)}.${store.rev(`${path}.mcmeta`)}`;
+  useEffect(() => {
+    if (!inView) return;
+    const m = TEXTURE.exec(path);
+    if (!m) return;
+    let stop = () => {};
+    let alive = true;
+    void loadTexture(store, `${m[1]}:${m[2]}`).then((info) => {
+      const c = canvas.current;
+      if (!alive || !c) return;
+      c.width = info.width;
+      c.height = info.height;
+      const ctx = c.getContext('2d')!;
+      if (!info.animation || !info.sheet) return ctx.drawImage(info.canvas, 0, 0);
+      const { animation, sheet } = info;
+      stop = subscribeTicks((ticks) => drawAnimationFrame(ctx, sheet, animation, ticks));
+    });
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, [inView, store, path, rev]);
+  return (
+    <div ref={ref} className={`flex items-center justify-center overflow-hidden ${className}`}>
+      <canvas ref={canvas} className="pixelated h-full w-full object-contain" />
+    </div>
+  );
+}
+
 export function TextureThumb({ store, path, className = 'h-12 w-12' }: { store: AssetStore; path: string; className?: string }) {
+  if (store.has(`${path}.mcmeta`)) return <AnimatedThumb store={store} path={path} className={className} />;
+  return <StaticThumb store={store} path={path} className={className} />;
+}
+
+function StaticThumb({ store, path, className }: { store: AssetStore; path: string; className: string }) {
   const [ref, inView] = useInView<HTMLDivElement>();
   const [url, setUrl] = useState<string>();
   const bytes = inView ? store.get(path) : undefined;

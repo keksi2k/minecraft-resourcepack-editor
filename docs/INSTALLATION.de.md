@@ -271,6 +271,7 @@ Browser dürfen Daten von fremden Servern nur laden, wenn diese es per CORS-Head
 3. **Pack öffnen:** Beim ersten Mal pro Version lädt der Browser die client.jar (~40 MB). Das dauert je nach Leitung 10–60 Sekunden. Danach liegt sie im Browser-Speicher und der Start dauert nur noch Sekunden.
 4. Ohne eigenes Pack: **„Neues Pack erstellen“** startet mit einem leeren Pack auf Vanilla-Basis.
 5. **Sprache:** Oben rechts lässt sich zwischen Deutsch und Englisch wechseln. Beim ersten Start gilt die Sprache des Browsers.
+6. **Automatisch speichern:** Deine Änderungen werden laufend im Browser gespeichert. Lädst du die Seite neu oder stürzt der Browser ab, bietet die Startseite *„Fortsetzen“* an. *„Schließen“* in der Kopfzeile verwirft die Sitzung, also vorher exportieren.
 
 Bedeutung der Farben: **blauer Rahmen/„Pack“** = vom geladenen Pack verändert, **orange/„Bearbeitet“** = von dir geändert, **„Vanilla“** = Original.
 
@@ -296,7 +297,7 @@ Tipp: Liegt das Pack schon im Ordner, reicht im Spiel `F3 + T` zum Neuladen, nac
   npm run build   # falls du mit serve arbeitest
   ```
 
-> Ungespeicherte Änderungen in der App gehen beim Neuladen der Seite verloren. Exportiere dein Pack, bevor du aktualisierst.
+> Änderungen werden im Browser gespeichert und überstehen ein Neuladen, sind aber an diesen Browser und die Adresse (z. B. `127.0.0.1:8080`) gebunden. Exportiere dein Pack sicherheitshalber, bevor du aktualisierst.
 
 ## 10. Mob-Modelle für eine neue Minecraft-Version erzeugen
 

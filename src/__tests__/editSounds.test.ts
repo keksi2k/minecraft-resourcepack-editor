@@ -74,3 +74,29 @@ describe('inspectOgg', () => {
     expect(inspectOgg(new Uint8Array(100))).toMatch(/Not an Ogg/);
   });
 });
+
+describe('volume and pitch', () => {
+  it('turns entries into objects and back to plain strings at the defaults', async () => {
+    const { setSoundAttributes } = await import('../sounds/editSounds');
+    let json = addSoundToEvent({}, EV, 'custom/a');
+    json = setSoundAttributes(json, EV, 'minecraft:custom/a', { volume: 0.5 });
+    json = setSoundAttributes(json, EV, 'minecraft:custom/a', { pitch: 1.5 });
+    expect(json['entity.zombie_villager.step'].sounds).toEqual([{ name: 'custom/a', volume: 0.5, pitch: 1.5 }]);
+    json = setSoundAttributes(json, EV, 'minecraft:custom/a', { volume: undefined, pitch: 1 });
+    expect(json['entity.zombie_villager.step'].sounds).toEqual(['custom/a']);
+  });
+
+  it('adopts vanilla variants with replace: true, keeping their attributes and event references', async () => {
+    const { adoptEvent } = await import('../sounds/editSounds');
+    const json = adoptEvent({ other: { sounds: ['x'] } }, EV, [{ name: 'minecraft:mob/zombie/step1' }, { name: 'minecraft:mob/zombie/step2', volume: 0.8 }], ['minecraft:some.event']);
+    expect(json[ 'entity.zombie_villager.step']).toEqual({
+      replace: true,
+      sounds: ['minecraft:mob/zombie/step1', { name: 'minecraft:mob/zombie/step2', volume: 0.8 }, { name: 'minecraft:some.event', type: 'event' }],
+    });
+    const [ev] = mergeSounds({ 'entity.zombie_villager.step': { sounds: ['mob/zombie/step1', { name: 'mob/zombie/step2', volume: 0.8 }] } }, { minecraft: json }).filter((e) => e.id === EV);
+    expect(ev.files.map((f) => [f.name, f.volume, !!f.fromPack])).toEqual([
+      ['minecraft:mob/zombie/step1', undefined, true],
+      ['minecraft:mob/zombie/step2', 0.8, true],
+    ]);
+  });
+});

@@ -2,7 +2,7 @@ import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import type { ItemEntry } from '../models/items';
 import { itemThumbnail } from '../render/thumbnails';
-import { useT } from '../i18n';
+import { useLocale, useT } from '../i18n';
 import { useApp } from '../state/appStore';
 import { useInView } from './common';
 import { ItemDetail } from './ItemDetail';
@@ -55,18 +55,24 @@ const Tile = memo(function Tile({ store, item, selected, onSelect }: {
 export function ItemsView() {
   const { store, items, selectedItem, select } = useApp();
   const t = useT();
+  const locale = useLocale((s) => s.locale);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const q = useDeferredValue(query.trim().toLowerCase());
 
+  // Sorted by the displayed (translated) name, so the grid reads alphabetically in every language.
+  const sorted = useMemo(() => {
+    const collator = new Intl.Collator(locale);
+    return [...items].sort((a, b) => collator.compare(a.name, b.name));
+  }, [items, locale]);
   const visible = useMemo(
     () =>
-      items.filter(
+      sorted.filter(
         (i) =>
           (filter === 'all' || (filter === 'changed' ? i.source !== 'vanilla' : i.source === 'edited')) &&
           (!q || i.name.toLowerCase().includes(q) || i.id.includes(q)),
       ),
-    [items, q, filter],
+    [sorted, q, filter],
   );
   const current = items.find((i) => i.id === selectedItem);
   const counts = useMemo(

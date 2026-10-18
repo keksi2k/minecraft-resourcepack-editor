@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # weekly check against the newest Minecraft release
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run package
+      - name: Check that the release server starts
+        run: |
+          cd "$(mktemp -d)"
+          unzip -q "$GITHUB_WORKSPACE"/release/*.zip
+          node */serve.mjs --port 8099 &
+          sleep 1
+          curl -fsS -o /dev/null http://127.0.0.1:8099/
+          kill %1
+      - uses: actions/upload-artifact@v4
+        if: matrix.node == 22
+        with:
+          name: release-zip
+          path: release/*.zip
+
+  vanilla:
+    name: Resolve every vanilla item (${{ github.event_name == 'schedule' && 'latest release' || '26.3' }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Pushes test the version the mob models were generated from; the weekly run tries the newest release.
+      - run: node scripts/fetch-minecraft.mjs ${{ github.event_name == 'schedule' && '' || '26.3' }} --jar-only
+      - run: echo "MC_JAR=$(ls .mc/*/client.jar | head -1)" >> "$GITHUB_ENV"
+      - run: npx vitest run vanilla

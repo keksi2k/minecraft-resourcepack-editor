@@ -1,17 +1,19 @@
 # Minecraft Resource Pack Editor
 
+[![CI](https://github.com/keksi2k/minecraft-resourcepack-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/keksi2k/minecraft-resourcepack-editor/actions/workflows/ci.yml)
+
 **English** · [Deutsch](README.de.md)
 
 A browser-based editor for **Minecraft Java Edition resource packs**. Load a pack, view every item and mob in 3D, listen to sounds, download or replace textures and sounds, add your own sounds, and export the pack as a ZIP again.
 
 ## Features
 
-- **Every item** (~1650 in 26.3) with an inventory-style render: blocks isometric, flat items as sprites, tints (leaves, grass, potions …) like in game.
+- **Every item** (~1650 in 26.3) with an inventory-style render: blocks isometric, flat items as sprites, tints (leaves, grass, potions …) like in game. Chests, banners, shields, heads and beds are drawn with their real models too, and animated textures (water, lava, fire, portals …) play in the 3D viewer and texture preview.
 - **3D viewer** for each item, orbitable, with the game's display contexts (inventory, 1st/3rd person hand, ground, item frame, head). Renders can be downloaded as PNG.
-- **38 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on.
+- **61 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants and 23 babies) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on.
 - **Texture browser** for all ~4000 textures (blocks, items, entities, GUI …).
-- **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants) or replace the vanilla variants entirely.
-- **Safe editing**: every file shows whether it comes from vanilla, the pack or your own change. Changes can be discarded one by one or reset to vanilla.
+- **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely.
+- **Safe editing**: every file shows whether it comes from vanilla, the pack or your own change. Changes can be discarded one by one or reset to vanilla. Your work is **saved automatically** in the browser; after a reload or crash you can continue where you left off.
 - **Export** as a new pack ZIP with the original files plus your changes. Without a pack, “Create new pack” starts from vanilla.
 - **Multilingual**: the interface is available in English and German (switch at the top right). Item and mob names come from Minecraft's own language files. More languages are easy to add (see [Languages](#languages)).
 - **Private**: your pack never leaves your computer. Vanilla files come straight from Mojang's servers and are cached in the browser per version.
@@ -95,6 +97,8 @@ The docs can be translated too: add `README.<code>.md` and `docs/INSTALLATION.<c
 | Rendering | `src/render/`: three.js with Minecraft's face shading. `item/generated` becomes an extruded 1 px sprite. Thumbnails use one shared offscreen renderer. |
 | Mobs | Mob models live in the game's Java code, not in packs. `scripts/DumpEntityModels.java` runs the game's model builders and writes the geometry to `src/entities/entityModels.json`. `catalog.ts` maps mobs to layers and textures. |
 | Sounds | Vanilla sounds live on `resources.download.minecraft.net`, which sends **no CORS** headers. `vite.config.ts` (dev) and `scripts/serve.mjs` (production) forward `/mcres/<hash>` there. A local `.minecraft/assets` folder works as an alternative. |
+| Special models | Item definitions describe chests, banners, shields and heads as `minecraft:special` models placed with a `transformation`. `src/entities/specials.ts` maps them to the game's model layers and textures. |
+| Autosave | `src/state/session.ts`: the original pack ZIP and your edits are kept in IndexedDB and offered for resuming on the start page. |
 | Languages | `src/i18n/`: messages per language, type-checked keys, plurals via `Intl.PluralRules`. Item and mob names come from Minecraft's language file (through the same proxy as sounds, falling back to English). |
 
 ## Development
@@ -107,6 +111,8 @@ npm run serve     # serve dist/ including the sound proxy (port 8080)
 npm run package   # release ZIP to release/
 ```
 
+Every push runs type check, tests and build on Node 20 and 22 (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)), plus the resolver test against the real client.jar. Once a week the same test runs against the newest Minecraft release, so breaking game updates show up early.
+
 Check the resolver against a real client.jar:
 
 ```sh
@@ -116,8 +122,8 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 ## Limitations
 
 - Mobs are shown in a static pose without animation. Armour, saddles, collars, villager professions and mooshroom mushrooms are missing for now.
-- Special models the game draws in code (chests, banners, heads, shields, shulker boxes, beds …) appear as a cube with their particle texture.
-- Animated textures show only the first frame.
+- A few special models are still drawn as a cube with their particle texture (shulker boxes, decorated pots, conduits, copper golem statues …). Banner and shield patterns aren't shown yet.
+- Thumbnails in the grids show the first frame of animated textures; the 3D viewer and texture preview animate.
 - Dynamic item states (drawing a bow, compass …) show the resting state.
 - Matching sounds to items is a name heuristic, because Minecraft defines it in code.
 - Bedrock Edition is not supported.

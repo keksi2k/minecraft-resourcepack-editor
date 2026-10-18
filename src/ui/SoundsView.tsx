@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { Source } from '../assets/AssetStore';
 import { getResourcesBase, setResourcesBase } from '../mojang/soundAssets';
 import { playSound } from '../sounds/player';
@@ -16,10 +16,10 @@ function useSoundFile(ref: SoundFileRef) {
   return { source, load, vanillaAvailable: !!objects?.has(ref.key) };
 }
 
-async function play(load: () => Promise<Uint8Array | undefined>, volume?: number) {
+async function play(load: () => Promise<Uint8Array | undefined>, volume?: number, pitch?: number) {
   try {
     const bytes = await load();
-    if (bytes) await playSound(bytes, volume ?? 1);
+    if (bytes) await playSound(bytes, volume ?? 1, pitch ?? 1);
   } catch (e) {
     alert(translate('sounds.playFailed', { error: (e as Error).message }));
   }
@@ -27,17 +27,19 @@ async function play(load: () => Promise<Uint8Array | undefined>, volume?: number
 
 function SoundFileRow({ file, eventId }: { file: SoundFileRef; eventId: string }) {
   const { source, load, vanillaAvailable } = useSoundFile(file);
-  const { removeEventSound, store, objects } = useApp();
+  const { removeEventSound, setSoundAttributes, store, objects } = useApp();
   const t = useT();
   // Files added through "+ Add sound" exist only as edits; "Remove" deletes file and entry together.
   const addedHere = !!file.fromPack && !store?.pack.has(file.path) && !objects?.has(file.key);
   useApp((s) => s.revision); // re-render after edits
   return (
     <div className="flex items-center gap-2 py-0.5 pl-6">
-      <Btn onClick={() => void play(load, file.volume)} disabled={!source} title={t('sounds.play')}>▶</Btn>
+      <Btn onClick={() => void play(load, file.volume, file.pitch)} disabled={!source} title={t('sounds.play')}>▶</Btn>
       <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={file.path}>
         {file.name}
       </span>
+      <AttributeInput label={t('sounds.volume')} title={t('sounds.volumeTitle')} value={file.volume} min={0} max={10} editable={!!file.fromPack} onCommit={(volume) => setSoundAttributes(eventId, file, { volume })} />
+      <AttributeInput label={t('sounds.pitch')} title={t('sounds.pitchTitle')} value={file.pitch} min={0.5} max={2} editable={!!file.fromPack} onCommit={(pitch) => setSoundAttributes(eventId, file, { pitch })} />
       <SourceBadge source={source} />
       <AssetActions path={file.path} source={source} load={load} kind="sound" vanillaAvailable={vanillaAvailable} allowDiscard={!addedHere} />
       {file.fromPack && (
@@ -49,10 +51,47 @@ function SoundFileRow({ file, eventId }: { file: SoundFileRef; eventId: string }
   );
 }
 
+/** Number field for volume/pitch that commits on blur or Enter (not on every keystroke). */
+function AttributeInput({ label, title, value, min, max, editable, onCommit }: {
+  label: string;
+  title: string;
+  value: number | undefined;
+  min: number;
+  max: number;
+  editable: boolean;
+  onCommit: (v: number | undefined) => void;
+}) {
+  const [draft, setDraft] = useState(String(value ?? 1));
+  useEffect(() => setDraft(String(value ?? 1)), [value]);
+  const commit = () => {
+    const n = Number(draft.replace(',', '.'));
+    if (!Number.isFinite(n)) return setDraft(String(value ?? 1));
+    const v = Math.round(Math.max(min, Math.min(max, n)) * 100) / 100;
+    setDraft(String(v));
+    if (v !== (value ?? 1)) onCommit(v === 1 ? undefined : v);
+  };
+  if (!editable && (value ?? 1) === 1) return <span className="w-[74px]" />;
+  return (
+    <label className="flex w-[74px] items-center gap-1 text-[10px] text-neutral-400" title={title}>
+      {label}
+      <input
+        value={draft}
+        disabled={!editable}
+        inputMode="decimal"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        className="w-10 rounded bg-neutral-800 px-1 py-0.5 text-right text-[11px] text-neutral-100 disabled:bg-transparent disabled:text-neutral-400"
+      />
+    </label>
+  );
+}
+
 export function SoundEventRow({ event, compact }: { event: SoundEvent; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
-  const { store, objects, addEventSound, setEventReplace } = useApp();
+  const { store, objects, addEventSound, setEventReplace, adoptEvent } = useApp();
+  const hasVanillaVariants = event.files.some((f) => !f.fromPack);
   const t = useT();
   const add = async () => {
     const file = await pickFile('audio/ogg,.ogg');
@@ -66,7 +105,7 @@ export function SoundEventRow({ event, compact }: { event: SoundEvent; compact?:
   };
   const playRandom = () => {
     const f = event.files[Math.floor(Math.random() * event.files.length)];
-    if (f) void play(async () => store?.get(f.path) ?? objects?.fetch(f.key), f.volume);
+    if (f) void play(async () => store?.get(f.path) ?? objects?.fetch(f.key), f.volume, f.pitch);
   };
   return (
     <div className={compact ? '' : 'border-b border-neutral-800/60'}>
@@ -95,6 +134,11 @@ export function SoundEventRow({ event, compact }: { event: SoundEvent; compact?:
               <input type="checkbox" checked={!!event.replaced} onChange={(e) => setEventReplace(event.id, e.target.checked)} />
               {t('sounds.replaceVanilla')}
             </label>
+            {hasVanillaVariants && (
+              <Btn onClick={() => adoptEvent(event.id)} title={t('sounds.adoptTitle')}>
+                {t('sounds.adopt')}
+              </Btn>
+            )}
           </div>
           {notice && (
             <div className={`ml-6 mt-1 rounded px-2 py-1 text-[11px] ${notice.error ? 'bg-red-950 text-red-200' : 'bg-neutral-800 text-neutral-300'}`}>
