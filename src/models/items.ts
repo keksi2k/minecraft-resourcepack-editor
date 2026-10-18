@@ -1,6 +1,6 @@
 import type { AssetStore, Source } from '../assets/AssetStore';
 import { specialLayers } from '../entities/specials';
-import { legacyTints, resolveItemModel, type ModelRef } from './itemDefinition';
+import { allItemModels, legacyTints, resolveItemModel, type ItemState, type ModelRef, type StateSwitch } from './itemDefinition';
 import { modelTextures, resolveModel, type DisplayContext, type ResolvedModel } from './modelResolver';
 import { itemDefinitionPath, modelPath, parseRL, texturePath } from './resourceLocation';
 
@@ -17,7 +17,7 @@ export interface ItemEntry {
   models: ResolvedItemModel[];
   /** Texture ids drawn by the item's (GUI) models. */
   textures: string[];
-  /** Every file the item's appearance depends on. */
+  /** Every file the item's appearance depends on, in any state. */
   deps: string[];
   /** Strongest source among deps: edited > pack > vanilla. */
   source: Source;
@@ -32,11 +32,21 @@ export function usesItemDefinitions(store: AssetStore): boolean {
   return store.list('assets/minecraft/items/').length > 0;
 }
 
-export function resolveItemModels(store: AssetStore, id: string, context: DisplayContext = 'gui'): ResolvedItemModel[] {
+/**
+ * The models an item shows in a display context and state (see `resolveItemModel`);
+ * the dynamic switches on the way are added to `found`.
+ */
+export function resolveItemModels(
+  store: AssetStore,
+  id: string,
+  context: DisplayContext = 'gui',
+  state: ItemState = {},
+  found?: StateSwitch[],
+): ResolvedItemModel[] {
   const { path } = parseRL(id);
   let refs: ModelRef[];
   if (store.has(itemDefinitionPath(id))) {
-    refs = resolveItemModel(store.json<any>(itemDefinitionPath(id))?.model, context);
+    refs = resolveItemModel(store.json<any>(itemDefinitionPath(id))?.model, context, state, found);
   } else {
     const { ns } = parseRL(id);
     refs = [{ model: `${ns}:item/${path}`, tints: legacyTints(path) }];
@@ -46,18 +56,25 @@ export function resolveItemModels(store: AssetStore, id: string, context: Displa
 
 const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 
+const texturesOf = (models: ResolvedItemModel[]) => [
+  ...new Set(
+    models.flatMap((m) => {
+      const special = m.ref.special && specialLayers(m.ref.special);
+      return special ? special.map((l) => l.texture) : modelTextures(m.model);
+    }),
+  ),
+];
+
 function buildEntry(store: AssetStore, id: string, defPath: string, lang: Record<string, string>): ItemEntry {
   const models = resolveItemModels(store, id);
-  const textures = [
-    ...new Set(
-      models.flatMap((m) => {
-        const special = m.ref.special && specialLayers(m.ref.special);
-        return special ? special.map((l) => l.texture) : modelTextures(m.model);
-      }),
-    ),
-  ];
-  const deps = [defPath, ...models.flatMap((m) => m.model.chain.map(modelPath))];
-  for (const t of textures) deps.push(texturePath(t), `${texturePath(t)}.mcmeta`);
+  const textures = texturesOf(models);
+  // models of other states and contexts count too, so editing e.g. a bow pulling texture marks the bow
+  const others = store.has(itemDefinitionPath(id))
+    ? [...allItemModels(store.json<any>(itemDefinitionPath(id))?.model)].filter((m) => !models.some((r) => r.ref.model === m))
+    : [];
+  const otherModels = others.map((m) => resolveModel(store, m));
+  const deps = [defPath, ...[...models.map((m) => m.model), ...otherModels].flatMap((m) => m.chain.map(modelPath))];
+  for (const t of new Set([...textures, ...otherModels.flatMap(modelTextures)])) deps.push(texturePath(t), `${texturePath(t)}.mcmeta`);
 
   let source: Source = 'vanilla';
   for (const d of deps) {
@@ -67,6 +84,20 @@ function buildEntry(store: AssetStore, id: string, defPath: string, lang: Record
   const { ns, path } = parseRL(id);
   const name = lang[`item.${ns}.${path}`] ?? lang[`block.${ns}.${path}`] ?? path.replace(/_/g, ' ');
   return { id, name, defPath, models, textures, deps, source, depsKey: deps.map((d) => store.rev(d)).join('.') };
+}
+
+/** The item as it looks in `state`: models and textures of that state, same name and dependencies. */
+export function itemVariant(store: AssetStore, item: ItemEntry, state: ItemState): ItemEntry {
+  if (Object.keys(state).length === 0) return item;
+  const models = resolveItemModels(store, item.id, 'gui', state);
+  return { ...item, models, textures: texturesOf(models), depsKey: `${item.depsKey}|${JSON.stringify(state)}` };
+}
+
+/** The dynamic switches (in use, pull, angle …) an item passes in `state`, in display context `context`. */
+export function itemStateSwitches(store: AssetStore, id: string, state: ItemState, context: DisplayContext = 'gui'): StateSwitch[] {
+  const found: StateSwitch[] = [];
+  resolveItemModels(store, id, context, state, found);
+  return found;
 }
 
 /** Display names: English from the jar, overlaid with a translation (Minecraft language file) if given. */

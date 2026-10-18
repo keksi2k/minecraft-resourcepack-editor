@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import { availablePatterns, availableSherds, DYE, PATTERNED, POT_SIDES, specialLayers, type SpecialOptions } from '../entities/specials';
-import type { ItemEntry } from '../models/items';
+import type { ItemState, StateSwitch } from '../models/itemDefinition';
+import { itemStateSwitches, itemVariant, type ItemEntry } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
 import { itemThumbnail } from '../render/thumbnails';
 import { soundsForItem } from '../sounds/soundsJson';
-import { useT } from '../i18n';
+import { useT, type MessageKey, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge } from './common';
 import { ItemThumb } from './ItemsView';
@@ -29,19 +30,29 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
   const t = useT();
   const [context, setContext] = useState<DisplayContext>('gui');
   const sounds = useMemo(() => soundsForItem(soundEvents, item.id), [soundEvents, item.id]);
-  const patterned = item.models.find((m) => m.ref.special && PATTERNED.has(m.ref.special.type))?.ref.special;
+  const [state, setState] = useState<ItemState>({});
   const [options, setOptions] = useState<SpecialOptions>({});
-  useEffect(() => setOptions({}), [item.id]);
+  useEffect(() => {
+    setState({});
+    setOptions({});
+  }, [item.id]);
+  // the item in the previewed state (in use, pulled …)
+  const shown = useMemo(() => itemVariant(store, item, state), [store, item, state]);
+  const switches = useMemo(
+    () => itemStateSwitches(store, item.id, state, context === 'none' ? 'gui' : context),
+    [store, item, state, context],
+  );
+  const patterned = shown.models.find((m) => m.ref.special && PATTERNED.has(m.ref.special.type))?.ref.special;
   const opts = patterned ? options : undefined;
   // pattern textures in use belong to the item's textures while previewed
   const textures = useMemo(() => {
-    if (!patterned) return item.textures;
+    if (!patterned) return shown.textures;
     const extra = specialLayers(patterned, options)?.map((l) => l.texture) ?? [];
-    return [...new Set([...item.textures, ...extra])];
-  }, [item.textures, patterned, options]);
+    return [...new Set([...shown.textures, ...extra])];
+  }, [shown.textures, patterned, options]);
 
   const downloadRender = async () => {
-    const url = await itemThumbnail(store, item, 512, opts);
+    const url = await itemThumbnail(store, shown, 512, opts);
     if (url) downloadBlob(await (await fetch(url)).blob(), `${item.id.split(':')[1]}.png`);
   };
 
@@ -63,7 +74,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
 
       <div className="px-3">
         <div className="h-72">
-          <ItemViewer store={store} item={item} context={context} options={opts} />
+          <ItemViewer store={store} item={item} context={context} options={opts} state={state} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1">
           {CONTEXTS.map((id) => (
@@ -82,6 +93,12 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           </span>
         </div>
       </div>
+
+      {switches.length > 0 && (
+        <Section title={t('items.states')}>
+          <StateEditor switches={switches} value={state} onChange={setState} />
+        </Section>
+      )}
 
       {patterned?.type === 'decorated_pot' ? (
         <Section title={t('items.sherds')}>
@@ -125,7 +142,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
       <Section title={t('items.models')}>
         <div className="flex flex-col gap-3">
           <FileRow store={store} path={item.defPath} label={t('items.itemDefinition')} />
-          {item.models.map(({ ref, model }, i) => (
+          {shown.models.map(({ ref, model }, i) => (
             <div key={i} className="rounded bg-neutral-900 p-2">
               <div className="mb-1 text-xs">
                 {ref.special && specialLayers(ref.special) ? t('items.kind.special') : t(`items.kind.${model.kind}`)}
@@ -150,6 +167,72 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+/** Name of a switch's property, e.g. "In use" or "Has lodestone_tracker"; unknown ones as in the file. */
+function propertyLabel(t: TFunction, s: StateSwitch): string {
+  const key = `items.property.${s.property.replace(/\//g, '_')}` as MessageKey;
+  const text = t(key, s.params);
+  return text === key ? s.property : text;
+}
+
+function optionLabel(t: TFunction, s: StateSwitch, value: string): string {
+  const o = s.options.find((x) => x.value === value);
+  if (o?.when) return o.when.join(', ');
+  if (o?.threshold !== undefined) return `≥ ${o.threshold}`;
+  if (value === 'fallback' && s.kind === 'range_dispatch') {
+    const min = s.options.find((x) => x.threshold !== undefined)?.threshold;
+    return min === undefined ? t('items.otherState') : `< ${min}`;
+  }
+  return t('items.otherState');
+}
+
+/** Preview of the item's dynamic states: conditions as checkboxes, selects as lists, ranges as sliders. */
+function StateEditor({ switches, value, onChange }: { switches: StateSwitch[]; value: ItemState; onChange: (s: ItemState) => void }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-2 text-xs">
+      <p className="text-neutral-400">{t('items.statesInfo')}</p>
+      {switches.map((s) => {
+        const current = value[s.key] ?? s.default;
+        const set = (v: string) => onChange({ ...value, [s.key]: v });
+        const index = Math.max(0, s.options.findIndex((o) => o.value === current));
+        return (
+          <label key={s.key} className="flex items-center gap-2" title={`${s.kind} ${s.property} ${JSON.stringify(s.params)}`}>
+            <span className="w-36 shrink-0 truncate text-neutral-400">{propertyLabel(t, s)}</span>
+            {s.kind === 'condition' && s.options.length === 2 ? (
+              <input type="checkbox" checked={current === 'true'} onChange={(e) => set(String(e.target.checked))} />
+            ) : s.kind === 'range_dispatch' ? (
+              <>
+                <input
+                  type="range"
+                  min={0}
+                  max={s.options.length - 1}
+                  value={index}
+                  onChange={(e) => set(s.options[Number(e.target.value)].value)}
+                  className="min-w-0 flex-1"
+                />
+                <span className="w-14 shrink-0 text-right font-mono">{optionLabel(t, s, current)}</span>
+              </>
+            ) : (
+              <select value={current} onChange={(e) => set(e.target.value)} className="min-w-0 max-w-56 rounded bg-neutral-800 px-1 py-0.5">
+                {s.options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {s.kind === 'condition' ? t(o.value === 'true' ? 'items.stateOn' : 'items.stateOff') : optionLabel(t, s, o.value)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+        );
+      })}
+      {Object.keys(value).length > 0 && (
+        <div>
+          <Btn onClick={() => onChange({})}>{t('items.restingState')}</Btn>
+        </div>
+      )}
     </div>
   );
 }

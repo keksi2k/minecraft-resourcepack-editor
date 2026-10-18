@@ -6,7 +6,8 @@ import { AssetStore } from '../assets/AssetStore';
 import { MOBS } from '../entities/catalog';
 import { availablePatterns, availableSherds, specialLayers } from '../entities/specials';
 import { ENTITY_MODELS } from '../render/entityMesh';
-import { listItems, resolveItemModels } from '../models/items';
+import type { ItemState } from '../models/itemDefinition';
+import { itemStateSwitches, listItems, resolveItemModels } from '../models/items';
 import { texturePath } from '../models/resourceLocation';
 
 const jarPath = process.env.MC_JAR;
@@ -58,6 +59,35 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
       }
     }
     expect([...unsupported]).toEqual([]);
+
+    // every state of every item shows existing models and textures
+    let states = 0;
+    const badStates: string[] = [];
+    for (const item of items) {
+      const seen = new Set<string>();
+      const todo: ItemState[] = [{}];
+      while (todo.length && seen.size < 300) {
+        const state = todo.pop()!;
+        const key = JSON.stringify(state);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        for (const m of resolveItemModels(store, item.id, 'gui', state)) {
+          const layers = m.ref.special && specialLayers(m.ref.special);
+          if (m.model.kind === 'missing' || (m.ref.special && !layers)) badStates.push(`${item.id} ${key} ${m.ref.model}`);
+        }
+        for (const s of itemStateSwitches(store, item.id, state)) for (const o of s.options) todo.push({ ...state, [s.key]: o.value });
+      }
+      states += seen.size;
+    }
+    console.log({ states });
+    expect(badStates).toEqual([]);
+    expect(states).toBeGreaterThan(items.length + 500);
+
+    const bowSwitches = itemStateSwitches(store, 'minecraft:bow', {});
+    const bowInUse = { [bowSwitches[0].key]: 'true' };
+    const pull = itemStateSwitches(store, 'minecraft:bow', bowInUse)[1];
+    expect(resolveItemModels(store, 'minecraft:bow', 'gui', { ...bowInUse, [pull.key]: pull.options.at(-1)!.value })[0].ref.model).toBe('minecraft:item/bow_pulling_2');
+    expect(itemStateSwitches(store, 'minecraft:compass', {}).map((s) => s.property)).toEqual(['has_component', 'compass']);
 
     // every pattern exists for banners and shields
     const paths = store.list('assets/minecraft/textures/entity/');

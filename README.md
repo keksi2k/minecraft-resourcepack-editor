@@ -11,6 +11,7 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 - **Every item** (~1650 in 26.3) with an inventory-style render: blocks isometric, flat items as sprites, tints (leaves, grass, potions …) like in game. Chests, shulker boxes, banners, shields, heads, beds, decorated pots, conduits, tridents and copper golem statues are drawn with their real models too, and animated textures (water, lava, fire, portals …) play in the grid, the 3D viewer and the texture preview.
 - **3D viewer** for each item, orbitable, with the game's display contexts (inventory, 1st/3rd person hand, ground, item frame, head). Renders can be downloaded as PNG.
 - **Pattern preview** for banners and shields (pattern layers and colours) and pottery sherds for decorated pots, so you can check your pattern textures on the real model.
+- **Item states**: preview what an item looks like in use, pulled, loaded, broken, at another compass angle or time of day, with another trim and so on. Every switch in the item definition can be set, and the textures of that state can be replaced right there.
 - **61 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants and 23 babies) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on.
 - **Texture browser** for all ~4000 textures (blocks, items, entities, GUI …).
 - **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely.
@@ -124,7 +125,7 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 
 - Mobs are shown in a static pose without animation. Armour, saddles, collars, villager professions and mooshroom mushrooms are missing for now.
 - Banner patterns and pottery sherds are a preview only: in game they are stored on the item, so they aren't part of the exported pack (their textures are).
-- Dynamic item states (drawing a bow, compass …) show the resting state.
+- Movements in hand (eating, drawing a bow, blocking) are coded in the game and not part of a pack, so they aren't animated; the models of these states can be previewed.
 - Matching sounds to items is a name heuristic, because Minecraft defines it in code.
 - Bedrock Edition is not supported.
 

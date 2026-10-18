@@ -11,6 +11,7 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 - **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel. Truhen, Shulkerkisten, Banner, Schilde, Köpfe, Betten, verzierte Krüge, Aquisitoren, Dreizacke und Kupfergolem-Statuen werden ebenfalls mit ihren echten Modellen gezeichnet, und animierte Texturen (Wasser, Lava, Feuer, Portale …) laufen im Grid, im 3D-Viewer und in der Texturvorschau.
 - **3D-Viewer** pro Item, drehbar, mit den Display-Ansichten des Spiels (Inventar, Hand 1st/3rd Person, Boden, Rahmen, Kopf). Render als PNG herunterladbar.
 - **Muster-Vorschau** für Banner und Schilde (Musterebenen und Farben) sowie Töpferscherben für verzierte Krüge, damit du deine Mustertexturen am echten Modell prüfen kannst.
+- **Item-Zustände**: Sieh dir an, wie ein Item beim Benutzen, gespannt, geladen, kaputt, mit anderem Kompasswinkel oder anderer Uhrzeit, mit anderem Rüstungsbesatz usw. aussieht. Jeder Schalter der Item-Definition lässt sich einstellen, und die Texturen dieses Zustands kannst du direkt dort ersetzen.
 - **61 Mobs in 3D** (Creeper, Zombie, Skelett, Spinne, Schwein, Kuh, Schaf, Fuchs, Axolotl, Spieler-Skins … inkl. Varianten und 23 Babys) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört.
 - **Texturen-Browser** für alle ~4000 Texturen (Blöcke, Items, Entities, GUI …).
 - **Sounds**: alle ~2000 Sound-Events durchsuchen und abspielen, einzelne Dateien ersetzen, **eigene Sounds zu Events hinzufügen** (z. B. weitere Schrittgeräusche), **Lautstärke und Tonhöhe pro Variante** einstellen oder die Vanilla-Varianten komplett ersetzen.
@@ -124,7 +125,7 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 
 - Mobs stehen in einer statischen Pose ohne Animation. Rüstung, Sattel, Halsband, Villager-Berufe und Mooshroom-Pilze fehlen noch.
 - Bannermuster und Töpferscherben sind nur eine Vorschau: Im Spiel stehen sie am Item und gehören deshalb nicht zum exportierten Pack (ihre Texturen schon).
-- Dynamische Item-Zustände (Bogen spannen, Kompass …) zeigen den Ruhezustand.
+- Bewegungen in der Hand (Essen, Bogen spannen, Blocken) stecken im Spielcode und nicht im Pack, deshalb sind sie nicht animiert; die Modelle dieser Zustände lassen sich aber ansehen.
 - Die Zuordnung Item ↔ Sounds ist eine Namensheuristik, weil Minecraft sie im Code festlegt.
 - Bedrock Edition wird nicht unterstützt.
 

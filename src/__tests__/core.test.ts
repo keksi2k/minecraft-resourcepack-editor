@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AssetStore, parseLenientJson } from '../assets/AssetStore';
-import { colorValue, resolveItemModel, tintColor } from '../models/itemDefinition';
+import { allItemModels, colorValue, resolveItemModel, tintColor, type StateSwitch } from '../models/itemDefinition';
 import { gameNames, listItems } from '../models/items';
 import { modelTextures, resolveModel } from '../models/modelResolver';
 import { findPackRoot, parsePackMeta, textComponentToString } from '../pack/loadPack';
@@ -100,6 +100,52 @@ describe('item definitions', () => {
     const t2 = { scale: [2, 2, 2] };
     const def = { type: 'composite', transformation: t1, models: [{ type: 'model', model: 'block/a' }, { type: 'model', model: 'block/b', transformation: t2 }] };
     expect(resolveItemModel(def).map((r) => r.transforms)).toEqual([[t1], [t1, t2]]);
+  });
+
+  it('previews dynamic states', () => {
+    const bow = {
+      type: 'condition',
+      property: 'minecraft:using_item',
+      on_false: { type: 'model', model: 'item/bow' },
+      on_true: {
+        type: 'range_dispatch',
+        property: 'minecraft:use_duration',
+        scale: 0.05,
+        entries: [
+          { threshold: 0.9, model: { type: 'model', model: 'item/bow_pulling_2' } },
+          { threshold: 0.65, model: { type: 'model', model: 'item/bow_pulling_1' } },
+        ],
+        fallback: { type: 'model', model: 'item/bow_pulling_0' },
+      },
+    };
+    const found: StateSwitch[] = [];
+    expect(resolveItemModel(bow, 'gui', {}, found)[0].model).toBe('minecraft:item/bow');
+    expect(found.map((s) => [s.kind, s.property, s.default, s.options.map((o) => o.value)])).toEqual([['condition', 'using_item', 'false', ['false', 'true']]]);
+
+    const inUse = { [found[0].key]: 'true' };
+    found.length = 0;
+    expect(resolveItemModel(bow, 'gui', inUse, found)[0].model).toBe('minecraft:item/bow_pulling_0');
+    const pull = found[1];
+    expect(pull.params).toEqual({ scale: '0.05' });
+    // ranges are offered by threshold
+    expect(pull.options.map((o) => o.threshold ?? o.value)).toEqual(['fallback', 0.65, 0.9]);
+    expect(resolveItemModel(bow, 'gui', { ...inUse, [pull.key]: '0' })[0].model).toBe('minecraft:item/bow_pulling_2');
+    // unknown values fall back to the resting state
+    expect(resolveItemModel(bow, 'gui', { [found[0].key]: 'nope' })[0].model).toBe('minecraft:item/bow');
+
+    expect([...allItemModels(bow)].sort()).toEqual(['minecraft:item/bow', 'minecraft:item/bow_pulling_0', 'minecraft:item/bow_pulling_1', 'minecraft:item/bow_pulling_2']);
+  });
+  it('previews select cases', () => {
+    const crossbow = {
+      type: 'select',
+      property: 'charge_type',
+      cases: [{ when: 'arrow', model: { type: 'model', model: 'item/crossbow_arrow' } }, { when: ['rocket'], model: { type: 'model', model: 'item/crossbow_firework' } }],
+      fallback: { type: 'model', model: 'item/crossbow' },
+    };
+    const found: StateSwitch[] = [];
+    expect(resolveItemModel(crossbow, 'gui', {}, found)[0].model).toBe('minecraft:item/crossbow');
+    expect(found[0].options).toEqual([{ value: '0', when: ['arrow'] }, { value: '1', when: ['rocket'] }, { value: 'fallback' }]);
+    expect(resolveItemModel(crossbow, 'gui', { [found[0].key]: '1' })[0].model).toBe('minecraft:item/crossbow_firework');
   });
 
   it('decodes tint colours', () => {
