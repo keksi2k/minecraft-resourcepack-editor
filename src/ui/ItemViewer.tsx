@@ -8,15 +8,8 @@ import { resolveItemModels } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { buildItemObject, disposeObject } from '../render/buildMesh';
 
-export const CONTEXTS: [DisplayContext, string][] = [
-  ['gui', 'Inventar'],
-  ['none', 'Ohne Transform'],
-  ['ground', 'Boden'],
-  ['fixed', 'Rahmen'],
-  ['head', 'Kopf'],
-  ['thirdperson_righthand', '3rd Person'],
-  ['firstperson_righthand', '1st Person'],
-];
+/** Display contexts offered in the viewer; labels are translated as `items.contexts.<context>`. */
+export const CONTEXTS: DisplayContext[] = ['gui', 'none', 'ground', 'fixed', 'head', 'thirdperson_righthand', 'firstperson_righthand'];
 
 /**
  * Orbitable three.js view of an object built asynchronously. `buildKey` must change whenever

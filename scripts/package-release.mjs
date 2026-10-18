@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const folder = `${pkg.name}-${pkg.version}`;
+const repo = pkg.repository.url.replace(/\.git$/, '');
 const zip = new JSZip();
 const dir = zip.folder(folder);
 
@@ -26,22 +27,23 @@ dir.file(
   'START.txt',
   `Minecraft Resource Pack Editor ${pkg.version}
 
-Voraussetzung: Node.js 18.18 oder neuer (https://nodejs.org)
+Requirement: Node.js 18.18 or newer (https://nodejs.org)
 
-Starten unter Windows:
-  Doppelklick auf Start.bat (öffnet den Browser automatisch).
-  Anderer Port: Start.bat 3000
+Windows:
+  Double-click Start.bat (opens the browser automatically).
+  Other port: Start.bat 3000
 
-Starten unter macOS/Linux (oder manuell unter Windows):
-  1. Dieses ZIP entpacken.
-  2. Im entpackten Ordner ein Terminal öffnen.
+macOS/Linux (or manually on Windows):
+  1. Extract this ZIP.
+  2. Open a terminal in the extracted folder.
   3. node serve.mjs
-  4. Im Browser http://127.0.0.1:8080 öffnen.
+  4. Open http://127.0.0.1:8080 in your browser.
 
-Anderer Port:  node serve.mjs --port 3000
-Im Netzwerk erreichbar:  node serve.mjs --host 0.0.0.0
+Other port:           node serve.mjs --port 3000
+Reachable on the LAN: node serve.mjs --host 0.0.0.0
 
-Ausführliche Anleitung: ${pkg.repository.url.replace(/\.git$/, '')}/blob/main/docs/INSTALLATION.md
+Full guide: ${repo}/blob/main/docs/INSTALLATION.md
+Deutsch:    ${repo}/blob/main/docs/INSTALLATION.de.md
 `,
 );
 

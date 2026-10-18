@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AssetStore, parseLenientJson } from '../assets/AssetStore';
 import { colorValue, resolveItemModel, tintColor } from '../models/itemDefinition';
-import { listItems } from '../models/items';
+import { gameNames, listItems } from '../models/items';
 import { modelTextures, resolveModel } from '../models/modelResolver';
 import { findPackRoot, parsePackMeta, textComponentToString } from '../pack/loadPack';
 import { mergeSounds, soundsForItem } from '../sounds/soundsJson';
@@ -110,6 +110,15 @@ describe('listItems', () => {
       ['minecraft:diamond_sword', 'Diamond Sword', 'vanilla'],
       ['minecraft:stone', 'Stone', 'pack'],
     ]);
+  });
+});
+
+describe('gameNames', () => {
+  it('overlays a translation on the English names', () => {
+    const store = new AssetStore(vanilla, new Map());
+    const names = gameNames(store, { 'item.minecraft.diamond_sword': 'Diamantschwert' });
+    const items = listItems(store, names);
+    expect(items.map((i) => i.name)).toEqual(['Diamantschwert', 'Stone']);
   });
 });
 

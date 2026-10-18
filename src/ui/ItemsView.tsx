@@ -2,6 +2,7 @@ import { memo, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import type { ItemEntry } from '../models/items';
 import { itemThumbnail } from '../render/thumbnails';
+import { useT } from '../i18n';
 import { useApp } from '../state/appStore';
 import { useInView } from './common';
 import { ItemDetail } from './ItemDetail';
@@ -53,6 +54,7 @@ const Tile = memo(function Tile({ store, item, selected, onSelect }: {
 
 export function ItemsView() {
   const { store, items, selectedItem, select } = useApp();
+  const t = useT();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const q = useDeferredValue(query.trim().toLowerCase());
@@ -80,14 +82,14 @@ export function ItemsView() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Items suchen …"
+            placeholder={t('items.search')}
             className="w-64 rounded bg-neutral-800 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
           />
           {(
             [
-              ['all', `Alle (${items.length})`],
-              ['changed', `Im Pack (${counts.changed})`],
-              ['edited', `Bearbeitet (${counts.edited})`],
+              ['all', t('items.filterAll', { count: items.length })],
+              ['changed', t('items.filterPack', { count: counts.changed })],
+              ['edited', t('items.filterEdited', { count: counts.edited })],
             ] as [Filter, string][]
           ).map(([id, label]) => (
             <button
@@ -98,7 +100,7 @@ export function ItemsView() {
               {label}
             </button>
           ))}
-          <span className="ml-auto text-xs text-neutral-500">{visible.length} angezeigt</span>
+          <span className="ml-auto text-xs text-neutral-500">{t('items.shown', { count: visible.length })}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1.5">

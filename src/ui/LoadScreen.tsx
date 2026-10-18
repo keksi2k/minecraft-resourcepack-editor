@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { suggestVersion } from '../mojang/versions';
 import { loadPackZip, type LoadedPack } from '../pack/loadPack';
+import { useT } from '../i18n';
 import { useApp } from '../state/appStore';
-import { Btn } from './common';
+import { Btn, LanguageSelect } from './common';
 
 export function LoadScreen() {
   const { manifest, phase, status, progress, error, open } = useApp();
+  const t = useT();
   const [pack, setPack] = useState<LoadedPack | null>(null);
   const [packError, setPackError] = useState<string>();
   const [versionId, setVersionId] = useState('');
@@ -24,7 +26,7 @@ export function LoadScreen() {
     try {
       const p = await loadPackZip(file);
       if (!p.files.has('pack.mcmeta') && ![...p.files.keys()].some((k) => k.startsWith('assets/'))) {
-        throw new Error('Keine pack.mcmeta und kein assets/-Ordner gefunden – ist das ein Java-Resourcepack?');
+        throw new Error(t('load.notAPack'));
       }
       setPack(p);
       setVersionId('');
@@ -43,18 +45,18 @@ export function LoadScreen() {
             style={progress !== undefined ? { width: `${Math.round(progress * 100)}%` } : undefined}
           />
         </div>
-        <div className="text-xs text-neutral-500">Vanilla-Assets werden pro Version einmal geladen und im Browser gecacht.</div>
+        <div className="text-xs text-neutral-500">{t('load.cacheHint')}</div>
       </div>
     );
   }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 p-6">
-      <h1 className="text-3xl font-bold">Resource Pack Editor</h1>
-      <p className="text-sm text-neutral-400">
-        Java-Edition-Resourcepack laden, alle Items in 3D ansehen, Sounds anhören, Texturen und Sounds herunterladen oder
-        ersetzen und das Pack wieder exportieren. Alles passiert lokal im Browser.
-      </p>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold">{t('app.title')}</h1>
+        <LanguageSelect />
+      </div>
+      <p className="text-sm text-neutral-400">{t('app.tagline')}</p>
 
       <label
         onDragOver={(e) => {
@@ -75,22 +77,22 @@ export function LoadScreen() {
         {pack ? (
           <>
             <div className="text-lg font-semibold">{pack.name}</div>
-            <div className="text-sm text-neutral-400">{pack.meta?.description || 'Keine Beschreibung'}</div>
+            <div className="text-sm text-neutral-400">{pack.meta?.description || t('load.noDescription')}</div>
             <div className="text-xs text-neutral-500">
-              {pack.files.size} Dateien · pack_format {pack.meta?.format ?? '?'}
+              {t('load.fileInfo', { count: pack.files.size, format: pack.meta?.format ?? '?' })}
             </div>
           </>
         ) : (
           <>
-            <div className="text-lg">Resourcepack (.zip) hierher ziehen</div>
-            <div className="text-sm text-neutral-500">oder klicken zum Auswählen</div>
+            <div className="text-lg">{t('load.dropTitle')}</div>
+            <div className="text-sm text-neutral-500">{t('load.dropHint')}</div>
           </>
         )}
       </label>
       {packError && <div className="rounded bg-red-950 p-3 text-sm text-red-200">{packError}</div>}
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm">Minecraft-Version (Vanilla-Basis):</span>
+        <span className="text-sm">{t('load.versionLabel')}</span>
         <select
           value={selected}
           onChange={(e) => setVersionId(e.target.value)}
@@ -100,25 +102,25 @@ export function LoadScreen() {
           {versions.map((v) => (
             <option key={v.id} value={v.id}>
               {v.id}
-              {v.type === 'snapshot' ? ' (Snapshot)' : ''}
+              {v.type === 'snapshot' ? t('load.snapshotSuffix') : ''}
             </option>
           ))}
         </select>
         <label className="flex items-center gap-1 text-xs text-neutral-400">
           <input type="checkbox" checked={snapshots} onChange={(e) => setSnapshots(e.target.checked)} />
-          Snapshots zeigen
+          {t('load.showSnapshots')}
         </label>
       </div>
       {pack?.meta?.format !== undefined && !versionId && (
-        <div className="-mt-4 text-xs text-neutral-500">Vorschlag anhand von pack_format {pack.meta.format}.</div>
+        <div className="-mt-4 text-xs text-neutral-500">{t('load.suggested', { format: pack.meta.format })}</div>
       )}
 
       <div className="flex gap-3">
         <Btn tone="primary" disabled={!pack || !selected} onClick={() => void open(pack, selected)}>
-          Pack öffnen
+          {t('load.openPack')}
         </Btn>
-        <Btn disabled={!selected} onClick={() => void open(null, selected)} title="Mit leerem Pack auf Vanilla-Basis starten">
-          Neues Pack erstellen
+        <Btn disabled={!selected} onClick={() => void open(null, selected)} title={t('load.newPackTitle')}>
+          {t('load.newPack')}
         </Btn>
       </div>
       {error && <div className="rounded bg-red-950 p-3 text-sm text-red-200">{error}</div>}

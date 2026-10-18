@@ -1,4 +1,5 @@
 import { get, set } from 'idb-keyval';
+import { t } from '../i18n';
 import { fetchJsonCached } from './fetchUtil';
 import type { VersionJson } from './versions';
 
@@ -63,7 +64,7 @@ export class VanillaObjects {
 
   fetch(key: string): Promise<Uint8Array> {
     const obj = this.index.objects[key];
-    if (!obj) return Promise.reject(new Error(`Nicht im Asset-Index: ${key}`));
+    if (!obj) return Promise.reject(new Error(t('sounds.notInIndex', { key })));
     let p = this.memo.get(obj.hash);
     if (!p) {
       p = this.load(obj.hash);
@@ -77,21 +78,30 @@ export class VanillaObjects {
     const file = this.local.get(hash);
     if (file) return new Uint8Array(await file.arrayBuffer());
     const res = await fetch(`${getResourcesBase()}/${hash.slice(0, 2)}/${hash}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status} – Sound-Server nicht erreichbar (Proxy?)`);
+    if (!res.ok) throw new Error(t('sounds.serverError', { status: res.status }));
     const bytes = new Uint8Array(await res.arrayBuffer());
     // Guard against SPA fallbacks answering 200 with index.html when no proxy is configured.
-    if (bytes[0] === 0x3c) throw new Error('Kein Sound-Proxy konfiguriert');
+    if (bytes[0] === 0x3c) throw new Error(t('sounds.noProxy'));
     return bytes;
   }
 
   /** sounds.json is small and content-addressed, so it is kept in IndexedDB. */
-  async soundsJson(): Promise<unknown> {
-    const obj = this.index.objects['minecraft/sounds.json'];
+  soundsJson(): Promise<unknown> {
+    return this.cachedJson('minecraft/sounds.json', 'soundsjson');
+  }
+
+  /** Minecraft language file, e.g. `de_de` (only en_us ships inside the jar). */
+  langJson(code: string): Promise<Record<string, string> | undefined> {
+    return this.cachedJson(`minecraft/lang/${code}.json`, 'lang') as Promise<Record<string, string> | undefined>;
+  }
+
+  private async cachedJson(indexKey: string, prefix: string): Promise<unknown> {
+    const obj = this.index.objects[indexKey];
     if (!obj) return undefined;
-    const key = `soundsjson:${obj.hash}`;
+    const key = `${prefix}:${obj.hash}`;
     const hit = await get(key).catch(() => undefined);
     if (hit) return hit;
-    const json = JSON.parse(new TextDecoder().decode(await this.fetch('minecraft/sounds.json')));
+    const json = JSON.parse(new TextDecoder().decode(await this.fetch(indexKey)));
     await set(key, json).catch(() => {});
     return json;
   }

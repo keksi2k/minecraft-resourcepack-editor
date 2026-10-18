@@ -1,19 +1,41 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Source } from '../assets/AssetStore';
+import { LOCALES, useLocale, useT, type Locale } from '../i18n';
 import { basename } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
 import { useApp } from '../state/appStore';
 
-const BADGE: Record<Source, [string, string]> = {
-  vanilla: ['Vanilla', 'bg-neutral-700 text-neutral-300'],
-  pack: ['Pack', 'bg-sky-800 text-sky-100'],
-  edited: ['Bearbeitet', 'bg-amber-600 text-amber-50'],
+const BADGE: Record<Source, string> = {
+  vanilla: 'bg-neutral-700 text-neutral-300',
+  pack: 'bg-sky-800 text-sky-100',
+  edited: 'bg-amber-600 text-amber-50',
 };
 
 export function SourceBadge({ source }: { source: Source | undefined }) {
-  if (!source) return <span className="rounded px-1.5 py-0.5 text-[10px] bg-red-900 text-red-100">fehlt</span>;
-  const [label, cls] = BADGE[source];
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{label}</span>;
+  const t = useT();
+  if (!source) return <span className="rounded px-1.5 py-0.5 text-[10px] bg-red-900 text-red-100">{t('source.missing')}</span>;
+  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${BADGE[source]}`}>{t(`source.${source}`)}</span>;
+}
+
+/** Language picker; lists every registered locale by its own name. */
+export function LanguageSelect() {
+  const { locale, setLocale } = useLocale();
+  const t = useT();
+  return (
+    <select
+      value={locale}
+      onChange={(e) => setLocale(e.target.value as Locale)}
+      title={t('app.language')}
+      aria-label={t('app.language')}
+      className="rounded bg-neutral-800 px-2 py-1 text-xs"
+    >
+      {(Object.entries(LOCALES) as [Locale, (typeof LOCALES)[Locale]][]).map(([code, info]) => (
+        <option key={code} value={code}>
+          {info.name}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 /** Becomes true once the element has scrolled into view (and stays true). */
@@ -87,13 +109,14 @@ interface AssetActionsProps {
   kind: 'texture' | 'sound' | 'file';
   /** A vanilla version exists that removing the pack's file would reveal. */
   vanillaAvailable: boolean;
-  /** Offer "Verwerfen" for edits (off when another action owns the file's lifecycle). */
+  /** Offer "discard" for edits (off when another action owns the file's lifecycle). */
   allowDiscard?: boolean;
 }
 
 /** Download / replace / reset buttons shared by textures, sounds and model files. */
 export function AssetActions({ path, source, load, kind, vanillaAvailable, allowDiscard = true }: AssetActionsProps) {
   const { setFile, resetFile, store } = useApp();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const edited = store?.edits.has(path) ?? false;
   const accept = kind === 'texture' ? 'image/png,.png' : kind === 'sound' ? 'audio/ogg,.ogg' : '*/*';
@@ -120,13 +143,11 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (kind === 'texture') {
       const next = await imageSize(file);
-      if (!next) throw new Error('Datei ist kein gültiges PNG.');
+      if (!next) throw new Error(t('actions.notAPng'));
       const cur = store?.get(path);
       const prev = cur && (await imageSize(cur));
       if (prev && prev[0] / prev[1] !== next[0] / next[1]) {
-        const ok = confirm(
-          `Seitenverhältnis weicht ab: bisher ${prev[0]}×${prev[1]}, neu ${next[0]}×${next[1]}. Animierte Texturen oder UV-Mapping könnten kaputtgehen. Trotzdem übernehmen?`,
-        );
+        const ok = confirm(t('actions.aspectMismatch', { oldW: prev[0], oldH: prev[1], newW: next[0], newH: next[1] }));
         if (!ok) return;
       }
     }
@@ -135,12 +156,12 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
 
   return (
     <div className="flex flex-wrap gap-1">
-      <Btn onClick={download} disabled={busy || !source} title="Aktuelle Datei herunterladen">⬇ Download</Btn>
-      {kind !== 'file' && <Btn onClick={replace} disabled={busy} title="Durch eigene Datei ersetzen">⬆ Ersetzen</Btn>}
-      {edited && allowDiscard && <Btn onClick={() => resetFile(path)} title="Eigene Änderung verwerfen">↺ Verwerfen</Btn>}
+      <Btn onClick={download} disabled={busy || !source} title={t('actions.downloadTitle')}>{t('actions.download')}</Btn>
+      {kind !== 'file' && <Btn onClick={replace} disabled={busy} title={t('actions.replaceTitle')}>{t('actions.replace')}</Btn>}
+      {edited && allowDiscard && <Btn onClick={() => resetFile(path)} title={t('actions.discardTitle')}>{t('actions.discard')}</Btn>}
       {store?.pack.has(path) && store.edits.get(path) !== null && vanillaAvailable && (
-        <Btn onClick={() => setFile(path, null)} tone="danger" title="Datei aus dem Pack entfernen, Vanilla wird wieder sichtbar">
-          Vanilla
+        <Btn onClick={() => setFile(path, null)} tone="danger" title={t('actions.vanillaTitle')}>
+          {t('actions.vanilla')}
         </Btn>
       )}
     </div>

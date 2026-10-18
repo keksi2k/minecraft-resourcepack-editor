@@ -10,12 +10,12 @@ import { delimiter, join } from 'node:path';
 
 const [id, ...rest] = process.argv.slice(2);
 if (!id) {
-  console.error('Version angeben, z. B.: node scripts/update-entity-models.mjs 26.3');
+  console.error('Pass a version, e.g.: node scripts/update-entity-models.mjs 26.3');
   process.exit(1);
 }
 const dir = join('.mc', id);
 if (!existsSync(join(dir, 'client.jar'))) {
-  console.error(`${dir}/client.jar fehlt – zuerst: node scripts/fetch-minecraft.mjs ${id}`);
+  console.error(`${dir}/client.jar is missing – run first: node scripts/fetch-minecraft.mjs ${id}`);
   process.exit(1);
 }
 
@@ -31,5 +31,5 @@ else {
 
 const r = spawnSync('java', ['-cp', cp, 'scripts/DumpEntityModels.java', ...args], { stdio: 'inherit' });
 rmSync('logs', { recursive: true, force: true }); // log4j output of the game code
-if (r.error) console.error('Java nicht gefunden – JDK installieren (siehe docs/INSTALLATION.md).');
+if (r.error) console.error('Java not found – install a JDK (see docs/INSTALLATION.md).');
 process.exit(r.status ?? 1);

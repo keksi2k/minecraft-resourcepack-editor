@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { parseRL } from '../models/resourceLocation';
 
 type SoundEntry = string | { name: string; type?: string; [k: string]: unknown };
@@ -71,12 +72,12 @@ export interface OggInfo {
 /** Minecraft only plays Ogg Vorbis. Returns the stream info, or an error message. */
 export function inspectOgg(bytes: Uint8Array): OggInfo | string {
   const ascii = (o: number, n: number) => String.fromCharCode(...bytes.subarray(o, o + n));
-  if (bytes.length < 64 || ascii(0, 4) !== 'OggS') return 'Keine Ogg-Datei. Minecraft braucht .ogg (Vorbis), z. B. mit Audacity exportieren.';
+  if (bytes.length < 64 || ascii(0, 4) !== 'OggS') return t('sounds.notOgg');
   // The first page carries the codec identification header right after the segment table.
   const segments = bytes[26];
   const p = 27 + segments;
-  if (ascii(p, 8) === 'OpusHead') return 'Die Datei ist Ogg Opus – Minecraft unterstützt nur Ogg Vorbis.';
-  if (bytes[p] !== 1 || ascii(p + 1, 6) !== 'vorbis') return 'Ogg-Datei ohne Vorbis-Audio – Minecraft unterstützt nur Ogg Vorbis.';
+  if (ascii(p, 8) === 'OpusHead') return t('sounds.opus');
+  if (bytes[p] !== 1 || ascii(p + 1, 6) !== 'vorbis') return t('sounds.notVorbis');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return { channels: bytes[p + 11], sampleRate: view.getUint32(p + 12, true) };
 }

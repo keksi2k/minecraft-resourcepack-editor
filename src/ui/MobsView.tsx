@@ -5,6 +5,7 @@ import { texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
 import { buildMobObject, mobDeps } from '../render/entityMesh';
 import { mobThumbnail } from '../render/thumbnails';
+import { useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { ObjectViewer } from './ItemViewer';
@@ -13,10 +14,10 @@ import { UVOverlay } from './UVOverlay';
 
 const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 
-export function mobName(store: AssetStore, mob: MobDef): string {
-  const lang = store.json<Record<string, string>>('assets/minecraft/lang/en_us.json') ?? {};
-  const base = lang[`entity.minecraft.${mob.entity}`] ?? (mob.entity === 'player' ? 'Spieler' : mob.entity.replace(/_/g, ' '));
-  return mob.variant ? `${base} (${mob.variant})` : base;
+/** Mob name from Minecraft's language files (in the UI language), plus the translated variant. */
+export function mobName(names: Record<string, string>, mob: MobDef, t: TFunction): string {
+  const base = names[`entity.minecraft.${mob.entity}`] ?? (mob.entity === 'player' ? t('mobs.player') : mob.entity.replace(/_/g, ' '));
+  return mob.variant ? `${base} (${t(`mobs.variant.${mob.variant}`)})` : base;
 }
 
 function mobSource(store: AssetStore, mob: MobDef): Source {
@@ -48,17 +49,18 @@ function MobThumb({ store, mob, className = 'h-16 w-16' }: { store: AssetStore; 
 }
 
 export function MobsView() {
-  const { store, revision, selectedMob, selectMob } = useApp();
+  const { store, revision, names, selectedMob, selectMob } = useApp();
+  const t = useT();
   const [query, setQuery] = useState('');
   const q = useDeferredValue(query.trim().toLowerCase());
   const mobs = useMemo(
     () =>
       store
-        ? MOBS.map((m) => ({ mob: m, name: mobName(store, m), source: mobSource(store, m) })).filter(
+        ? MOBS.map((m) => ({ mob: m, name: mobName(names, m, t), source: mobSource(store, m) })).filter(
             (m) => !q || m.name.toLowerCase().includes(q) || m.mob.id.includes(q),
           )
         : [],
-    [store, revision, q],
+    [store, revision, q, names, t],
   );
   const current = MOBS.find((m) => m.id === selectedMob);
   if (!store) return null;
@@ -70,10 +72,10 @@ export function MobsView() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Mobs suchen …"
+            placeholder={t('mobs.search')}
             className="w-64 rounded bg-neutral-800 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
           />
-          <span className="ml-auto text-xs text-neutral-500">{mobs.length} Mobs</span>
+          <span className="ml-auto text-xs text-neutral-500">{t('mobs.count', { count: mobs.length })}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-1.5">
@@ -105,7 +107,9 @@ export function MobsView() {
 }
 
 function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; onClose: () => void }) {
+  const names = useApp((s) => s.names);
   useApp((s) => s.revision);
+  const t = useT();
   const [uvFor, setUvFor] = useState<number | undefined>(0);
   const depsKey = mobDeps(mob)
     .map((d) => store.rev(d))
@@ -121,12 +125,12 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
       <div className="flex items-start gap-3 p-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="truncate text-lg font-semibold">{mobName(store, mob)}</h2>
+            <h2 className="truncate text-lg font-semibold">{mobName(names, mob, t)}</h2>
             <SourceBadge source={mobSource(store, mob)} />
           </div>
           <div className="font-mono text-xs text-neutral-400">minecraft:{mob.entity}</div>
         </div>
-        <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200" title="Schließen">
+        <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200" title={t('actions.close')}>
           ✕
         </button>
       </div>
@@ -135,17 +139,17 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
           <ObjectViewer fit buildKey={`${mob.id}|${depsKey}`} build={() => buildMobObject(store, mob)} />
         </div>
         <div className="mt-2 flex items-center">
-          <span className="text-[11px] text-neutral-500">Statische Pose – Animationen werden nicht dargestellt.</span>
+          <span className="text-[11px] text-neutral-500">{t('mobs.staticPose')}</span>
           <span className="ml-auto">
-            <Btn onClick={() => void downloadRender()} title="Render als PNG (512 px)">
-              ⬇ Render
+            <Btn onClick={() => void downloadRender()} title={t('mobs.renderTitle')}>
+              {t('actions.render')}
             </Btn>
           </span>
         </div>
       </div>
 
       <section className="border-t border-neutral-800 p-3">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">Texturen</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('mobs.textures')}</h3>
         <div className="flex flex-col gap-3">
           {mob.layers.map((layer, i) => {
             const path = texturePath(layer.texture);
@@ -158,12 +162,12 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
                     <div className="flex items-center gap-1.5">
                       <span className="truncate font-mono text-xs">{layer.texture.replace('minecraft:entity/', '')}</span>
                       <SourceBadge source={src} />
-                      {layer.emissive && <span className="text-[10px] text-neutral-500">leuchtend</span>}
+                      {layer.emissive && <span className="text-[10px] text-neutral-500">{t('mobs.emissive')}</span>}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       <AssetActions path={path} source={src} load={async () => store.get(path)} kind="texture" vanillaAvailable={store.vanilla.has(path)} />
-                      <Btn onClick={() => setUvFor(uvFor === i ? undefined : i)} title="Welche Textur-Bereiche zu welchem Körperteil gehören">
-                        {uvFor === i ? 'UV ausblenden' : 'UV-Layout'}
+                      <Btn onClick={() => setUvFor(uvFor === i ? undefined : i)} title={t('mobs.uvTitle')}>
+                        {uvFor === i ? t('mobs.uvHide') : t('mobs.uvShow')}
                       </Btn>
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import type { AssetStore } from '../assets/AssetStore';
+import { t } from '../i18n';
 
 export function newPackMeta(packFormat: number, description: string): Uint8Array {
   // pack_format for older games, min/max_format for 1.21.9+; each version ignores the other fields.
@@ -11,7 +12,7 @@ export function newPackMeta(packFormat: number, description: string): Uint8Array
 
 export async function exportPackZip(store: AssetStore, fallbackFormat: number | undefined): Promise<Blob> {
   const files = store.exportFiles();
-  if (!files.has('pack.mcmeta')) files.set('pack.mcmeta', newPackMeta(fallbackFormat ?? 46, 'Erstellt mit Resource Pack Editor'));
+  if (!files.has('pack.mcmeta')) files.set('pack.mcmeta', newPackMeta(fallbackFormat ?? 46, t('load.newPackDescription')));
   const zip = new JSZip();
   for (const [path, data] of files) zip.file(path, data);
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });

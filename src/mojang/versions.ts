@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { fetchJsonCached } from './fetchUtil';
 
 const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
@@ -23,7 +24,7 @@ export interface VersionJson {
 export async function fetchManifest(): Promise<VersionManifest> {
   // The manifest changes with every release, so it is never cached.
   const res = await fetch(MANIFEST_URL);
-  if (!res.ok) throw new Error(`Versionsliste nicht erreichbar (HTTP ${res.status})`);
+  if (!res.ok) throw new Error(t('errors.versionList', { status: res.status }));
   return res.json();
 }
 

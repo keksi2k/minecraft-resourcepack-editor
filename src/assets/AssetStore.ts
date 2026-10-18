@@ -59,7 +59,7 @@ export class AssetStore {
       try {
         value = parseLenientJson(decoder.decode(bytes));
       } catch (e) {
-        console.warn(`Ungültiges JSON: ${path}`, e);
+        console.warn(`Invalid JSON: ${path}`, e);
       }
     }
     this.jsonCache.set(path, value);

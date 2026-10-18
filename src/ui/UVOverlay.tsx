@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
+import { useT } from '../i18n';
 import { layerUVRects } from '../render/entityMesh';
 import { TextureThumb } from './TexturesView';
 
@@ -9,6 +10,7 @@ const topPart = (part: string) => part.split('/')[0] || 'root';
 
 /** The texture with the regions each model part samples drawn on top, plus a hoverable legend. */
 export function UVOverlay({ store, path, modelKey }: { store: AssetStore; path: string; modelKey: string }) {
+  const t = useT();
   const data = useMemo(() => layerUVRects(modelKey), [modelKey]);
   const [hover, setHover] = useState<string>();
   const parts = useMemo(() => [...new Set(data?.rects.map((r) => topPart(r.part)))], [data]);
@@ -58,7 +60,7 @@ export function UVOverlay({ store, path, modelKey }: { store: AssetStore; path: 
         ))}
       </div>
       <div className="text-[10px] text-neutral-500">
-        Modell-Texturgröße {w}×{h} px – höher aufgelöste Texturen skalieren proportional.
+        {t('mobs.uvHint', { w, h })}
       </div>
     </div>
   );

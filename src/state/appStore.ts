@@ -1,9 +1,10 @@
 import { create } from 'zustand';
+import { LOCALES, t, useLocale } from '../i18n';
 import { AssetStore } from '../assets/AssetStore';
 import { loadVanillaAssets } from '../mojang/clientJar';
 import { fetchAssetIndex, VanillaObjects } from '../mojang/soundAssets';
 import { fetchManifest, fetchVersionJson, type VersionJson, type VersionManifest } from '../mojang/versions';
-import { listItems, type ItemEntry } from '../models/items';
+import { gameNames, listItems, type ItemEntry } from '../models/items';
 import type { LoadedPack, PackMeta } from '../pack/loadPack';
 import {
   addSoundToEvent,
@@ -37,11 +38,15 @@ interface AppState {
   /** Bumped on every edit so components re-read from the store. */
   revision: number;
   items: ItemEntry[];
+  /** Minecraft display names (lang keys → text) in the UI language, falling back to English. */
+  names: Record<string, string>;
 
   objects?: VanillaObjects;
   vanillaSounds?: Record<string, any>;
   soundEvents: SoundEvent[];
-  soundsStatus: string;
+  soundsLoading: boolean;
+  /** Why vanilla sounds couldn't be loaded, if they couldn't. */
+  soundsError?: string;
 
   tab: Tab;
   selectedItem?: string;
@@ -57,6 +62,8 @@ interface AppState {
   setEventReplace(eventId: string, replace: boolean): void;
   addLocalAssetsFolder(files: FileList): number;
   loadSounds(): Promise<void>;
+  /** (Re)loads item/mob names for the current UI language. */
+  loadGameNames(): Promise<void>;
   setTab(tab: Tab): void;
   select(id: string | undefined): void;
   selectMob(id: string | undefined): void;
@@ -77,36 +84,38 @@ export const useApp = create<AppState>((set, get) => ({
   packName: '',
   revision: 0,
   items: [],
+  names: {},
   soundEvents: [],
-  soundsStatus: '',
+  soundsLoading: false,
   tab: 'items',
 
   async loadManifest() {
     try {
       set({ manifest: await fetchManifest() });
     } catch (e) {
-      set({ error: `Mojang-Versionsliste nicht erreichbar: ${(e as Error).message}` });
+      set({ error: t('load.manifestError', { error: (e as Error).message }) });
     }
   },
 
   async open(pack, versionId) {
     const entry = get().manifest?.versions.find((v) => v.id === versionId);
-    if (!entry) return set({ error: `Unbekannte Version ${versionId}` });
-    set({ phase: 'loading', error: undefined, status: 'Lade Versionsinfo …', progress: undefined });
+    if (!entry) return set({ error: t('load.unknownVersion', { version: versionId }) });
+    set({ phase: 'loading', error: undefined, status: t('load.statusVersionInfo'), progress: undefined });
     try {
       const version = await fetchVersionJson(entry);
       const vanilla = await loadVanillaAssets(version, (status, progress) => set({ status, progress }));
-      set({ status: 'Analysiere Items …', progress: undefined });
+      set({ status: t('load.statusAnalyzing'), progress: undefined });
       const store = new AssetStore(vanilla.files, pack?.files ?? new Map());
       const icon = store.get('pack.png');
       set({
         phase: 'ready',
         version,
         gameFormat: vanilla.packFormat,
-        packName: pack?.name ?? 'Neues Pack',
+        packName: pack?.name ?? t('load.newPackName'),
         packMeta: pack?.meta,
         packIcon: icon ? URL.createObjectURL(new Blob([icon], { type: 'image/png' })) : undefined,
         store,
+        names: gameNames(store),
         items: listItems(store),
         revision: 0,
         selectedItem: undefined,
@@ -125,17 +134,33 @@ export const useApp = create<AppState>((set, get) => ({
   async loadSounds() {
     const { store, version } = get();
     if (!store || !version) return;
-    set({ soundsStatus: 'Lade Sound-Index …' });
+    set({ soundsLoading: true });
     let objects = get().objects;
     let vanillaSounds = get().vanillaSounds;
-    let soundsStatus = '';
+    let soundsError: string | undefined;
     try {
       objects ??= new VanillaObjects(await fetchAssetIndex(version));
       vanillaSounds ??= (await objects.soundsJson()) as Record<string, any>;
     } catch (e) {
-      soundsStatus = `Vanilla-Sounds nicht verfügbar (${(e as Error).message}). Lokalen .minecraft/assets-Ordner wählen oder Proxy einstellen.`;
+      soundsError = (e as Error).message;
     }
-    set({ objects, vanillaSounds, soundsStatus, soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
+    set({ objects, vanillaSounds, soundsError, soundsLoading: false, soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
+    void get().loadGameNames();
+  },
+
+  async loadGameNames() {
+    const { store, objects } = get();
+    if (!store) return;
+    const code = LOCALES[useLocale.getState().locale].minecraftLang;
+    let translated: Record<string, string> | undefined;
+    if (code !== 'en_us') {
+      // Vanilla translations live in the asset index (same server as sounds); a pack may add its own.
+      const vanilla = await objects?.langJson(code).catch(() => undefined);
+      translated = { ...vanilla, ...store.json<Record<string, string>>(`assets/minecraft/lang/${code}.json`) };
+    }
+    if (get().store !== store) return;
+    const names = gameNames(store, translated);
+    set({ names, items: listItems(store, names) });
   },
 
   setFile(path, data) {
@@ -159,9 +184,7 @@ export const useApp = create<AppState>((set, get) => ({
     get().setFile(soundPath(`${ns}:${name}`), bytes);
     const jsonPath = soundsJsonPath(eventId);
     writeJson(jsonPath, addSoundToEvent(store.json<SoundsJsonFile>(jsonPath) ?? {}, eventId, name));
-    return info.channels > 1
-      ? 'Hinweis: Die Datei ist Stereo. Minecraft spielt Stereo-Sounds ohne Richtung und Entfernungsabfall ab – für Schritte & Co. besser Mono verwenden.'
-      : undefined;
+    return info.channels > 1 ? t('sounds.stereoHint') : undefined;
   },
 
   removeEventSound(eventId, ref) {
@@ -207,7 +230,13 @@ function writeJson(path: string, json: unknown) {
 function afterEdit(path: string) {
   const { store, vanillaSounds, revision } = useApp.getState();
   if (!store) return;
-  const patch: Partial<AppState> = { revision: revision + 1, items: listItems(store) };
+  const patch: Partial<AppState> = { revision: revision + 1, items: listItems(store, useApp.getState().names) };
   if (path.endsWith('sounds.json')) patch.soundEvents = mergeSounds(vanillaSounds, packSoundFiles(store));
   useApp.setState(patch);
+  if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
 }
+
+// Item and mob names follow the UI language.
+useLocale.subscribe((s, prev) => {
+  if (s.locale !== prev.locale) void useApp.getState().loadGameNames();
+});

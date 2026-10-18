@@ -8,11 +8,14 @@ export interface MobLayer {
   emissive?: boolean;
 }
 
+/** Variant labels are translated (i18n key `mobs.variant.<name>`). */
+export type MobVariant = 'temperate' | 'cold' | 'warm' | 'red' | 'brown' | 'snow' | 'tabby' | 'lucy' | 'steve' | 'alex';
+
 export interface MobDef {
   id: string;
-  /** Entity id used for the display name (`entity.minecraft.<entity>`). */
+  /** Entity id used for the display name (`entity.minecraft.<entity>` in Minecraft's language files). */
   entity: string;
-  variant?: string;
+  variant?: MobVariant;
   layers: MobLayer[];
   /** Extra rotation (radians, x/y/z) per part name for a recognisable resting pose. */
   pose?: Record<string, [number, number, number]>;
@@ -86,14 +89,14 @@ export const MOBS: MobDef[] = [
     ],
   },
   { id: 'magma_cube', entity: 'magma_cube', layers: one('magma_cube', 'slime/magmacube') },
-  { id: 'pig', entity: 'pig', variant: 'Gemäßigt', layers: one('pig', 'pig/pig_temperate') },
-  { id: 'pig_cold', entity: 'pig', variant: 'Kalt', layers: one('cold_pig', 'pig/pig_cold') },
-  { id: 'pig_warm', entity: 'pig', variant: 'Warm', layers: one('pig', 'pig/pig_warm') },
-  { id: 'cow', entity: 'cow', variant: 'Gemäßigt', layers: one('cow', 'cow/cow_temperate') },
-  { id: 'cow_cold', entity: 'cow', variant: 'Kalt', layers: one('cold_cow', 'cow/cow_cold') },
-  { id: 'cow_warm', entity: 'cow', variant: 'Warm', layers: one('warm_cow', 'cow/cow_warm') },
-  { id: 'mooshroom', entity: 'mooshroom', variant: 'Rot', layers: one('mooshroom', 'cow/mooshroom_red') },
-  { id: 'mooshroom_brown', entity: 'mooshroom', variant: 'Braun', layers: one('mooshroom', 'cow/mooshroom_brown') },
+  { id: 'pig', entity: 'pig', variant: 'temperate', layers: one('pig', 'pig/pig_temperate') },
+  { id: 'pig_cold', entity: 'pig', variant: 'cold', layers: one('cold_pig', 'pig/pig_cold') },
+  { id: 'pig_warm', entity: 'pig', variant: 'warm', layers: one('pig', 'pig/pig_warm') },
+  { id: 'cow', entity: 'cow', variant: 'temperate', layers: one('cow', 'cow/cow_temperate') },
+  { id: 'cow_cold', entity: 'cow', variant: 'cold', layers: one('cold_cow', 'cow/cow_cold') },
+  { id: 'cow_warm', entity: 'cow', variant: 'warm', layers: one('warm_cow', 'cow/cow_warm') },
+  { id: 'mooshroom', entity: 'mooshroom', variant: 'red', layers: one('mooshroom', 'cow/mooshroom_red') },
+  { id: 'mooshroom_brown', entity: 'mooshroom', variant: 'brown', layers: one('mooshroom', 'cow/mooshroom_brown') },
   {
     id: 'sheep',
     entity: 'sheep',
@@ -102,22 +105,22 @@ export const MOBS: MobDef[] = [
       { model: 'minecraft:sheep#wool', texture: tex('sheep/sheep_wool') },
     ],
   },
-  { id: 'chicken', entity: 'chicken', variant: 'Gemäßigt', layers: one('chicken', 'chicken/chicken_temperate') },
-  { id: 'chicken_cold', entity: 'chicken', variant: 'Kalt', layers: one('cold_chicken', 'chicken/chicken_cold') },
-  { id: 'chicken_warm', entity: 'chicken', variant: 'Warm', layers: one('chicken', 'chicken/chicken_warm') },
+  { id: 'chicken', entity: 'chicken', variant: 'temperate', layers: one('chicken', 'chicken/chicken_temperate') },
+  { id: 'chicken_cold', entity: 'chicken', variant: 'cold', layers: one('cold_chicken', 'chicken/chicken_cold') },
+  { id: 'chicken_warm', entity: 'chicken', variant: 'warm', layers: one('chicken', 'chicken/chicken_warm') },
   { id: 'wolf', entity: 'wolf', layers: one('wolf', 'wolf/wolf') },
-  { id: 'cat', entity: 'cat', variant: 'Tabby', layers: one('cat', 'cat/cat_tabby') },
+  { id: 'cat', entity: 'cat', variant: 'tabby', layers: one('cat', 'cat/cat_tabby') },
   { id: 'ocelot', entity: 'ocelot', layers: one('ocelot', 'cat/ocelot') },
   { id: 'fox', entity: 'fox', layers: one('fox', 'fox/fox') },
-  { id: 'fox_snow', entity: 'fox', variant: 'Schnee', layers: one('fox', 'fox/fox_snow') },
+  { id: 'fox_snow', entity: 'fox', variant: 'snow', layers: one('fox', 'fox/fox_snow') },
   { id: 'bee', entity: 'bee', layers: one('bee', 'bee/bee') },
-  { id: 'axolotl', entity: 'axolotl', variant: 'Lucy', layers: one('axolotl', 'axolotl/axolotl_lucy') },
-  { id: 'frog', entity: 'frog', variant: 'Gemäßigt', layers: one('frog', 'frog/frog_temperate') },
+  { id: 'axolotl', entity: 'axolotl', variant: 'lucy', layers: one('axolotl', 'axolotl/axolotl_lucy') },
+  { id: 'frog', entity: 'frog', variant: 'temperate', layers: one('frog', 'frog/frog_temperate') },
   { id: 'allay', entity: 'allay', layers: one('allay', 'allay/allay') },
   { id: 'iron_golem', entity: 'iron_golem', layers: one('iron_golem', 'iron_golem/iron_golem') },
   { id: 'villager', entity: 'villager', layers: one('villager', 'villager/villager') },
-  { id: 'player', entity: 'player', variant: 'Steve (breit)', layers: one('player', 'player/wide/steve') },
-  { id: 'player_slim', entity: 'player', variant: 'Alex (schmal)', layers: one('player_slim', 'player/slim/alex') },
+  { id: 'player', entity: 'player', variant: 'steve', layers: one('player', 'player/wide/steve') },
+  { id: 'player_slim', entity: 'player', variant: 'alex', layers: one('player_slim', 'player/slim/alex') },
 ];
 
 /** Mobs (and their layer) that use a texture, for the UV overlay in the texture view. */

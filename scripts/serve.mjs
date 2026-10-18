@@ -24,7 +24,7 @@ const port = Number(opt('port', 8080));
 const host = opt('host', '127.0.0.1');
 
 if (!existsSync(join(root, 'index.html'))) {
-  console.error(`Kein Build gefunden in ${root}. Zuerst "npm run build" ausführen.`);
+  console.error(`No build found in ${root}. Run "npm run build" first.`);
   process.exit(1);
 }
 
@@ -55,7 +55,7 @@ async function proxy(req, res, m) {
     });
     res.end(body);
   } catch (e) {
-    send(res, 502, `Proxy-Fehler: ${e.message}`);
+    send(res, 502, `Proxy error: ${e.message}`);
   }
 }
 
@@ -82,5 +82,5 @@ createServer((req, res) => {
   if (req.url.startsWith('/mcres/')) return send(res, 404, 'Not found');
   serveFile(req, res);
 }).listen(port, host, () => {
-  console.log(`Resource Pack Editor läuft auf http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
+  console.log(`Resource Pack Editor running at http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
 });

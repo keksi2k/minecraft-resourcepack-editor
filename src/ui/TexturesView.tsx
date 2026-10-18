@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import { mobsForTexture } from '../entities/catalog';
+import { useT } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { mobName } from './MobsView';
@@ -28,7 +29,8 @@ export function TextureThumb({ store, path, className = 'h-12 w-12' }: { store: 
 const TEXTURE = /^assets\/([^/]+)\/textures\/(.+)\.png$/;
 
 export function TexturesView() {
-  const { store, revision } = useApp();
+  const { store, revision, names } = useApp();
+  const t = useT();
   const [query, setQuery] = useState('');
   const [folder, setFolder] = useState('minecraft:item');
   const [onlyPack, setOnlyPack] = useState(false);
@@ -68,7 +70,7 @@ export function TexturesView() {
             onClick={() => setFolder(f)}
             className={`flex w-full justify-between rounded px-2 py-1 text-left ${folder === f ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}
           >
-            <span className="truncate">{f === '*' ? 'Alle' : f}</span>
+            <span className="truncate">{f === '*' ? t('textures.all') : f}</span>
             <span className="text-xs text-neutral-500">{n}</span>
           </button>
         ))}
@@ -78,14 +80,14 @@ export function TexturesView() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Pfad suchen …"
+            placeholder={t('textures.search')}
             className="w-64 rounded bg-neutral-800 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
           />
           <label className="flex items-center gap-1 text-xs">
             <input type="checkbox" checked={onlyPack} onChange={(e) => setOnlyPack(e.target.checked)} />
-            nur Pack/bearbeitet
+            {t('textures.onlyPack')}
           </label>
-          <span className="ml-auto text-xs text-neutral-500">{visible.length} Texturen</span>
+          <span className="ml-auto text-xs text-neutral-500">{t('textures.count', { count: visible.length })}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1.5">
@@ -109,21 +111,22 @@ export function TexturesView() {
           </div>
           {visible.length > limit && (
             <button onClick={() => setLimit(limit + PAGE)} className="mt-3 w-full rounded bg-neutral-800 py-2 text-sm hover:bg-neutral-700">
-              Weitere {Math.min(PAGE, visible.length - limit)} anzeigen
+              {t('textures.showMore', { count: Math.min(PAGE, visible.length - limit) })}
             </button>
           )}
         </div>
       </section>
       {selected && store.has(selected) && (
         <aside className="w-96 shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-3">
-          <TextureDetail store={store} path={selected} onClose={() => setSelected(undefined)} />
+          <TextureDetail store={store} path={selected} names={names} onClose={() => setSelected(undefined)} />
         </aside>
       )}
     </div>
   );
 }
 
-function TextureDetail({ store, path, onClose }: { store: AssetStore; path: string; onClose: () => void }) {
+function TextureDetail({ store, path, names, onClose }: { store: AssetStore; path: string; names: Record<string, string>; onClose: () => void }) {
+  const t = useT();
   const [size, setSize] = useState<string>();
   const bytes = store.get(path);
   useEffect(() => {
@@ -142,7 +145,7 @@ function TextureDetail({ store, path, onClose }: { store: AssetStore; path: stri
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1 break-all font-mono text-xs">{path}</div>
-        <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200">
+        <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200" title={t('actions.close')}>
           ✕
         </button>
       </div>
@@ -153,7 +156,7 @@ function TextureDetail({ store, path, onClose }: { store: AssetStore; path: stri
       )}
       {users.length > 0 && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
-          <Btn onClick={() => setShowUV(!showUV)}>{showUV ? 'UV-Overlay aus' : 'UV-Overlay an'}</Btn>
+          <Btn onClick={() => setShowUV(!showUV)}>{showUV ? t('textures.uvOff') : t('textures.uvOn')}</Btn>
           {users.map(({ mob }) => (
             <Btn
               key={mob.id}
@@ -161,16 +164,16 @@ function TextureDetail({ store, path, onClose }: { store: AssetStore; path: stri
                 selectMob(mob.id);
                 setTab('mobs');
               }}
-              title="In 3D ansehen"
+              title={t('textures.view3d')}
             >
-              ▶ {mobName(store, mob)}
+              ▶ {mobName(names, mob, t)}
             </Btn>
           ))}
         </div>
       )}
       <div className="flex items-center gap-2 text-xs text-neutral-400">
         <SourceBadge source={store.source(path)} /> {size}
-        {store.has(meta) && <span>· animiert/mcmeta</span>}
+        {store.has(meta) && <span>{t('textures.animated')}</span>}
       </div>
       <AssetActions path={path} source={store.source(path)} load={async () => store.get(path)} kind="texture" vanillaAvailable={store.vanilla.has(path)} />
       {store.has(meta) && (

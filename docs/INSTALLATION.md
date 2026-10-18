@@ -1,181 +1,183 @@
-# Installation und Betrieb
+# Installation and operation
 
-Diese Anleitung erklärt Schritt für Schritt, wie du den Minecraft Resource Pack Editor auf Windows, macOS oder Linux installierst, startest, aktualisierst und auf einem Server betreibst. Am Ende stehen Lösungen für typische Probleme.
+**English** · [Deutsch](INSTALLATION.de.md)
 
-**Inhalt**
+This guide explains step by step how to install, start, update and host the Minecraft Resource Pack Editor on Windows, macOS or Linux. Solutions for common problems are at the end.
 
-1. [Welcher Weg passt zu mir?](#1-welcher-weg-passt-zu-mir)
-2. [Voraussetzungen](#2-voraussetzungen)
-3. [Node.js installieren](#3-nodejs-installieren)
-4. [Variante A: Fertiges Release (empfohlen)](#4-variante-a-fertiges-release-empfohlen)
-5. [Variante B: Aus dem Quellcode](#5-variante-b-aus-dem-quellcode)
-6. [Variante C: Auf einem Server oder im Heimnetz](#6-variante-c-auf-einem-server-oder-im-heimnetz)
-7. [Erster Start in der App](#7-erster-start-in-der-app)
-8. [Das bearbeitete Pack in Minecraft verwenden](#8-das-bearbeitete-pack-in-minecraft-verwenden)
-9. [Aktualisieren](#9-aktualisieren)
-10. [Mob-Modelle für eine neue Minecraft-Version erzeugen](#10-mob-modelle-für-eine-neue-minecraft-version-erzeugen)
-11. [Fehlerbehebung](#11-fehlerbehebung)
-12. [Deinstallation](#12-deinstallation)
+**Contents**
+
+1. [Which option suits me?](#1-which-option-suits-me)
+2. [Requirements](#2-requirements)
+3. [Installing Node.js](#3-installing-nodejs)
+4. [Option A: Prebuilt release (recommended)](#4-option-a-prebuilt-release-recommended)
+5. [Option B: From source](#5-option-b-from-source)
+6. [Option C: On a server or your home network](#6-option-c-on-a-server-or-your-home-network)
+7. [First start in the app](#7-first-start-in-the-app)
+8. [Using the edited pack in Minecraft](#8-using-the-edited-pack-in-minecraft)
+9. [Updating](#9-updating)
+10. [Generating mob models for a new Minecraft version](#10-generating-mob-models-for-a-new-minecraft-version)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Uninstalling](#12-uninstalling)
 
 ---
 
-## 1. Welcher Weg passt zu mir?
+## 1. Which option suits me?
 
-| Du möchtest … | Weg |
+| You want to … | Option |
 | --- | --- |
-| den Editor einfach benutzen | **[A: Release-ZIP](#4-variante-a-fertiges-release-empfohlen)**, nur Node.js nötig |
-| am Code mitarbeiten oder die neueste Version | **[B: Quellcode](#5-variante-b-aus-dem-quellcode)**, Node.js und Git |
-| den Editor für mehrere Leute im Netz bereitstellen | **[C: Server](#6-variante-c-auf-einem-server-oder-im-heimnetz)** |
+| just use the editor | **[A: Release ZIP](#4-option-a-prebuilt-release-recommended)**, only Node.js needed |
+| work on the code or run the latest version | **[B: Source](#5-option-b-from-source)**, Node.js and Git |
+| provide the editor to several people on a network | **[C: Server](#6-option-c-on-a-server-or-your-home-network)** |
 
-Der Editor läuft immer im Browser. Node.js liefert nur die Seite aus und leitet Sound-Anfragen an Mojang weiter (siehe [Warum ein Proxy?](#warum-braucht-es-einen-proxy-für-sounds)).
+The editor always runs in the browser. Node.js only serves the page and forwards sound requests to Mojang (see [Why a proxy?](#why-do-sounds-need-a-proxy)).
 
-## 2. Voraussetzungen
+## 2. Requirements
 
-| | Minimum | Hinweis |
+| | Minimum | Note |
 | --- | --- | --- |
-| **Node.js** | 18.18 | Empfohlen: aktuelle LTS-Version (20 oder 22) |
-| **Browser** | aktuelles Chrome, Edge, Firefox oder Opera | WebGL muss aktiv sein. Safari ist nicht getestet und spielt `.ogg`-Sounds je nach Version nicht ab. |
-| **Speicher** | ca. 100 MB frei im Browser-Speicher | für die Vanilla-Dateien pro Minecraft-Version |
-| **Internet** | beim ersten Öffnen einer Version | lädt die client.jar (~40 MB) von Mojang, danach aus dem Cache |
-| **Git** | nur für Variante B | |
-| **Java (JDK)** | nur für [Abschnitt 10](#10-mob-modelle-für-eine-neue-minecraft-version-erzeugen) | Version wie das Spiel (26.x: Java 25) |
+| **Node.js** | 18.18 | Recommended: current LTS (20 or 22) |
+| **Browser** | current Chrome, Edge, Firefox or Opera | WebGL must be enabled. Safari is untested and, depending on the version, doesn't play `.ogg` sounds. |
+| **Storage** | about 100 MB free browser storage | for the vanilla files per Minecraft version |
+| **Internet** | the first time you open a version | downloads the client.jar (~40 MB) from Mojang, cached afterwards |
+| **Git** | only for option B | |
+| **Java (JDK)** | only for [section 10](#10-generating-mob-models-for-a-new-minecraft-version) | the version the game needs (26.x: Java 25) |
 
-Minecraft selbst muss **nicht** installiert sein.
+Minecraft itself does **not** need to be installed.
 
-## 3. Node.js installieren
+## 3. Installing Node.js
 
-Prüfe zuerst, ob Node.js schon da ist. Öffne ein Terminal (Windows: *PowerShell*, macOS: *Terminal*, Linux: Terminal deiner Wahl):
+First check whether Node.js is already installed. Open a terminal (Windows: *PowerShell*, macOS: *Terminal*, Linux: any terminal):
 
 ```sh
 node -v
 ```
 
-Zeigt das `v18.18.0` oder höher, bist du fertig und kannst diesen Abschnitt überspringen.
+If it shows `v18.18.0` or higher, you're done and can skip this section.
 
 ### Windows
 
-- **Installer:** Auf https://nodejs.org die **LTS**-Version herunterladen, den `.msi`-Installer ausführen und die Standardoptionen übernehmen.
-- **Oder per winget** (in PowerShell):
+- **Installer:** download the **LTS** version from https://nodejs.org, run the `.msi` installer and keep the default options.
+- **Or with winget** (in PowerShell):
   ```powershell
   winget install OpenJS.NodeJS.LTS
   ```
 
-Danach das Terminal **neu öffnen**, damit `node` gefunden wird.
+Then **reopen** the terminal so `node` is found.
 
 ### macOS
 
-- **Installer:** Auf https://nodejs.org das `.pkg` der LTS-Version herunterladen und installieren.
-- **Oder per Homebrew:**
+- **Installer:** download the LTS `.pkg` from https://nodejs.org and install it.
+- **Or with Homebrew:**
   ```sh
   brew install node
   ```
 
 ### Linux
 
-Die Pakete der Distributionen sind oft veraltet. Am zuverlässigsten ist **nvm**:
+Distribution packages are often outdated. The most reliable way is **nvm**:
 
 ```sh
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-# Terminal neu öffnen, dann:
+# reopen the terminal, then:
 nvm install --lts
 ```
 
-Alternativ gibt es die offiziellen Pakete für Debian/Ubuntu/Fedora unter https://nodejs.org/en/download/package-manager.
+Official packages for Debian/Ubuntu/Fedora are listed at https://nodejs.org/en/download/package-manager.
 
-## 4. Variante A: Fertiges Release (empfohlen)
+## 4. Option A: Prebuilt release (recommended)
 
-1. Öffne die **[Releases-Seite](https://github.com/keksi2k/minecraft-resourcepack-editor/releases)** und lade `minecraft-resourcepack-editor-1.0.0.zip` herunter.
-2. **Entpacke** das ZIP an einen beliebigen Ort, z. B. in deinen Dokumente-Ordner.
-3. Öffne ein Terminal **im entpackten Ordner** `minecraft-resourcepack-editor-1.0.0`:
-   - **Windows:** Ordner im Explorer öffnen, mit Rechtsklick auf eine freie Stelle *„In Terminal öffnen“* wählen. Alternativ in die Adressleiste `powershell` tippen und Enter drücken.
-   - **macOS:** Im Finder Rechtsklick auf den Ordner → *Dienste* → *„Neues Terminal beim Ordner“*. Alternativ `cd ` tippen und den Ordner ins Terminal ziehen.
-   - **Linux:** Rechtsklick im Dateimanager → *„Im Terminal öffnen“* oder `cd /pfad/zum/ordner`.
-4. Starte den Editor:
+1. Open the **[releases page](https://github.com/keksi2k/minecraft-resourcepack-editor/releases)** and download `minecraft-resourcepack-editor-<version>.zip` from the latest release.
+2. **Extract** the ZIP anywhere, e.g. into your Documents folder.
+3. Open a terminal **in the extracted folder** `minecraft-resourcepack-editor-<version>`:
+   - **Windows:** open the folder in Explorer, right-click an empty spot and choose *“Open in Terminal”*. Alternatively type `powershell` into the address bar and press Enter.
+   - **macOS:** in Finder, right-click the folder → *Services* → *“New Terminal at Folder”*. Alternatively type `cd ` and drag the folder into the terminal.
+   - **Linux:** right-click in the file manager → *“Open in Terminal”*, or `cd /path/to/folder`.
+4. Start the editor:
    ```sh
    node serve.mjs
    ```
-   Es erscheint `Resource Pack Editor läuft auf http://127.0.0.1:8080`.
-5. Öffne **http://127.0.0.1:8080** im Browser.
+   You'll see `Resource Pack Editor running at http://127.0.0.1:8080`.
+5. Open **http://127.0.0.1:8080** in your browser.
 
-Zum **Beenden** im Terminal `Strg + C` drücken (macOS: `Control + C`).
+To **stop** it, press `Ctrl + C` in the terminal (macOS: `Control + C`).
 
-### Optionen
+### Options
 
-| Option | Bedeutung | Beispiel |
+| Option | Meaning | Example |
 | --- | --- | --- |
-| `--port <zahl>` | anderer Port (Standard 8080) | `node serve.mjs --port 3000` |
-| `--host <adresse>` | Netzwerkadresse (Standard `127.0.0.1` = nur dieser Rechner) | `node serve.mjs --host 0.0.0.0` |
-| `--dir <ordner>` | anderer Ordner mit den Dateien | `node serve.mjs --dir ./dist` |
+| `--port <number>` | another port (default 8080) | `node serve.mjs --port 3000` |
+| `--host <address>` | network address (default `127.0.0.1` = this computer only) | `node serve.mjs --host 0.0.0.0` |
+| `--dir <folder>` | another folder with the files | `node serve.mjs --dir ./dist` |
 
-Statt der Optionen kannst du auch die Umgebungsvariablen `PORT`, `HOST` und `DIR` setzen.
+Instead of the options you can set the environment variables `PORT`, `HOST` and `DIR`.
 
-### Schneller starten
+### Starting faster
 
-- **Windows:** Im Ordner liegt eine **`Start.bat`**. Ein Doppelklick prüft, ob Node.js installiert ist, startet den Server und öffnet den Browser. Mit `Start.bat 3000` wählst du einen anderen Port. Bei einem Fehler bleibt das Fenster offen, damit du die Meldung lesen kannst.
-  > Beim ersten Start zeigt Windows eventuell *„Der Computer wurde durch Windows geschützt“* (SmartScreen), weil die Datei aus dem Internet stammt. Mit *Weitere Informationen → Trotzdem ausführen* geht es weiter. Alternativ vorher Rechtsklick auf die Datei → *Eigenschaften* → *Zulassen* anhaken.
-- **macOS/Linux:** Lege eine Datei `start.sh` an mit
+- **Windows:** the folder contains a **`Start.bat`**. Double-clicking it checks that Node.js is installed, starts the server and opens the browser. `Start.bat 3000` uses another port. If something goes wrong, the window stays open so you can read the message.
+  > On the first start Windows may show *“Windows protected your PC”* (SmartScreen), because the file comes from the internet. Click *More info → Run anyway*. Alternatively right-click the file beforehand → *Properties* → tick *Unblock*.
+- **macOS/Linux:** create a file `start.sh` containing
   ```sh
   #!/bin/sh
   cd "$(dirname "$0")"
   (sleep 1 && (xdg-open http://127.0.0.1:8080 || open http://127.0.0.1:8080)) >/dev/null 2>&1 &
   node serve.mjs
   ```
-  und mache sie mit `chmod +x start.sh` ausführbar.
+  and make it executable with `chmod +x start.sh`.
 
-## 5. Variante B: Aus dem Quellcode
+## 5. Option B: From source
 
-### Git installieren
+### Installing Git
 
-- **Windows:** https://git-scm.com/download/win oder `winget install Git.Git`
-- **macOS:** `xcode-select --install` oder `brew install git`
-- **Linux:** `sudo apt install git` bzw. `sudo dnf install git`
+- **Windows:** https://git-scm.com/download/win or `winget install Git.Git`
+- **macOS:** `xcode-select --install` or `brew install git`
+- **Linux:** `sudo apt install git` or `sudo dnf install git`
 
-### Herunterladen und starten
+### Download and start
 
 ```sh
 git clone https://github.com/keksi2k/minecraft-resourcepack-editor.git
 cd minecraft-resourcepack-editor
-npm ci            # installiert die Abhängigkeiten genau wie in package-lock.json
+npm ci            # installs dependencies exactly as in package-lock.json
 npm run dev
 ```
 
-Öffne **http://localhost:5173**. Unter Windows geht es auch ohne Terminal: Ein Doppelklick auf **`Start.bat`** im Repo-Ordner installiert beim ersten Mal die Abhängigkeiten, baut die App und startet sie auf http://127.0.0.1:8080. Nach einem `git pull` den Ordner `dist` löschen, damit neu gebaut wird.
+Open **http://localhost:5173**. On Windows this also works without a terminal: double-clicking **`Start.bat`** in the repository folder installs the dependencies on first run, builds the app and starts it at http://127.0.0.1:8080. After a `git pull`, delete the `dist` folder so it gets rebuilt.
 
-Im Dev-Modus werden Änderungen am Code sofort im Browser sichtbar. Den Sound-Proxy liefert der Dev-Server automatisch mit.
+In dev mode, code changes show up in the browser immediately. The dev server includes the sound proxy.
 
-### Produktions-Build
+### Production build
 
 ```sh
-npm run build     # Typecheck und optimierter Build nach dist/
-npm run serve     # liefert dist/ inkl. Sound-Proxy auf http://127.0.0.1:8080 aus
+npm run build     # type check and optimised build to dist/
+npm run serve     # serves dist/ including the sound proxy at http://127.0.0.1:8080
 ```
 
-`npm start` macht beides in einem Schritt. Mit `npm run serve -- --port 3000 --host 0.0.0.0` reichst du Optionen durch.
+`npm start` does both in one step. Pass options with `npm run serve -- --port 3000 --host 0.0.0.0`.
 
-### Weitere Befehle
+### More commands
 
-| Befehl | Zweck |
+| Command | Purpose |
 | --- | --- |
-| `npm test` | Unit-Tests ausführen |
-| `npm run package` | Release-ZIP nach `release/` bauen (wie in Variante A) |
-| `npm run mc:fetch` / `npm run mc:models` | siehe [Abschnitt 10](#10-mob-modelle-für-eine-neue-minecraft-version-erzeugen) |
+| `npm test` | run the unit tests |
+| `npm run package` | build the release ZIP to `release/` (as in option A) |
+| `npm run mc:fetch` / `npm run mc:models` | see [section 10](#10-generating-mob-models-for-a-new-minecraft-version) |
 
-## 6. Variante C: Auf einem Server oder im Heimnetz
+## 6. Option C: On a server or your home network
 
-### Im Heimnetz (z. B. für andere PCs oder ein Tablet)
+### On your home network (e.g. for other PCs or a tablet)
 
 ```sh
 node serve.mjs --host 0.0.0.0 --port 8080
 ```
 
-Andere Geräte erreichen den Editor dann über `http://<IP-deines-Rechners>:8080`. Die IP findest du unter Windows mit `ipconfig` und unter macOS/Linux mit `ip addr` bzw. `ifconfig`. Eventuell musst du den Port in der Firewall freigeben.
+Other devices then reach the editor at `http://<your-computer's-IP>:8080`. Find the IP with `ipconfig` on Windows or `ip addr` / `ifconfig` on macOS/Linux. You may have to allow the port in your firewall.
 
-> **Sicherheit:** Der Editor hat keine Anmeldung. Das ist unkritisch, denn jede Person arbeitet nur mit den Dateien in ihrem eigenen Browser, und auf dem Server wird nichts gespeichert. Der eingebaute Proxy leitet nur Anfragen der Form `/mcres/<xx>/<40-stelliger-hash>` an Mojang weiter und ist **kein** offener Proxy.
+> **Security:** the editor has no login. That's fine, because everyone only works with the files in their own browser and nothing is stored on the server. The built-in proxy only forwards requests of the form `/mcres/<xx>/<40-character-hash>` to Mojang and is **not** an open proxy.
 
-### Dauerhaft mit systemd (Linux)
+### Permanently with systemd (Linux)
 
-1. Release nach `/opt/resourcepack-editor` entpacken.
-2. Datei `/etc/systemd/system/resourcepack-editor.service` anlegen:
+1. Extract the release to `/opt/resourcepack-editor`.
+2. Create `/etc/systemd/system/resourcepack-editor.service`:
    ```ini
    [Unit]
    Description=Minecraft Resource Pack Editor
@@ -189,21 +191,21 @@ Andere Geräte erreichen den Editor dann über `http://<IP-deines-Rechners>:8080
    [Install]
    WantedBy=multi-user.target
    ```
-3. Aktivieren:
+3. Enable it:
    ```sh
    sudo systemctl daemon-reload
    sudo systemctl enable --now resourcepack-editor
    ```
 
-### Hinter nginx (mit eigener Domain/HTTPS)
+### Behind nginx (with your own domain/HTTPS)
 
-Den Node-Server auf `127.0.0.1:8080` laufen lassen und nginx davorschalten:
+Run the Node server on `127.0.0.1:8080` and put nginx in front of it:
 
 ```nginx
 server {
     listen 443 ssl;
     server_name editor.example.org;
-    # ssl_certificate … (z. B. mit certbot)
+    # ssl_certificate … (e.g. with certbot)
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -213,7 +215,7 @@ server {
 
 ### Docker
 
-Eine `Dockerfile` im entpackten Release-Ordner:
+A `Dockerfile` in the extracted release folder:
 
 ```dockerfile
 FROM node:22-alpine
@@ -228,19 +230,19 @@ docker build -t resourcepack-editor .
 docker run -d -p 8080:8080 --name resourcepack-editor resourcepack-editor
 ```
 
-### Rein statisches Hosting (GitHub Pages, Netlify, Webspace …)
+### Purely static hosting (GitHub Pages, Netlify, web space …)
 
-Der Inhalt von `dist/` lässt sich auf jeden Webspace legen. **Ohne Proxy funktionieren dann aber die Vanilla-Sounds nicht.** Texturen, Modelle, Mobs und Pack-Sounds gehen trotzdem. Es gibt drei Möglichkeiten:
+The contents of `dist/` can go on any web space. **Without a proxy, though, vanilla sounds don't work.** Textures, models, mobs and pack sounds still do. There are three ways around it:
 
-1. **Eigenen Proxy angeben** und beim Build einbauen:
+1. **Set your own proxy** at build time:
    ```sh
-   VITE_RESOURCES_BASE=https://mein-proxy.example.org npm run build
+   VITE_RESOURCES_BASE=https://my-proxy.example.org npm run build
    ```
-   Unter Windows (PowerShell): `$env:VITE_RESOURCES_BASE="https://…"; npm run build`
-2. **Proxy-URL in der App setzen:** Im Sounds-Tab erscheint bei fehlenden Sounds ein Eingabefeld dafür. Die Einstellung wird im Browser gespeichert.
-3. **Lokalen Ordner nutzen:** Ist Minecraft installiert, im Sounds-Tab *„.minecraft/assets-Ordner wählen“* klicken. Die Sounds kommen dann von der Festplatte.
+   On Windows (PowerShell): `$env:VITE_RESOURCES_BASE="https://…"; npm run build`
+2. **Set the proxy URL in the app:** when sounds are missing, the Sounds tab shows an input field for it. The setting is saved in the browser.
+3. **Use a local folder:** if Minecraft is installed, click *“Choose .minecraft/assets folder”* in the Sounds tab. The sounds are then read from disk.
 
-Ein minimaler Proxy als **Cloudflare Worker** (kostenloser Tarif reicht):
+A minimal proxy as a **Cloudflare Worker** (the free plan is enough):
 
 ```js
 export default {
@@ -256,107 +258,111 @@ export default {
 };
 ```
 
-Die Worker-URL (z. B. `https://mcres.dein-name.workers.dev`) dann als `VITE_RESOURCES_BASE` verwenden.
+Then use the worker URL (e.g. `https://mcres.your-name.workers.dev`) as `VITE_RESOURCES_BASE`.
 
-### Warum braucht es einen Proxy für Sounds?
+### Why do sounds need a proxy?
 
-Browser dürfen Daten von fremden Servern nur laden, wenn diese es per CORS-Header erlauben. Mojangs Server für Versionsliste und client.jar (`piston-meta`/`piston-data.mojang.com`) tun das. Der Server für Sounds (`resources.download.minecraft.net`) tut es **nicht**. Deshalb läuft diese eine Art von Anfragen über den eigenen Server.
+Browsers may only load data from other servers if those servers allow it with CORS headers. Mojang's servers for the version list and client.jar (`piston-meta`/`piston-data.mojang.com`) do. The sound server (`resources.download.minecraft.net`) does **not**. That's why this one kind of request goes through your own server. Translated item and mob names live on the same server, so they need the proxy too.
 
-## 7. Erster Start in der App
+## 7. First start in the app
 
-1. **Resourcepack laden:** Die `.zip` auf die Startseite ziehen oder anklicken und auswählen. Packs, die in einem Unterordner gezippt sind, werden erkannt.
-2. **Version prüfen:** Der Editor schlägt anhand von `pack_format` eine Minecraft-Version vor. Wähle die Version, für die dein Pack gedacht ist. Mit *„Snapshots zeigen“* stehen auch Snapshots zur Auswahl.
-3. **Pack öffnen:** Beim ersten Mal pro Version lädt der Browser die client.jar (~40 MB). Das dauert je nach Leitung 10–60 Sekunden. Danach liegt sie im Browser-Speicher und der Start dauert nur noch Sekunden.
-4. Ohne eigenes Pack: **„Neues Pack erstellen“** startet mit einem leeren Pack auf Vanilla-Basis.
+1. **Load a resource pack:** drop the `.zip` onto the start page, or click and choose it. Packs zipped inside a subfolder are detected.
+2. **Check the version:** the editor suggests a Minecraft version from `pack_format`. Pick the version your pack is made for. *“Show snapshots”* adds snapshots to the list.
+3. **Open pack:** the first time per version, the browser downloads the client.jar (~40 MB). Depending on your connection that takes 10–60 seconds. After that it's in browser storage and starting takes only seconds.
+4. Without a pack of your own: **“Create new pack”** starts with an empty pack on top of vanilla.
+5. **Language:** switch between English and German at the top right. On first start the browser's language is used.
 
-Bedeutung der Farben: **blauer Rahmen/„Pack“** = vom geladenen Pack verändert, **orange/„Bearbeitet“** = von dir geändert, **„Vanilla“** = Original.
+Colour meaning: **blue frame/“Pack”** = changed by the loaded pack, **orange/“Edited”** = changed by you, **“Vanilla”** = original.
 
-## 8. Das bearbeitete Pack in Minecraft verwenden
+## 8. Using the edited pack in Minecraft
 
-1. In der App **„Pack exportieren“** klicken. Das ZIP landet in deinem Download-Ordner.
-2. Das ZIP in den Resourcepack-Ordner von Minecraft kopieren (nicht entpacken):
-   - **Windows:** `%APPDATA%\.minecraft\resourcepacks` (in die Explorer-Adressleiste einfügen)
+1. Click **“Export pack”** in the app. The ZIP lands in your downloads folder.
+2. Copy the ZIP into Minecraft's resource pack folder (don't extract it):
+   - **Windows:** `%APPDATA%\.minecraft\resourcepacks` (paste into the Explorer address bar)
    - **macOS:** `~/Library/Application Support/minecraft/resourcepacks`
    - **Linux:** `~/.minecraft/resourcepacks`
-   - Bei anderen Launchern (Prism, MultiMC, CurseForge, Modrinth): Instanz öffnen → Ordner *resourcepacks*
-3. In Minecraft: *Optionen → Ressourcenpakete* → Pack nach rechts schieben → *Fertig*.
+   - Other launchers (Prism, MultiMC, CurseForge, Modrinth): open the instance → *resourcepacks* folder
+3. In Minecraft: *Options → Resource Packs* → move the pack to the right → *Done*.
 
-Tipp: Liegt das Pack schon im Ordner, reicht im Spiel `F3 + T` zum Neuladen, nachdem du die Datei ersetzt hast.
+Tip: if the pack is already in the folder, `F3 + T` in game reloads it after you've replaced the file.
 
-## 9. Aktualisieren
+## 9. Updating
 
-- **Release (Variante A):** Das neue ZIP herunterladen und entpacken, den alten Ordner löschen. Deine Daten liegen im Browser und bleiben erhalten.
-- **Quellcode (Variante B):**
+- **Release (option A):** download and extract the new ZIP, delete the old folder. Your data lives in the browser and is kept.
+- **Source (option B):**
   ```sh
   git pull
   npm ci
-  npm run build   # falls du mit serve arbeitest
+  npm run build   # if you use serve
   ```
 
-> Ungespeicherte Änderungen in der App gehen beim Neuladen der Seite verloren. Exportiere dein Pack, bevor du aktualisierst.
+> Unsaved changes in the app are lost when the page reloads. Export your pack before updating.
 
-## 10. Mob-Modelle für eine neue Minecraft-Version erzeugen
+## 10. Generating mob models for a new Minecraft version
 
-Item- und Block-Modelle liest der Editor immer direkt aus der gewählten Version. **Mob-Modelle** stehen dagegen im Programmcode von Minecraft und werden einmalig als `src/entities/entityModels.json` erzeugt. Das ist nur nötig, wenn Mojang Mob-Modelle ändert und du am Quellcode arbeitest (Variante B).
+The editor always reads item and block models directly from the selected version. **Mob models**, however, live in Minecraft's program code and are generated once into `src/entities/entityModels.json`. This is only needed when Mojang changes mob models and you work on the source (option B).
 
-**Voraussetzung:** ein **JDK** (nicht nur JRE) in der Version, die das Spiel verlangt. Für 26.x ist das Java 25. Download z. B. bei https://adoptium.net, oder per `winget install EclipseAdoptium.Temurin.25.JDK` bzw. `brew install --cask temurin`. Prüfen mit `java -version`.
+**Requirement:** a **JDK** (not just a JRE) in the version the game needs. For 26.x that's Java 25. Download it e.g. from https://adoptium.net, or use `winget install EclipseAdoptium.Temurin.25.JDK` or `brew install --cask temurin`. Check with `java -version`.
 
 ```sh
-npm run mc:fetch -- 26.3              # client.jar + Bibliotheken nach .mc/26.3/ laden (offizielle Mojang-Server)
-npm run mc:models -- 26.3             # alle vorhandenen Mob-Modelle neu erzeugen
-npm run mc:models -- 26.3 --list      # alle Modell-Layer des Spiels auflisten
-npm run mc:models -- 26.3 minecraft:goat#main   # weitere Layer hinzufügen
+npm run mc:fetch -- 26.3              # download client.jar + libraries to .mc/26.3/ (official Mojang servers)
+npm run mc:models -- 26.3             # regenerate all existing mob models
+npm run mc:models -- 26.3 --list      # list every model layer the game defines
+npm run mc:models -- 26.3 minecraft:goat#main   # add more layers
 ```
 
-Ein neu hinzugefügter Layer erscheint erst in der App, wenn er in `src/entities/catalog.ts` einem Mob mit Textur zugeordnet ist. Der Ordner `.mc/` ist von Git ausgeschlossen.
+A newly added layer only shows up in the app once `src/entities/catalog.ts` assigns it to a mob with a texture. The `.mc/` folder is excluded from Git.
 
-## 11. Fehlerbehebung
+## 11. Troubleshooting
 
-**`node` wird nicht gefunden / „Der Begriff 'node' wurde nicht erkannt“**
-Node.js ist nicht installiert oder das Terminal war schon vor der Installation offen. Terminal schließen und neu öffnen, dann `node -v` prüfen.
+**`node` is not found / “The term 'node' is not recognized”**
+Node.js isn't installed, or the terminal was open before installing it. Close and reopen the terminal, then check `node -v`.
 
-**`SyntaxError` oder ähnliche Fehler beim Start von `serve.mjs`**
-Node.js ist zu alt. `node -v` muss mindestens `v18.18.0` zeigen.
+**`SyntaxError` or similar errors when starting `serve.mjs`**
+Node.js is too old. `node -v` must show at least `v18.18.0`.
 
 **`EADDRINUSE: address already in use`**
-Der Port ist belegt, oft durch einen noch laufenden Editor. Entweder das andere Terminal schließen oder einen anderen Port nehmen: `node serve.mjs --port 8081`.
+The port is taken, often by an editor that's still running. Close the other terminal or use another port: `node serve.mjs --port 8081`.
 
-**„Mojang-Versionsliste nicht erreichbar“ / client.jar lädt nicht**
-Der Browser erreicht `piston-meta.mojang.com` bzw. `piston-data.mojang.com` nicht. Internetverbindung, Firmen-Firewall, Adblocker oder Pi-hole prüfen.
+**“Could not reach the Mojang version list” / client.jar doesn't download**
+The browser can't reach `piston-meta.mojang.com` or `piston-data.mojang.com`. Check your internet connection, company firewall, ad blocker or Pi-hole.
 
-**Vanilla-Sounds spielen nicht („Kein Sound-Proxy konfiguriert“ / „HTTP 404“)**
-Die Seite läuft ohne Proxy, etwa über `python -m http.server`, einen anderen Webserver oder einen Webspace. Lösung: über `node serve.mjs` bzw. `npm run dev` starten oder einen Proxy einrichten (siehe [Statisches Hosting](#rein-statisches-hosting-github-pages-netlify-webspace-)).
+**Vanilla sounds don't play (“No sound proxy configured” / “HTTP 404”)**
+The page runs without a proxy, e.g. via `python -m http.server`, another web server or a web space. Fix: start it with `node serve.mjs` or `npm run dev`, or set up a proxy (see [static hosting](#purely-static-hosting-github-pages-netlify-web-space-)).
 
-**Ein Sound spielt in Safari nicht**
-Je nach Version unterstützt Safari Ogg Vorbis nicht oder nur eingeschränkt. Chrome, Edge oder Firefox verwenden.
+**Item and mob names are in English although another language is selected**
+Only the English names are inside the client.jar. Translations come from Minecraft's language file, which lives on the same server as the sounds and therefore needs the proxy too. If vanilla sounds work, translated names work as well. The interface itself isn't affected.
 
-**„Keine Ogg-Datei“ / „Ogg Opus“ beim Hinzufügen eines Sounds**
-Minecraft spielt nur **Ogg Vorbis** ab. In Audacity: *Datei → Exportieren → Als OGG exportieren*. Mit ffmpeg: `ffmpeg -i sound.mp3 -c:a libvorbis -ac 1 sound.ogg` (`-ac 1` = Mono).
+**A sound doesn't play in Safari**
+Depending on the version, Safari doesn't support Ogg Vorbis or only partly. Use Chrome, Edge or Firefox.
 
-**Hinweis „Die Datei ist Stereo“**
-Stereo-Sounds spielt Minecraft ohne Richtung und ohne Entfernungsabfall ab. Für Schritte, Mob-Geräusche usw. die Datei in Mono umwandeln (siehe oben).
+**“Not an Ogg file” / “Ogg Opus” when adding a sound**
+Minecraft only plays **Ogg Vorbis**. In Audacity: *File → Export → Export as OGG*. With ffmpeg: `ffmpeg -i sound.mp3 -c:a libvorbis -ac 1 sound.ogg` (`-ac 1` = mono).
 
-**Vorschaubilder bleiben leer oder schwarz**
-WebGL ist deaktiviert. In Chrome/Edge unter *Einstellungen → System* die *Hardwarebeschleunigung* einschalten und den Browser neu starten. Unter `chrome://gpu` lässt sich der Status prüfen.
+**Note “the file is stereo”**
+Minecraft plays stereo sounds without direction or distance falloff. For footsteps, mob sounds and so on, convert the file to mono (see above).
 
-**„passt evtl. nicht zur Version“ in der Kopfzeile**
-Das `pack_format` des Packs passt nicht genau zur gewählten Version. Meist ist das harmlos. Für eine exakte Darstellung die Version wählen, für die das Pack gebaut wurde.
+**Thumbnails stay empty or black**
+WebGL is disabled. In Chrome/Edge, enable *Settings → System → Use hardware acceleration* and restart the browser. `chrome://gpu` shows the status.
 
-**Browser-Speicher voll / Cache leeren**
-Pro geöffneter Minecraft-Version werden ca. 20–40 MB gespeichert. So löschst du den Cache: Entwicklertools öffnen (`F12`) → *Anwendung/Application* (Firefox: *Web-Speicher*) → *IndexedDB* → `keyval-store` löschen. Oder in den Website-Einstellungen *„Daten löschen“* für die Adresse des Editors.
+**“may not match this version” in the header**
+The pack's `pack_format` doesn't exactly match the selected version. Usually harmless. For an exact preview, pick the version the pack was made for.
 
-**Seite lädt nach einem Update alte Dateien**
-Hartes Neuladen mit `Strg + F5` (macOS: `Cmd + Shift + R`).
+**Browser storage full / clearing the cache**
+Each opened Minecraft version stores about 20–40 MB. To clear it: open the developer tools (`F12`) → *Application* (Firefox: *Storage*) → *IndexedDB* → delete `keyval-store`. Or use *“Clear data”* in the site settings for the editor's address.
 
-**Mob-Export: `ClassNotFoundException` oder `UnsupportedClassVersionError`**
-Bei `ClassNotFoundException` fehlen Bibliotheken: `npm run mc:fetch -- <version>` erneut ausführen. Bei `UnsupportedClassVersionError` ist das JDK zu alt (siehe [Abschnitt 10](#10-mob-modelle-für-eine-neue-minecraft-version-erzeugen)).
+**The page loads old files after an update**
+Hard reload with `Ctrl + F5` (macOS: `Cmd + Shift + R`).
 
-Ein Problem, das hier nicht steht? Öffne ein [Issue](https://github.com/keksi2k/minecraft-resourcepack-editor/issues) mit Betriebssystem, Browser, Minecraft-Version und der Fehlermeldung. Schicke dabei keine Packs mit, die dir nicht gehören.
+**Mob export: `ClassNotFoundException` or `UnsupportedClassVersionError`**
+`ClassNotFoundException` means libraries are missing: run `npm run mc:fetch -- <version>` again. `UnsupportedClassVersionError` means the JDK is too old (see [section 10](#10-generating-mob-models-for-a-new-minecraft-version)).
 
-## 12. Deinstallation
+A problem that isn't listed? Open an [issue](https://github.com/keksi2k/minecraft-resourcepack-editor/issues) with your operating system, browser, Minecraft version and the error message. Please don't attach packs you don't own.
 
-1. Den Server mit `Strg + C` beenden und den Ordner des Editors löschen.
-2. Optional den Browser-Speicher leeren (siehe [Cache leeren](#11-fehlerbehebung)).
-3. Node.js kann bleiben oder über die Systemsteuerung, `brew uninstall node` bzw. `nvm uninstall` entfernt werden.
+## 12. Uninstalling
 
-Der Editor legt außerhalb seines Ordners und des Browser-Speichers keine Dateien an.
+1. Stop the server with `Ctrl + C` and delete the editor's folder.
+2. Optionally clear the browser storage (see [clearing the cache](#11-troubleshooting)).
+3. Node.js can stay, or be removed via the system settings, `brew uninstall node` or `nvm uninstall`.
+
+The editor creates no files outside its folder and the browser's storage.

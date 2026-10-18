@@ -1,10 +1,11 @@
 import { get, set } from 'idb-keyval';
+import { t } from '../i18n';
 
 export type Progress = (loaded: number, total: number) => void;
 
 export async function fetchBytes(url: string, onProgress?: Progress): Promise<Uint8Array> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} beim Laden von ${url}`);
+  if (!res.ok) throw new Error(t('errors.http', { status: res.status, url }));
   const total = Number(res.headers.get('content-length')) || 0;
   if (!res.body || !onProgress) return new Uint8Array(await res.arrayBuffer());
 
@@ -32,7 +33,7 @@ export async function fetchJsonCached<T>(url: string, cacheKey = `json:${url}`):
   const hit = await get<T>(cacheKey).catch(() => undefined);
   if (hit) return hit;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} beim Laden von ${url}`);
+  if (!res.ok) throw new Error(t('errors.http', { status: res.status, url }));
   const json = (await res.json()) as T;
   await set(cacheKey, json).catch(() => {});
   return json;

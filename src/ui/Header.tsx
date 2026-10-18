@@ -1,17 +1,14 @@
 import { useState } from 'react';
 import { exportPackZip, downloadBlob } from '../pack/exportPack';
+import { useT } from '../i18n';
 import { useApp, type Tab } from '../state/appStore';
-import { Btn } from './common';
+import { Btn, LanguageSelect } from './common';
 
-const TABS: [Tab, string][] = [
-  ['items', 'Items'],
-  ['mobs', 'Mobs'],
-  ['textures', 'Texturen'],
-  ['sounds', 'Sounds'],
-];
+const TABS: Tab[] = ['items', 'mobs', 'textures', 'sounds'];
 
 export function Header() {
   const { packName, packMeta, packIcon, version, gameFormat, tab, setTab, store, close, revision } = useApp();
+  const t = useT();
   const [exporting, setExporting] = useState(false);
   const edits = store?.editCount ?? 0;
   void revision; // re-render on edits so the counter stays current
@@ -22,7 +19,7 @@ export function Header() {
     if (!store) return;
     setExporting(true);
     try {
-      downloadBlob(await exportPackZip(store, gameFormat), `${packName}${edits ? '-bearbeitet' : ''}.zip`);
+      downloadBlob(await exportPackZip(store, gameFormat), `${packName}${edits ? t('header.editedSuffix') : ''}.zip`);
     } finally {
       setExporting(false);
     }
@@ -39,33 +36,34 @@ export function Header() {
         <div className="truncate font-semibold">{packName}</div>
         <div className="truncate text-xs text-neutral-400">
           Vanilla {version?.id}
-          {gameFormat !== undefined && ` (Format ${gameFormat})`}
-          {packMeta?.format !== undefined && ` · Pack-Format ${packMeta.format}`}
-          {formatMismatch && <span className="text-amber-400"> · passt evtl. nicht zur Version</span>}
+          {gameFormat !== undefined && ` (${t('header.format', { format: gameFormat })})`}
+          {packMeta?.format !== undefined && ` · ${t('header.packFormat', { format: packMeta.format })}`}
+          {formatMismatch && <span className="text-amber-400"> · {t('header.formatMismatch')}</span>}
         </div>
       </div>
       <nav className="ml-6 flex gap-1">
-        {TABS.map(([id, label]) => (
+        {TABS.map((id) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={`rounded px-3 py-1.5 text-sm ${tab === id ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}
           >
-            {label}
+            {t(`header.tabs.${id}`)}
           </button>
         ))}
       </nav>
       <div className="ml-auto flex items-center gap-2">
-        {edits > 0 && <span className="text-xs text-amber-400">{edits} Änderung{edits === 1 ? '' : 'en'}</span>}
+        {edits > 0 && <span className="text-xs text-amber-400">{t('header.edits', { count: edits })}</span>}
+        <LanguageSelect />
         <Btn tone="primary" onClick={() => void doExport()} disabled={exporting}>
-          {exporting ? 'Exportiere …' : 'Pack exportieren'}
+          {exporting ? t('header.exporting') : t('header.export')}
         </Btn>
         <Btn
           onClick={() => {
-            if (edits === 0 || confirm('Ungespeicherte Änderungen gehen verloren. Pack schließen?')) close();
+            if (edits === 0 || confirm(t('header.confirmClose'))) close();
           }}
         >
-          Schließen
+          {t('header.close')}
         </Btn>
       </div>
     </header>

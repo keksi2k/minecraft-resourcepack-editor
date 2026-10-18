@@ -71,6 +71,6 @@ describe('inspectOgg', () => {
   });
   it('rejects opus and non-ogg files', () => {
     expect(inspectOgg(fakeOgg('opus'))).toMatch(/Opus/);
-    expect(inspectOgg(new Uint8Array(100))).toMatch(/Keine Ogg/);
+    expect(inspectOgg(new Uint8Array(100))).toMatch(/Not an Ogg/);
   });
 });

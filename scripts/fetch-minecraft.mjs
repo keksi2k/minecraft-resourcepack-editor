@@ -12,7 +12,7 @@ const manifest = await (await fetch('https://piston-meta.mojang.com/mc/game/vers
 const id = process.argv[2] ?? manifest.latest.release;
 const entry = manifest.versions.find((v) => v.id === id);
 if (!entry) {
-  console.error(`Unbekannte Version "${id}". Neueste Release: ${manifest.latest.release}`);
+  console.error(`Unknown version "${id}". Latest release: ${manifest.latest.release}`);
   process.exit(1);
 }
 const version = await (await fetch(entry.url)).json();
@@ -25,7 +25,7 @@ async function download(url, sha1, target) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
   const buf = Buffer.from(await res.arrayBuffer());
-  if (createHash('sha1').update(buf).digest('hex') !== sha1) throw new Error(`Prüfsumme falsch: ${url}`);
+  if (createHash('sha1').update(buf).digest('hex') !== sha1) throw new Error(`Checksum mismatch: ${url}`);
   writeFileSync(target, buf);
 }
 
@@ -39,7 +39,7 @@ let n = 0;
 for (const l of libs) {
   const a = l.downloads.artifact;
   await download(a.url, a.sha1, join(libDir, basename(a.path)));
-  process.stdout.write(`\rBibliotheken ${++n}/${libs.length}`);
+  process.stdout.write(`\rLibraries ${++n}/${libs.length}`);
 }
-console.log(`\nFertig: ${dir}`);
-console.log(`Java ${version.javaVersion?.majorVersion ?? '?'} oder neuer wird für den Modell-Export benötigt.`);
+console.log(`\nDone: ${dir}`);
+console.log(`Exporting mob models needs Java ${version.javaVersion?.majorVersion ?? '?'} or newer.`);

@@ -61,8 +61,12 @@ function buildEntry(store: AssetStore, id: string, defPath: string, lang: Record
   return { id, name, defPath, models, textures, deps, source, depsKey: deps.map((d) => store.rev(d)).join('.') };
 }
 
-export function listItems(store: AssetStore): ItemEntry[] {
-  const lang = store.json<Record<string, string>>('assets/minecraft/lang/en_us.json') ?? {};
+/** Display names: English from the jar, overlaid with a translation (Minecraft language file) if given. */
+export function gameNames(store: AssetStore, translated?: Record<string, string>): Record<string, string> {
+  return { ...(store.json<Record<string, string>>('assets/minecraft/lang/en_us.json') ?? {}), ...translated };
+}
+
+export function listItems(store: AssetStore, lang: Record<string, string> = gameNames(store)): ItemEntry[] {
   const pattern = usesItemDefinitions(store) ? NEW_DEF : OLD_DEF;
   const out: ItemEntry[] = [];
   for (const p of store.list('assets/')) {
