@@ -3,7 +3,7 @@ import type { AssetStore, Source } from '../assets/AssetStore';
 import { MOBS, type MobDef } from '../entities/catalog';
 import { texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
-import { buildMobObject, mobDeps } from '../render/entityMesh';
+import { buildMobObject, mobDeps, pickTexture, type TexturePick } from '../render/entityMesh';
 import { mobThumbnail } from '../render/thumbnails';
 import { useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
@@ -122,6 +122,13 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
   const links = useSoundLinks();
   const sounds = useMemo(() => eventsLinkedTo(soundEvents, links, `minecraft:${mob.entity}`), [soundEvents, links, mob.entity]);
   const [uvFor, setUvFor] = useState<number | undefined>(0);
+  const [pick, setPick] = useState<TexturePick>();
+  useEffect(() => setPick(undefined), [mob.id]);
+  const onPick = (hits: Parameters<typeof pickTexture>[0]) => {
+    const p = pickTexture(hits);
+    setPick(p);
+    if (p) setUvFor(p.layer);
+  };
   const depsKey = mobDeps(mob)
     .map((d) => store.rev(d))
     .join('.');
@@ -147,10 +154,10 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
       </div>
       <div className="px-3">
         <div className="h-80">
-          <ObjectViewer fit buildKey={`${mob.id}|${depsKey}`} build={() => buildMobObject(store, mob)} />
+          <ObjectViewer fit buildKey={`${mob.id}|${depsKey}`} build={() => buildMobObject(store, mob)} onPick={onPick} marker={pick?.point} />
         </div>
         <div className="mt-2 flex items-center">
-          <span className="text-[11px] text-neutral-500">{t('mobs.staticPose')}</span>
+          <span className="text-[11px] text-neutral-500">{t('mobs.staticPose')} {t('mobs.pickHint')}</span>
           <span className="ml-auto">
             <Btn onClick={() => void downloadRender()} title={t('mobs.renderTitle')}>
               {t('actions.render')}
@@ -183,7 +190,7 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
                     </div>
                   </div>
                 </div>
-                {uvFor === i && <UVOverlay store={store} path={path} modelKey={layer.model} />}
+                {uvFor === i && <UVOverlay store={store} path={path} modelKey={layer.model} pick={pick?.layer === i ? pick : undefined} />}
               </div>
             );
           })}

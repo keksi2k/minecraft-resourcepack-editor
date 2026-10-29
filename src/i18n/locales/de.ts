@@ -181,6 +181,8 @@ const de: Translation = {
     emissive: 'leuchtend',
     uvShow: 'UV-Layout',
     uvHide: 'UV ausblenden',
+    pickHint: 'Klick auf den Mob zeigt die Stelle in der Textur.',
+    picked: 'Pixel {x}, {y} · {part}',
     uvTitle: 'Welche Textur-Bereiche zu welchem Körperteil gehören',
     uvHint: 'Modell-Texturgröße {w}×{h} px – höher aufgelöste Texturen skalieren proportional.',
     player: 'Spieler',

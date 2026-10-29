@@ -182,6 +182,8 @@ const en = {
     emissive: 'glowing',
     uvShow: 'UV layout',
     uvHide: 'Hide UV',
+    pickHint: 'Click the mob to find the spot in its texture.',
+    picked: 'Pixel {x}, {y} · {part}',
     uvTitle: 'Which texture regions belong to which body part',
     uvHint: 'Model texture size {w}×{h} px – higher-resolution textures scale proportionally.',
     player: 'Player',
