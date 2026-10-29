@@ -322,6 +322,9 @@ Node.js ist nicht installiert oder das Terminal war schon vor der Installation o
 **`SyntaxError` oder ähnliche Fehler beim Start von `serve.mjs`**
 Node.js ist zu alt. `node -v` muss mindestens `v18.18.0` zeigen.
 
+**Der Server startet, aber die Seite lädt endlos**
+Editor 1.3.0 und älter bleiben unter Node.js 26 hängen, sobald der Browser eine Verbindung wiederverwendet. Auf 1.4.0 oder neuer aktualisieren.
+
 **`EADDRINUSE: address already in use`**
 Der Port ist belegt, oft durch einen noch laufenden Editor. Entweder das andere Terminal schließen oder einen anderen Port nehmen: `node serve.mjs --port 8081`.
 

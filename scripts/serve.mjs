@@ -5,7 +5,7 @@
 //
 //   node scripts/serve.mjs [--port 8080] [--host 127.0.0.1] [--dir dist]
 
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,11 +71,19 @@ function serveFile(req, res) {
   if (!existsSync(file) || statSync(file).isDirectory()) file = join(root, 'index.html');
   const type = TYPES[extname(file)] ?? 'application/octet-stream';
   const immutable = file.includes(`${sep}assets${sep}`);
-  res.writeHead(200, { 'content-type': type, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache' });
-  createReadStream(file).pipe(res);
+  // Sent in one piece: piping a file stream into the response stalls on Node 26 (the files are small anyway).
+  const body = readFileSync(file);
+  res.writeHead(200, {
+    'content-type': type,
+    'content-length': body.length,
+    'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+  });
+  res.end(body);
 }
 
 createServer((req, res) => {
+  // Node 26 stalls the second response on a reused keep-alive connection, so use one connection per request.
+  res.setHeader('connection', 'close');
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
   const m = HASH_PATH.exec(req.url.split('?')[0]);
   if (m) return void proxy(req, res, m);
