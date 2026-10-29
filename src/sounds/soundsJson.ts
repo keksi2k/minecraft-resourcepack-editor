@@ -1,4 +1,4 @@
-import { normalizeRL, parseRL, soundPath } from '../models/resourceLocation';
+import { normalizeRL, soundPath } from '../models/resourceLocation';
 
 export interface SoundFileRef {
   /** Sound id as written in sounds.json, e.g. `minecraft:dig/stone1`. */
@@ -66,10 +66,4 @@ export function mergeSounds(vanilla: SoundsJson | undefined, pack: Record<string
   addEvents(events, 'minecraft', vanilla, false);
   for (const [ns, json] of Object.entries(pack)) addEvents(events, ns, json, true);
   return [...events.values()].sort((a, b) => a.id.localeCompare(b.id));
-}
-
-/** Events whose id mentions the item, e.g. `item.trident.throw` for `minecraft:trident`. */
-export function soundsForItem(events: SoundEvent[], itemId: string): SoundEvent[] {
-  const { path } = parseRL(itemId);
-  return events.filter((e) => parseRL(e.id).path.split('.').includes(path)).slice(0, 30);
 }

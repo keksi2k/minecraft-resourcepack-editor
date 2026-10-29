@@ -1,13 +1,100 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { Source } from '../assets/AssetStore';
+import { MOBS, type MobDef } from '../entities/catalog';
+import type { ItemEntry } from '../models/items';
+import { parseRL } from '../models/resourceLocation';
 import { getResourcesBase, setResourcesBase } from '../mojang/soundAssets';
 import { playSound } from '../sounds/player';
+import { linkSounds, type SoundLink, type SoundLinks } from '../sounds/soundLinks';
 import type { SoundEvent, SoundFileRef } from '../sounds/soundsJson';
-import { t as translate, useT } from '../i18n';
+import { t as translate, useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, pickFile, SourceBadge } from './common';
+import { ItemThumb } from './ItemsView';
+import { mobName, MobThumb } from './MobsView';
 
 const PAGE = 300;
+const CHIPS = 6;
+
+type LinkFilter = 'all' | 'blocks' | 'mobs' | 'none';
+
+let linkCache: { events: SoundEvent[]; items: ItemEntry[]; names: Record<string, string>; links: SoundLinks } | undefined;
+
+/** Which blocks, items and mobs play each sound event (recomputed when events, items or names change). */
+export function useSoundLinks(): SoundLinks {
+  const { soundEvents: events, items, names } = useApp();
+  if (linkCache?.events !== events || linkCache.items !== items || linkCache.names !== names) {
+    const isEntity = (id: string) => {
+      const { ns, path } = parseRL(id);
+      return `entity.${ns}.${path}` in names;
+    };
+    const links = linkSounds(events, items.map((i) => i.id), MOBS.map((m) => `minecraft:${m.entity}`), isEntity);
+    linkCache = { events, items, names, links };
+  }
+  return linkCache.links;
+}
+
+/** The mob shown for an entity: its first catalog entry (the adult in its default variant). */
+const mobForEntity = (id: string): MobDef | undefined => MOBS.find((m) => `minecraft:${m.entity}` === id);
+
+function linkName(link: SoundLink, items: ItemEntry[], names: Record<string, string>, t: TFunction): string {
+  const { ns, path } = parseRL(link.id);
+  if (link.kind === 'item') return items.find((i) => i.id === link.id)?.name ?? path;
+  const mob = link.kind === 'mob' && mobForEntity(link.id);
+  if (mob) return mobName(names, { ...mob, variant: undefined, babyOf: undefined }, t);
+  return names[`${link.kind}.${ns}.${path}`] ?? path.replace(/_/g, ' ');
+}
+
+/** Small buttons for what plays a sound; items and mobs open in their tab. */
+function SoundLinkChips({ links }: { links: SoundLink[] }) {
+  const { store, items, names, setTab, select, selectMob } = useApp();
+  const t = useT();
+  const [all, setAll] = useState(false);
+  if (!store || links.length === 0) return null;
+  const shown = all ? links : links.slice(0, CHIPS);
+  return (
+    <div className="flex flex-wrap items-center gap-1 pb-1 pl-10">
+      {shown.map((l) => {
+        const name = linkName(l, items, names, t);
+        const item = l.kind === 'item' ? items.find((i) => i.id === l.id) : undefined;
+        const mob = l.kind === 'mob' ? mobForEntity(l.id) : undefined;
+        const open = item
+          ? () => {
+              setTab('items');
+              select(item.id);
+            }
+          : mob
+            ? () => {
+                setTab('mobs');
+                selectMob(mob.id);
+              }
+            : undefined;
+        const body = (
+          <>
+            {item && <ItemThumb store={store} item={item} className="h-4 w-4" />}
+            {mob && <MobThumb store={store} mob={mob} className="h-4 w-4" />}
+            <span className="max-w-[140px] truncate">{name}</span>
+          </>
+        );
+        const cls = 'flex items-center gap-1 rounded bg-neutral-800 px-1.5 py-0.5 text-[10px]';
+        return open ? (
+          <button key={l.id} onClick={open} title={t('sounds.linkOpen', { name })} className={`${cls} text-neutral-300 hover:bg-neutral-700`}>
+            {body}
+          </button>
+        ) : (
+          <span key={l.id} title={l.id} className={`${cls} text-neutral-400`}>
+            {body}
+          </span>
+        );
+      })}
+      {links.length > CHIPS && (
+        <button onClick={() => setAll(!all)} className="px-1 text-[10px] text-neutral-500 hover:text-neutral-300">
+          {all ? t('sounds.linkLess') : t('sounds.linkMore', { count: links.length - CHIPS })}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function useSoundFile(ref: SoundFileRef) {
   const { store, objects } = useApp();
@@ -87,7 +174,7 @@ function AttributeInput({ label, title, value, min, max, editable, onCommit }: {
   );
 }
 
-export function SoundEventRow({ event, compact }: { event: SoundEvent; compact?: boolean }) {
+export function SoundEventRow({ event, compact, links }: { event: SoundEvent; compact?: boolean; links?: SoundLink[] }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
   const { store, objects, addEventSound, setEventReplace, adoptEvent } = useApp();
@@ -120,6 +207,7 @@ export function SoundEventRow({ event, compact }: { event: SoundEvent; compact?:
         {event.fromPack && <SourceBadge source="pack" />}
         <span className="text-[10px] text-neutral-500">{t('sounds.files', { count: event.files.length })}</span>
       </div>
+      {links && <SoundLinkChips links={links} />}
       {open && (
         <div className="pb-2">
           {event.files.map((f, i) => (
@@ -155,18 +243,38 @@ export function SoundEventRow({ event, compact }: { event: SoundEvent; compact?:
 }
 
 export function SoundsView() {
-  const { soundEvents, soundsError, soundsLoading, addLocalAssetsFolder, loadSounds } = useApp();
+  const { soundEvents, soundsError, soundsLoading, addLocalAssetsFolder, loadSounds, items, names } = useApp();
   const t = useT();
+  const links = useSoundLinks();
   const [query, setQuery] = useState('');
   const [onlyPack, setOnlyPack] = useState(false);
+  const [linkFilter, setLinkFilter] = useState<LinkFilter>('all');
   const [limit, setLimit] = useState(PAGE);
   const [base, setBase] = useState(getResourcesBase());
   const q = useDeferredValue(query.trim().toLowerCase());
 
-  const visible = useMemo(
-    () => soundEvents.filter((e) => (!onlyPack || e.fromPack) && (!q || e.id.includes(q) || e.files.some((f) => f.name.includes(q)))),
-    [soundEvents, q, onlyPack],
+  // what an event can be found by: its id, its file names and the names of what plays it
+  const searchText = useMemo(
+    () =>
+      new Map(
+        soundEvents.map((e) => {
+          const linked = (links.get(e.id) ?? []).map((l) => `${l.id} ${linkName(l, items, names, t)}`);
+          return [e.id, [e.id, ...e.files.map((f) => f.name), ...linked].join('\n').toLowerCase()];
+        }),
+      ),
+    [soundEvents, links, items, names, t],
   );
+  const visible = useMemo(() => {
+    const matchesLink = (e: SoundEvent) => {
+      if (linkFilter === 'all') return true;
+      const kinds = (links.get(e.id) ?? []).map((l) => l.kind);
+      if (linkFilter === 'none') return kinds.length === 0;
+      return kinds.some((k) => (linkFilter === 'mobs' ? k === 'mob' || k === 'entity' : k === 'item' || k === 'block'));
+    };
+    const found = soundEvents.filter((e) => (!onlyPack || e.fromPack) && matchesLink(e) && (!q || searchText.get(e.id)!.includes(q)));
+    // events named after the search first, then those found through what plays them
+    return q ? [...found.filter((e) => e.id.includes(q)), ...found.filter((e) => !e.id.includes(q))] : found;
+  }, [soundEvents, q, onlyPack, linkFilter, links, searchText]);
 
   return (
     <div className="flex h-full flex-col">
@@ -183,6 +291,22 @@ export function SoundsView() {
         <label className="flex items-center gap-1 text-xs">
           <input type="checkbox" checked={onlyPack} onChange={(e) => setOnlyPack(e.target.checked)} />
           {t('sounds.onlyPack')}
+        </label>
+        <label className="flex items-center gap-1 text-xs">
+          {t('sounds.linkFilter')}
+          <select
+            value={linkFilter}
+            onChange={(e) => {
+              setLinkFilter(e.target.value as LinkFilter);
+              setLimit(PAGE);
+            }}
+            className="rounded bg-neutral-800 px-1 py-0.5 text-xs"
+          >
+            <option value="all">{t('sounds.linkAll')}</option>
+            <option value="blocks">{t('sounds.linkBlocks')}</option>
+            <option value="mobs">{t('sounds.linkMobs')}</option>
+            <option value="none">{t('sounds.linkNone')}</option>
+          </select>
         </label>
         <span className="ml-auto text-xs text-neutral-500">{t('sounds.events', { count: visible.length })}</span>
       </div>
@@ -219,7 +343,7 @@ export function SoundsView() {
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-3">
         {visible.slice(0, limit).map((e) => (
-          <SoundEventRow key={e.id} event={e} />
+          <SoundEventRow key={e.id} event={e} links={links.get(e.id)} />
         ))}
         {visible.length > limit && (
           <button onClick={() => setLimit(limit + PAGE)} className="my-3 w-full rounded bg-neutral-800 py-2 text-sm hover:bg-neutral-700">

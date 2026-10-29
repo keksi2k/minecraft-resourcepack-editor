@@ -7,13 +7,13 @@ import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
 import { itemThumbnail } from '../render/thumbnails';
-import { soundsForItem } from '../sounds/soundsJson';
+import { eventsLinkedTo } from '../sounds/soundLinks';
 import { useT, type MessageKey, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge } from './common';
 import { ItemThumb } from './ItemsView';
 import { CONTEXTS, ItemViewer } from './ItemViewer';
-import { SoundEventRow } from './SoundsView';
+import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -29,7 +29,8 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
   const { soundEvents, select } = useApp();
   const t = useT();
   const [context, setContext] = useState<DisplayContext>('gui');
-  const sounds = useMemo(() => soundsForItem(soundEvents, item.id), [soundEvents, item.id]);
+  const links = useSoundLinks();
+  const sounds = useMemo(() => eventsLinkedTo(soundEvents, links, item.id), [soundEvents, links, item.id]);
   const [state, setState] = useState<ItemState>({});
   const [options, setOptions] = useState<SpecialOptions>({});
   useEffect(() => {

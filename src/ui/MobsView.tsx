@@ -7,8 +7,10 @@ import { buildMobObject, mobDeps } from '../render/entityMesh';
 import { mobThumbnail } from '../render/thumbnails';
 import { useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
+import { eventsLinkedTo } from '../sounds/soundLinks';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { ObjectViewer } from './ItemViewer';
+import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
 import { UVOverlay } from './UVOverlay';
 
@@ -30,7 +32,7 @@ function mobSource(store: AssetStore, mob: MobDef): Source {
   return s;
 }
 
-function MobThumb({ store, mob, className = 'h-16 w-16' }: { store: AssetStore; mob: MobDef; className?: string }) {
+export function MobThumb({ store, mob, className = 'h-16 w-16' }: { store: AssetStore; mob: MobDef; className?: string }) {
   const [ref, inView] = useInView<HTMLDivElement>();
   const [url, setUrl] = useState<string>();
   const revision = useApp((s) => s.revision);
@@ -114,8 +116,11 @@ export function MobsView() {
 
 function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; onClose: () => void }) {
   const names = useApp((s) => s.names);
+  const soundEvents = useApp((s) => s.soundEvents);
   useApp((s) => s.revision);
   const t = useT();
+  const links = useSoundLinks();
+  const sounds = useMemo(() => eventsLinkedTo(soundEvents, links, `minecraft:${mob.entity}`), [soundEvents, links, mob.entity]);
   const [uvFor, setUvFor] = useState<number | undefined>(0);
   const depsKey = mobDeps(mob)
     .map((d) => store.rev(d))
@@ -183,6 +188,19 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
             );
           })}
         </div>
+      </section>
+
+      <section className="border-t border-neutral-800 p-3">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('mobs.sounds')}</h3>
+        {sounds.length === 0 ? (
+          <div className="text-xs text-neutral-500">{t('mobs.noSounds')}</div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {sounds.map((e) => (
+              <SoundEventRow key={e.id} event={e} compact />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

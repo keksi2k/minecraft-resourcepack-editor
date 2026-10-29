@@ -21,7 +21,8 @@
     "test": "vitest run",
     "package": "npm run build && node scripts/package-release.mjs",
     "mc:fetch": "node scripts/fetch-minecraft.mjs",
-    "mc:models": "node scripts/update-entity-models.mjs"
+    "mc:models": "node scripts/update-entity-models.mjs",
+    "mc:sounds": "node scripts/update-block-sounds.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.0",

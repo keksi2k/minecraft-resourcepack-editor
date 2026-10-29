@@ -4,7 +4,7 @@ import { allItemModels, colorValue, resolveItemModel, tintColor, type StateSwitc
 import { gameNames, listItems } from '../models/items';
 import { modelTextures, resolveModel } from '../models/modelResolver';
 import { findPackRoot, parsePackMeta, textComponentToString } from '../pack/loadPack';
-import { mergeSounds, soundsForItem } from '../sounds/soundsJson';
+import { mergeSounds } from '../sounds/soundsJson';
 
 const enc = (v: unknown) => new TextEncoder().encode(typeof v === 'string' ? v : JSON.stringify(v));
 const files = (o: Record<string, unknown>) => new Map(Object.entries(o).map(([k, v]) => [k, enc(v)]));
@@ -214,6 +214,5 @@ describe('sounds.json merge', () => {
     expect(byId['minecraft:item.trident.throw'].files).toEqual([]);
     expect(byId['minecraft:item.trident.throw'].refs).toEqual(['minecraft:x']);
     expect(byId['mypack:magic.zap'].files[0].path).toBe('assets/mypack/sounds/zap.ogg');
-    expect(soundsForItem(events, 'minecraft:trident').map((e) => e.id)).toEqual(['minecraft:item.trident.throw']);
   });
 });

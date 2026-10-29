@@ -14,7 +14,7 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 - **Item states**: preview what an item looks like in use, pulled, loaded, broken, at another compass angle or time of day, with another trim and so on. Every switch in the item definition can be set, and the textures of that state can be replaced right there.
 - **61 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants and 23 babies) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on.
 - **Texture browser** for all ~4000 textures (blocks, items, entities, GUI …).
-- **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely.
+- **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely. Every event shows which **blocks, items and mobs** play it (cobblestone and andesite sound like `block.stone`), and you can search by their names; item and mob details list their sounds.
 - **Safe editing**: every file shows whether it comes from vanilla, the pack or your own change. Changes can be discarded one by one or reset to vanilla. Your work is **saved automatically** in the browser; after a reload or crash you can continue where you left off.
 - **✨ Funny**: shuffle all matching textures and sounds (the sword looks like a carrot, the cow sounds like a ghast) or make every texture as colourful as possible (random colours, rainbow, neon, inverted). Textures only swap with ones that fit (same kind and size, mobs only with mobs built the same way, optional chaos mode); sounds are redirected in sounds.json without copying audio. Your own edits are left alone, a seed makes results repeatable, and one click removes it all again.
 - **Export** as a new pack ZIP with the original files plus your changes. Without a pack, “Create new pack” starts from vanilla.
@@ -99,7 +99,7 @@ The docs can be translated too: add `README.<code>.md` and `docs/INSTALLATION.<c
 | Items | `src/models/`: item definitions (`assets/*/items/*.json`, 1.21.4+) or `models/item/*.json` for older versions, parent chains, texture variables, display transforms, tints. |
 | Rendering | `src/render/`: three.js with Minecraft's face shading. `item/generated` becomes an extruded 1 px sprite. Thumbnails use one shared offscreen renderer. |
 | Mobs | Mob models live in the game's Java code, not in packs. `scripts/DumpEntityModels.java` runs the game's model builders and writes the geometry to `src/entities/entityModels.json`. `catalog.ts` maps mobs to layers and textures. |
-| Sounds | Vanilla sounds live on `resources.download.minecraft.net`, which sends **no CORS** headers. `vite.config.ts` (dev) and `scripts/serve.mjs` (production) forward `/mcres/<hash>` there. A local `.minecraft/assets` folder works as an alternative. |
+| Sounds | Vanilla sounds live on `resources.download.minecraft.net`, which sends **no CORS** headers. `vite.config.ts` (dev) and `scripts/serve.mjs` (production) forward `/mcres/<hash>` there. A local `.minecraft/assets` folder works as an alternative. Which block plays which sound is set in the game's code: `scripts/DumpBlockSounds.java` reads each block's sound type (and door/button/fence gate sounds) into `src/sounds/blockSounds.json`; `src/sounds/soundLinks.ts` adds name matches for items and mobs. |
 | Special models | Item definitions describe chests, shulker boxes, banners, shields, heads, pots and more as `minecraft:special` models placed with a `transformation`. `src/entities/specials.ts` maps them to the game's model layers and textures, including banner/shield pattern layers and pot sherds. |
 | Autosave | `src/state/session.ts`: the original pack ZIP and your edits are kept in IndexedDB and offered for resuming on the start page. |
 | Languages | `src/i18n/`: messages per language, type-checked keys, plurals via `Intl.PluralRules`. Item and mob names come from Minecraft's language file (through the same proxy as sounds, falling back to English). |
@@ -127,7 +127,7 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 - Mobs are shown in a static pose without animation. Armour, saddles, collars, villager professions and mooshroom mushrooms are missing for now.
 - Banner patterns and pottery sherds are a preview only: in game they are stored on the item, so they aren't part of the exported pack (their textures are).
 - Movements in hand (eating, drawing a bow, blocking) are coded in the game and not part of a pack, so they aren't animated; the models of these states can be previewed.
-- Matching sounds to items is a name heuristic, because Minecraft defines it in code.
+- Block sounds come straight from the game; for items and mobs the editor matches sound names (`entity.wolf_angry.*` → wolf), so sounds a mob or item plays under an unrelated name are not linked.
 - Bedrock Edition is not supported.
 
 ## Legal

@@ -310,6 +310,7 @@ npm run mc:fetch -- 26.3              # download client.jar + libraries to .mc/2
 npm run mc:models -- 26.3             # regenerate all existing mob models
 npm run mc:models -- 26.3 --list      # list every model layer the game defines
 npm run mc:models -- 26.3 minecraft:goat#main   # add more layers
+npm run mc:sounds -- 26.3             # regenerate which sounds each block plays (src/sounds/blockSounds.json)
 ```
 
 A newly added layer only shows up in the app once `src/entities/catalog.ts` assigns it to a mob with a texture. The `.mc/` folder is excluded from Git.
