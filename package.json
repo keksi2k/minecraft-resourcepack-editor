@@ -1,7 +1,7 @@
 {
   "name": "minecraft-resourcepack-editor",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Browser-based editor for Minecraft Java Edition resource packs: view items and mobs in 3D, listen to and add sounds, replace textures, export the pack.",
   "license": "MIT",
   "repository": {
