@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import { availablePatterns, availableSherds, DYE, PATTERNED, POT_SIDES, specialLayers, type SpecialOptions } from '../entities/specials';
 import type { ItemState, StateSwitch } from '../models/itemDefinition';
-import { itemStateSwitches, itemVariant, type ItemEntry } from '../models/items';
+import { appearanceKey, itemStages, itemStateSwitches, itemVariant, type ItemEntry, type ItemStage } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
@@ -33,16 +33,28 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
   const sounds = useMemo(() => eventsLinkedTo(soundEvents, links, item.id), [soundEvents, links, item.id]);
   const [state, setState] = useState<ItemState>({});
   const [options, setOptions] = useState<SpecialOptions>({});
+  const [playing, setPlaying] = useState(false);
   useEffect(() => {
     setState({});
     setOptions({});
+    setPlaying(false);
   }, [item.id]);
+  const stages = useMemo(() => itemStages(store, item), [store, item]);
   // the item in the previewed state (in use, pulled …)
   const shown = useMemo(() => itemVariant(store, item, state), [store, item, state]);
   const switches = useMemo(
     () => itemStateSwitches(store, item.id, state, context === 'none' ? 'gui' : context),
     [store, item, state, context],
   );
+  const stageIndex = useMemo(() => {
+    const key = appearanceKey(shown.models);
+    return stages.findIndex((s) => s.key === key);
+  }, [stages, shown]);
+  useEffect(() => {
+    if (!playing || stages.length < 2) return;
+    const id = setTimeout(() => setState(stages[(stageIndex + 1) % stages.length].state), Math.max(60, Math.min(400, 4000 / stages.length)));
+    return () => clearTimeout(id);
+  }, [playing, stages, stageIndex]);
   const patterned = shown.models.find((m) => m.ref.special && PATTERNED.has(m.ref.special.type))?.ref.special;
   const opts = patterned ? options : undefined;
   // pattern textures in use belong to the item's textures while previewed
@@ -95,9 +107,32 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
         </div>
       </div>
 
+      {stages.length > 0 && (
+        <Section title={t('items.stages', { count: stages.length })}>
+          <StageStrip
+            store={store}
+            stages={stages}
+            current={stageIndex}
+            playing={playing}
+            onPlay={setPlaying}
+            onPick={(s) => {
+              setPlaying(false);
+              setState(s.state);
+            }}
+          />
+        </Section>
+      )}
+
       {switches.length > 0 && (
         <Section title={t('items.states')}>
-          <StateEditor switches={switches} value={state} onChange={setState} />
+          <StateEditor
+            switches={switches}
+            value={state}
+            onChange={(s) => {
+              setPlaying(false);
+              setState(s);
+            }}
+          />
         </Section>
       )}
 
@@ -168,6 +203,39 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+/** Thumbnails of every stage of an item; the shown one is highlighted, and they can play in turn. */
+function StageStrip({ store, stages, current, playing, onPlay, onPick }: {
+  store: AssetStore;
+  stages: ItemStage[];
+  current: number;
+  playing: boolean;
+  onPlay: (playing: boolean) => void;
+  onPick: (stage: ItemStage) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-2 text-xs">
+      <div className="flex items-start gap-2">
+        <p className="flex-1 text-neutral-400">{t('items.stagesInfo')}</p>
+        <Btn onClick={() => onPlay(!playing)}>{playing ? `⏸ ${t('items.pauseStages')}` : `▶ ${t('items.playStages')}`}</Btn>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-1">
+        {stages.map((s, i) => (
+          <button
+            key={s.key}
+            onClick={() => onPick(s)}
+            title={`${i + 1}: ${s.item.textures.join('\n')}`}
+            className={`relative rounded p-0.5 ring-1 ${i === current ? 'bg-neutral-600 ring-emerald-500' : 'bg-neutral-800 ring-transparent hover:bg-neutral-700'}`}
+          >
+            <ItemThumb store={store} item={s.item} className="checker aspect-square w-full rounded-sm" />
+            <span className="absolute bottom-0 right-0.5 font-mono text-[9px] text-neutral-400">{i + 1}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

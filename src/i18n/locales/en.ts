@@ -122,6 +122,10 @@ const en = {
     stateOff: 'no',
     otherState: 'other',
     restingState: 'Back to resting state',
+    stages: 'All stages ({count})',
+    stagesInfo: 'Every look the item can have, side by side (bow pulling, clock times, compass angles …). Click one to preview it and edit its textures.',
+    playStages: 'Play',
+    pauseStages: 'Pause',
     property: {
       using_item: 'In use',
       use_duration: 'Use time',

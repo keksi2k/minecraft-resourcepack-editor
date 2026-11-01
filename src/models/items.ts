@@ -1,6 +1,6 @@
 import type { AssetStore, Source } from '../assets/AssetStore';
 import { specialLayers } from '../entities/specials';
-import { allItemModels, legacyTints, resolveItemModel, type ItemState, type ModelRef, type StateSwitch } from './itemDefinition';
+import { allItemModels, itemStatePaths, legacyTints, resolveItemModel, type ItemState, type ModelRef, type StateSwitch } from './itemDefinition';
 import { modelTextures, resolveModel, type DisplayContext, type ResolvedModel } from './modelResolver';
 import { itemDefinitionPath, modelPath, parseRL, texturePath } from './resourceLocation';
 
@@ -91,6 +91,37 @@ export function itemVariant(store: AssetStore, item: ItemEntry, state: ItemState
   if (Object.keys(state).length === 0) return item;
   const models = resolveItemModels(store, item.id, 'gui', state);
   return { ...item, models, textures: texturesOf(models), depsKey: `${item.depsKey}|${JSON.stringify(state)}` };
+}
+
+/** What an item shows, for telling stages apart: models with tints and special settings. */
+export const appearanceKey = (models: ResolvedItemModel[]) =>
+  JSON.stringify(models.map((m) => [m.ref.model, m.ref.tints, m.ref.special ?? null]));
+
+export interface ItemStage {
+  state: ItemState;
+  item: ItemEntry;
+  key: string;
+}
+
+/**
+ * Every distinct look of an item in the inventory (bow, bow pulling 0–2; clock 00–63 …), resting
+ * state first, then in the order of the item definition. Empty for items without dynamic states.
+ */
+export function itemStages(store: AssetStore, item: ItemEntry): ItemStage[] {
+  if (!store.has(itemDefinitionPath(item.id))) return [];
+  const restKey = appearanceKey(item.models);
+  const seen = new Set<string>();
+  const out: ItemStage[] = [];
+  for (const state of itemStatePaths(store.json<any>(itemDefinitionPath(item.id))?.model)) {
+    const variant = itemVariant(store, item, state);
+    const key = appearanceKey(variant.models);
+    if (variant.models.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    const stage = { state: key === restKey ? {} : state, item: key === restKey ? item : variant, key };
+    if (key === restKey) out.unshift(stage);
+    else out.push(stage);
+  }
+  return out.length > 1 ? out : [];
 }
 
 /** The dynamic switches (in use, pull, angle …) an item passes in `state`, in display context `context`. */

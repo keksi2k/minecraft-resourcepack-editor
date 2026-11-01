@@ -205,3 +205,46 @@ export function legacyTints(itemPath: string): number[] {
   if (itemPath === 'birch_leaves') return [0x80a755];
   return [];
 }
+
+/**
+ * One state per path through an item definition's switches to a model, in file order (at most
+ * `limit`): the choices made on the way, so `resolveItemModel` with it shows that model. Switches
+ * off the path stay at rest; `display_context` selects follow `context` as when resolving.
+ */
+export function itemStatePaths(node: Json | undefined, context: DisplayContext = 'gui', limit = 512, state: ItemState = {}): ItemState[] {
+  if (!node || typeof node !== 'object') return [];
+  const out: ItemState[] = [];
+  const walk = (n: Json | undefined, s: ItemState) => {
+    if (out.length < limit) out.push(...itemStatePaths(n, context, limit - out.length, s));
+  };
+  const branch = (kind: StateSwitch['kind'], childOf: (value: string) => Json | undefined) => {
+    const sw = stateSwitch(node, kind);
+    for (const o of sw.options) walk(childOf(o.value), { ...state, [sw.key]: o.value });
+    return out;
+  };
+  const pick = (list: Json[] | undefined) => (v: string) => (v === 'fallback' ? node.fallback : list?.[Number(v)]?.model);
+
+  switch (stripNs(node.type)) {
+    case 'model':
+    case 'special':
+      return [state];
+    case 'composite':
+      for (const m of node.models ?? []) walk(m, state);
+      return out.length ? out : [state];
+    case 'condition':
+      return branch('condition', (v) => (v === 'true' ? node.on_true : node.on_false));
+    case 'select': {
+      const cases: Json[] = node.cases ?? [];
+      if (stripNs(node.property) === 'display_context') {
+        const hit = cases.find((c) => [c.when].flat().includes(context));
+        walk(hit ? hit.model : (node.fallback ?? cases[0]?.model), state);
+        return out;
+      }
+      return branch('select', pick(cases));
+    }
+    case 'range_dispatch':
+      return branch('range_dispatch', pick(node.entries));
+    default:
+      return [];
+  }
+}

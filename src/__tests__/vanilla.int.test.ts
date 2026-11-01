@@ -7,7 +7,7 @@ import { MOBS } from '../entities/catalog';
 import { availablePatterns, availableSherds, specialLayers } from '../entities/specials';
 import { ENTITY_MODELS } from '../render/entityMesh';
 import type { ItemState } from '../models/itemDefinition';
-import { itemStateSwitches, listItems, resolveItemModels } from '../models/items';
+import { itemStages, itemStateSwitches, listItems, resolveItemModels } from '../models/items';
 import { texturePath } from '../models/resourceLocation';
 import { textureGroups } from '../funny/shuffle';
 
@@ -88,6 +88,11 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     const bowInUse = { [bowSwitches[0].key]: 'true' };
     const pull = itemStateSwitches(store, 'minecraft:bow', bowInUse)[1];
     expect(resolveItemModels(store, 'minecraft:bow', 'gui', { ...bowInUse, [pull.key]: pull.options.at(-1)!.value })[0].ref.model).toBe('minecraft:item/bow_pulling_2');
+    const stagesOf = (id: string) => itemStages(store, items.find((i) => i.id === id)!).map((s) => s.item.textures.join('+'));
+    expect(stagesOf('minecraft:bow')).toEqual(['minecraft:item/bow', 'minecraft:item/bow_pulling_0', 'minecraft:item/bow_pulling_1', 'minecraft:item/bow_pulling_2']);
+    expect(stagesOf('minecraft:clock')).toHaveLength(64);
+    expect(stagesOf('minecraft:compass')).toHaveLength(32);
+    expect(stagesOf('minecraft:diamond')).toEqual([]);
     expect(itemStateSwitches(store, 'minecraft:compass', {}).map((s) => s.property)).toEqual(['has_component', 'compass']);
 
     // funny shuffle: textures only swap with ones of the same layout

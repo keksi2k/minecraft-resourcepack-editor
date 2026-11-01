@@ -121,6 +121,10 @@ const de: Translation = {
     stateOff: 'nein',
     otherState: 'sonstige',
     restingState: 'Zurück zum Ruhezustand',
+    stages: 'Alle Stadien ({count})',
+    stagesInfo: 'Jedes Aussehen des Items nebeneinander (Bogen gespannt, Uhrzeiten, Kompasswinkel …). Klicke eins an, um es in der Vorschau zu sehen und seine Texturen zu bearbeiten.',
+    playStages: 'Abspielen',
+    pauseStages: 'Pause',
     property: {
       using_item: 'Wird benutzt',
       use_duration: 'Benutzungsdauer',

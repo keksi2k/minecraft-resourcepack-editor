@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AssetStore, parseLenientJson } from '../assets/AssetStore';
-import { allItemModels, colorValue, resolveItemModel, tintColor, type StateSwitch } from '../models/itemDefinition';
+import { allItemModels, colorValue, itemStatePaths, resolveItemModel, tintColor, type StateSwitch } from '../models/itemDefinition';
 import { gameNames, listItems } from '../models/items';
 import { modelTextures, resolveModel } from '../models/modelResolver';
 import { findPackRoot, parsePackMeta, textComponentToString } from '../pack/loadPack';
@@ -132,6 +132,15 @@ describe('item definitions', () => {
     expect(resolveItemModel(bow, 'gui', { ...inUse, [pull.key]: '0' })[0].model).toBe('minecraft:item/bow_pulling_2');
     // unknown values fall back to the resting state
     expect(resolveItemModel(bow, 'gui', { [found[0].key]: 'nope' })[0].model).toBe('minecraft:item/bow');
+
+    // every stage, in file order
+    expect(itemStatePaths(bow).map((s) => resolveItemModel(bow, 'gui', s)[0].model)).toEqual([
+      'minecraft:item/bow',
+      'minecraft:item/bow_pulling_0',
+      'minecraft:item/bow_pulling_1',
+      'minecraft:item/bow_pulling_2',
+    ]);
+    expect(itemStatePaths(bow, 'gui', 2)).toHaveLength(2);
 
     expect([...allItemModels(bow)].sort()).toEqual(['minecraft:item/bow', 'minecraft:item/bow_pulling_0', 'minecraft:item/bow_pulling_1', 'minecraft:item/bow_pulling_2']);
   });
