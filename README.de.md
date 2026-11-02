@@ -30,7 +30,7 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 
 1. [Node.js](https://nodejs.org) 18.18 oder neuer installieren.
 2. Das ZIP von der [Releases-Seite](https://github.com/keksi2k/minecraft-resourcepack-editor/releases) herunterladen und entpacken.
-3. Unter Windows **`Start.bat`** doppelklicken, sonst im entpackten Ordner `node serve.mjs` ausführen.
+3. Unter Windows **`Start.bat`** doppelklicken (bietet an, Node.js zu installieren, falls es fehlt), sonst im entpackten Ordner `node serve.mjs` ausführen.
 4. http://127.0.0.1:8080 öffnen.
 
 **Aus dem Quellcode:**

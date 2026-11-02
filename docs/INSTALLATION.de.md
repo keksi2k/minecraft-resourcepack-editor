@@ -64,6 +64,8 @@ Zeigt das `v18.18.0` oder höher, bist du fertig und kannst diesen Abschnitt üb
 
 Danach das Terminal **neu öffnen**, damit `node` gefunden wird.
 
+Mit dem Release-ZIP geht es auch ohne diesen Schritt: **`Start.bat`** bietet an, Node.js selbst zu installieren (siehe [Schneller starten](#schneller-starten)).
+
 ### macOS
 
 - **Installer:** Auf https://nodejs.org das `.pkg` der LTS-Version herunterladen und installieren.
@@ -113,7 +115,7 @@ Statt der Optionen kannst du auch die Umgebungsvariablen `PORT`, `HOST` und `DIR
 
 ### Schneller starten
 
-- **Windows:** Im Ordner liegt eine **`Start.bat`**. Ein Doppelklick prüft, ob Node.js installiert ist, startet den Server und öffnet den Browser. Mit `Start.bat 3000` wählst du einen anderen Port. Bei einem Fehler bleibt das Fenster offen, damit du die Meldung lesen kannst.
+- **Windows:** Im Ordner liegt eine **`Start.bat`**. Ein Doppelklick prüft, ob Node.js installiert ist, startet den Server und öffnet den Browser. Fehlt Node.js oder ist es zu alt, fragt sie, ob sie die aktuelle LTS-Version installieren soll (über winget oder den offiziellen Installer von nodejs.org, dessen Prüfsumme vorher kontrolliert wird), und startet danach direkt. Mit `Start.bat 3000` wählst du einen anderen Port. Bei einem Fehler bleibt das Fenster offen, damit du die Meldung lesen kannst.
   > Beim ersten Start zeigt Windows eventuell *„Der Computer wurde durch Windows geschützt“* (SmartScreen), weil die Datei aus dem Internet stammt. Mit *Weitere Informationen → Trotzdem ausführen* geht es weiter. Alternativ vorher Rechtsklick auf die Datei → *Eigenschaften* → *Zulassen* anhaken.
 - **macOS/Linux:** Lege eine Datei `start.sh` an mit
   ```sh

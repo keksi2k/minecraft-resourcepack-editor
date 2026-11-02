@@ -64,6 +64,8 @@ If it shows `v18.18.0` or higher, you're done and can skip this section.
 
 Then **reopen** the terminal so `node` is found.
 
+With the release ZIP you can skip this: **`Start.bat`** offers to install Node.js itself (see [Starting faster](#starting-faster)).
+
 ### macOS
 
 - **Installer:** download the LTS `.pkg` from https://nodejs.org and install it.
@@ -113,7 +115,7 @@ Instead of the options you can set the environment variables `PORT`, `HOST` and 
 
 ### Starting faster
 
-- **Windows:** the folder contains a **`Start.bat`**. Double-clicking it checks that Node.js is installed, starts the server and opens the browser. `Start.bat 3000` uses another port. If something goes wrong, the window stays open so you can read the message.
+- **Windows:** the folder contains a **`Start.bat`**. Double-clicking it checks that Node.js is installed, starts the server and opens the browser. If Node.js is missing or too old, it asks whether to install the current LTS version (with winget, or the official installer from nodejs.org after checking its checksum) and then starts right away. `Start.bat 3000` uses another port. If something goes wrong, the window stays open so you can read the message.
   > On the first start Windows may show *“Windows protected your PC”* (SmartScreen), because the file comes from the internet. Click *More info → Run anyway*. Alternatively right-click the file beforehand → *Properties* → tick *Unblock*.
 - **macOS/Linux:** create a file `start.sh` containing
   ```sh

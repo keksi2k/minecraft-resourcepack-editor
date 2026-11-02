@@ -30,7 +30,7 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 
 1. Install [Node.js](https://nodejs.org) 18.18 or newer.
 2. Download the ZIP from the [releases page](https://github.com/keksi2k/minecraft-resourcepack-editor/releases) and extract it.
-3. On Windows, double-click **`Start.bat`**. Otherwise run `node serve.mjs` in the extracted folder.
+3. On Windows, double-click **`Start.bat`** (it offers to install Node.js if it's missing). Otherwise run `node serve.mjs` in the extracted folder.
 4. Open http://127.0.0.1:8080.
 
 **From source:**

@@ -22,7 +22,10 @@ function addDir(src, target) {
 
 addDir('dist', dir);
 dir.file('serve.mjs', readFileSync('scripts/serve.mjs'));
-dir.file('Start.bat', readFileSync('Start.bat'));
+// Windows scripts need CRLF line endings (cmd's goto/call misbehave with LF), whatever the checkout has
+const crlf = (path) => readFileSync(path, 'utf8').replace(/\r?\n/g, '\r\n');
+dir.file('Start.bat', crlf('Start.bat'));
+dir.file('install-node.ps1', crlf('scripts/install-node.ps1'));
 dir.file('LICENSE', readFileSync('LICENSE'));
 // MIT, BSD and Apache require the bundled libraries' notices to travel with the app
 dir.file('THIRD_PARTY_LICENSES.txt', thirdPartyNotice(`Minecraft Resource Pack Editor ${pkg.version}`));
