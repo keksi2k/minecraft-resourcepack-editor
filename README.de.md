@@ -22,7 +22,7 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 - **✨ Funny**: alle passenden Texturen und Sounds durchmischen (das Schwert sieht aus wie eine Karotte, die Kuh klingt wie ein Ghast) oder jede Textur knallbunt machen (Zufallsfarben, Regenbogen, Neon, invertiert). Texturen tauschen nur mit passenden (gleiche Art und Größe, Mobs nur mit gleich gebauten, optional Chaos-Modus); Sounds werden in der sounds.json umgeleitet, ohne Audiodateien zu kopieren. Deine eigenen Änderungen bleiben unberührt, ein Seed macht Ergebnisse wiederholbar, und ein Klick entfernt alles wieder.
 - **Export** als neues Pack-ZIP mit Originaldateien und Änderungen. Ohne Pack startest du mit „Neues Pack erstellen“ auf Vanilla-Basis. Ein Klick auf das Pack-Bild oben links lädt ein eigenes **Pack-Bild** hoch (jedes Bild, quadratisch zugeschnitten) oder bearbeitet es.
 - **Mehrsprachig**: Oberfläche auf Deutsch und Englisch, umschaltbar oben rechts. Item- und Mob-Namen kommen aus Minecrafts eigenen Sprachdateien (z. B. „Diamantschwert“). Weitere Sprachen lassen sich leicht ergänzen (siehe [Sprachen](#sprachen)).
-- **Privat**: Dein Pack verlässt den Rechner nicht. Die Vanilla-Dateien kommen direkt von Mojangs Servern und werden pro Version im Browser gespeichert.
+- **Privat**: Dein Pack verlässt den Rechner nicht. Die Vanilla-Dateien kommen direkt von Mojangs Servern und werden pro Version im Browser gespeichert. Um dich auf neue Versionen hinzuweisen, fragt der Editor höchstens alle 12 Stunden bei GitHub nach dem neuesten Release; dabei wird nichts über dich oder dein Pack gesendet.
 
 ## Schnellstart
 
@@ -142,4 +142,4 @@ Kein offizielles Minecraft-Produkt, nicht von Mojang oder Microsoft genehmigt od
 
 Das Repository enthält keine Minecraft-Texturen, -Sounds oder -Programmdateien. Diese lädt der Browser zur Laufzeit von Mojangs offiziellen Servern. `src/entities/entityModels.json` enthält nur Geometriedaten (Quadermaße und UV-Koordinaten) der Vanilla-Mob-Modelle, damit die Mobs dargestellt werden können.
 
-Code unter [MIT-Lizenz](LICENSE).
+Code unter [MIT-Lizenz](LICENSE). Das Release-ZIP enthält `THIRD_PARTY_LICENSES.txt` mit den Lizenzen der mitgelieferten Bibliotheken (alle frei: MIT, BSD, ISC, Apache-2.0, Zlib), inklusive libogg/libvorbis im Ogg-Vorbis-Encoder.

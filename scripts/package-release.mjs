@@ -4,6 +4,7 @@
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import JSZip from 'jszip';
+import { thirdPartyNotice } from './third-party-licenses.mjs';
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const folder = `${pkg.name}-${pkg.version}`;
@@ -23,6 +24,8 @@ addDir('dist', dir);
 dir.file('serve.mjs', readFileSync('scripts/serve.mjs'));
 dir.file('Start.bat', readFileSync('Start.bat'));
 dir.file('LICENSE', readFileSync('LICENSE'));
+// MIT, BSD and Apache require the bundled libraries' notices to travel with the app
+dir.file('THIRD_PARTY_LICENSES.txt', thirdPartyNotice(`Minecraft Resource Pack Editor ${pkg.version}`));
 dir.file(
   'START.txt',
   `Minecraft Resource Pack Editor ${pkg.version}

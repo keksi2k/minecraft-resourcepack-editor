@@ -22,7 +22,7 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 - **✨ Funny**: shuffle all matching textures and sounds (the sword looks like a carrot, the cow sounds like a ghast) or make every texture as colourful as possible (random colours, rainbow, neon, inverted). Textures only swap with ones that fit (same kind and size, mobs only with mobs built the same way, optional chaos mode); sounds are redirected in sounds.json without copying audio. Your own edits are left alone, a seed makes results repeatable, and one click removes it all again.
 - **Export** as a new pack ZIP with the original files plus your changes. Without a pack, “Create new pack” starts from vanilla. Click the pack icon at the top left to upload your own **pack icon** (any image, cropped to a square) or edit it.
 - **Multilingual**: the interface is available in English and German (switch at the top right). Item and mob names come from Minecraft's own language files. More languages are easy to add (see [Languages](#languages)).
-- **Private**: your pack never leaves your computer. Vanilla files come straight from Mojang's servers and are cached in the browser per version.
+- **Private**: your pack never leaves your computer. Vanilla files come straight from Mojang's servers and are cached in the browser per version. To tell you about new versions, the editor asks GitHub for the latest release at most every 12 hours; nothing about you or your pack is sent.
 
 ## Quick start
 
@@ -142,4 +142,4 @@ Not an official Minecraft product. Not approved by or associated with Mojang or 
 
 The repository contains no Minecraft textures, sounds or program files. The browser downloads them at runtime from Mojang's official servers. `src/entities/entityModels.json` contains only geometry data (box sizes and UV coordinates) of the vanilla mob models, so the mobs can be displayed.
 
-Code under the [MIT license](LICENSE).
+Code under the [MIT license](LICENSE). The release ZIP contains `THIRD_PARTY_LICENSES.txt` with the licences of the bundled libraries (all permissive: MIT, BSD, ISC, Apache-2.0, Zlib), including libogg/libvorbis inside the Ogg Vorbis encoder.
