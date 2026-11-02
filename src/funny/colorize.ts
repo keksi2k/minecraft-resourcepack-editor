@@ -3,7 +3,7 @@ import { parseAnimation } from '../render/animation';
 export const COLOR_STYLES = ['hue', 'rainbow', 'neon', 'invert'] as const;
 export type ColorStyle = (typeof COLOR_STYLES)[number];
 
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255;
   g /= 255;
   b /= 255;
@@ -17,7 +17,7 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [h / 6, s, l];
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   h = ((h % 1) + 1) % 1;
   if (s === 0) return [l * 255, l * 255, l * 255];
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;

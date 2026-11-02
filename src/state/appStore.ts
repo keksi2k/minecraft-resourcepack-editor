@@ -12,7 +12,6 @@ import type { FunnyRecord } from '../funny/record';
 import {
   addSoundToEvent,
   adoptEvent,
-  inspectOgg,
   setSoundAttributes,
   type SoundAttributes,
   newSoundName,
@@ -21,6 +20,8 @@ import {
   soundsJsonPath,
   type SoundsJsonFile,
 } from '../sounds/editSounds';
+import { ensureVorbis } from '../sounds/audioEdit';
+import { useEditor } from './editorStore';
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
 
@@ -70,6 +71,8 @@ interface AppState {
   resetFile(path: string): void;
   /** Adds an uploaded .ogg as a new variant of a sound event. Returns a warning, if any. */
   addEventSound(eventId: string, file: File): Promise<string | undefined>;
+  /** Adds Ogg Vorbis bytes (e.g. a recording) as a new variant named after `name`. */
+  addEventSoundBytes(eventId: string, bytes: Uint8Array, name: string): void;
   removeEventSound(eventId: string, ref: SoundFileRef): void;
   setEventReplace(eventId: string, replace: boolean): void;
   setSoundAttributes(eventId: string, ref: SoundFileRef, attrs: SoundAttributes): void;
@@ -217,16 +220,20 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async addEventSound(eventId, file) {
+    // Anything the browser can decode is turned into Ogg Vorbis, the only format Minecraft plays.
+    const { bytes, channels, converted } = await ensureVorbis(new Uint8Array(await file.arrayBuffer()));
+    get().addEventSoundBytes(eventId, bytes, file.name);
+    const notes = [converted && t('sounds.converted', { name: file.name }), channels > 1 && t('sounds.stereoHint')].filter(Boolean);
+    return notes.length ? notes.join(' ') : undefined;
+  },
+
+  addEventSoundBytes(eventId, bytes, fileName) {
     const store = get().store!;
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const info = inspectOgg(bytes);
-    if (typeof info === 'string') throw new Error(info);
     const ns = eventId.includes(':') ? eventId.split(':')[0] : 'minecraft';
-    const name = newSoundName(eventId, file.name, (n) => store.has(soundPath(`${ns}:${n}`)));
+    const name = newSoundName(eventId, fileName, (n) => store.has(soundPath(`${ns}:${n}`)));
     get().setFile(soundPath(`${ns}:${name}`), bytes);
     const jsonPath = soundsJsonPath(eventId);
     writeJson(jsonPath, addSoundToEvent(store.json<SoundsJsonFile>(jsonPath) ?? {}, eventId, name));
-    return info.channels > 1 ? t('sounds.stereoHint') : undefined;
   },
 
   removeEventSound(eventId, ref) {
@@ -299,7 +306,16 @@ export const useApp = create<AppState>((set, get) => ({
     return n;
   },
 
-  setTab: (tab) => set({ tab }),
+  setTab(tab) {
+    if (tab === get().tab) return;
+    // an open editor belongs to its tab; leaving the tab closes it
+    const editor = useEditor.getState();
+    if (editor.target) {
+      if (!editor.confirmLeave()) return;
+      editor.close();
+    }
+    set({ tab });
+  },
   select: (selectedItem) => set({ selectedItem }),
   selectMob: (selectedMob) => set({ selectedMob }),
 
@@ -307,6 +323,7 @@ export const useApp = create<AppState>((set, get) => ({
     const icon = get().packIcon;
     if (icon) URL.revokeObjectURL(icon);
     void clearSession();
+    useEditor.getState().close();
     set({ phase: 'start', store: undefined, items: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, funny: undefined });
   },
 }));

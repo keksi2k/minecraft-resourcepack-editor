@@ -4,6 +4,8 @@ import { LOCALES, useLocale, useT, type Locale } from '../i18n';
 import { basename } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
 import { useApp } from '../state/appStore';
+import { useEditor } from '../state/editorStore';
+import { ensureVorbis } from '../sounds/audioEdit';
 
 const BADGE: Record<Source, string> = {
   vanilla: 'bg-neutral-700 text-neutral-300',
@@ -128,11 +130,12 @@ interface AssetActionsProps {
 
 /** Download / replace / reset buttons shared by textures, sounds and model files. */
 export function AssetActions({ path, source, load, kind, vanillaAvailable, allowDiscard = true }: AssetActionsProps) {
-  const { setFile, resetFile, store } = useApp();
+  const { setFile, resetFile, store, tab } = useApp();
   const t = useT();
   const [busy, setBusy] = useState(false);
   const edited = store?.edits.has(path) ?? false;
-  const accept = kind === 'texture' ? 'image/png,.png' : kind === 'sound' ? 'audio/ogg,.ogg' : '*/*';
+  const openEditor = useEditor((s) => s.open);
+  const accept = kind === 'texture' ? 'image/png,.png' : kind === 'sound' ? 'audio/*,.ogg' : '*/*';
 
   const run = (fn: () => Promise<void>) => async () => {
     setBusy(true);
@@ -153,7 +156,9 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
   const replace = run(async () => {
     const file = await pickFile(accept);
     if (!file) return;
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes = new Uint8Array(await file.arrayBuffer());
+    // Minecraft only plays Ogg Vorbis; other audio is converted.
+    if (kind === 'sound') bytes = (await ensureVorbis(bytes)).bytes;
     if (kind === 'texture') {
       const next = await imageSize(file);
       if (!next) throw new Error(t('actions.notAPng'));
@@ -170,6 +175,11 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
   return (
     <div className="flex flex-wrap gap-1">
       <Btn onClick={download} disabled={busy || !source} title={t('actions.downloadTitle')}>{t('actions.download')}</Btn>
+      {kind !== 'file' && (
+        <Btn onClick={() => openEditor({ kind, path, load }, tab)} disabled={busy || !source} title={t('actions.editTitle')}>
+          {t('actions.edit')}
+        </Btn>
+      )}
       {kind !== 'file' && <Btn onClick={replace} disabled={busy} title={t('actions.replaceTitle')}>{t('actions.replace')}</Btn>}
       {edited && allowDiscard && <Btn onClick={() => resetFile(path)} title={t('actions.discardTitle')}>{t('actions.discard')}</Btn>}
       {store?.pack.has(path) && store.edits.get(path) !== null && vanillaAvailable && (

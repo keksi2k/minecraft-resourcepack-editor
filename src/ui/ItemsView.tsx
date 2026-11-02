@@ -6,6 +6,8 @@ import { useLocale, useT } from '../i18n';
 import { useApp } from '../state/appStore';
 import { useInView, useVisible } from './common';
 import { ItemDetail } from './ItemDetail';
+import { EditorPanel } from './EditorPanel';
+import { useEditing } from '../state/editorStore';
 
 type Filter = 'all' | 'changed' | 'edited';
 
@@ -82,6 +84,7 @@ export function ItemsView() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const q = useDeferredValue(query.trim().toLowerCase());
+  const editing = useEditing('items');
 
   // Sorted by the displayed (translated) name, so the grid reads alphabetically in every language.
   const sorted = useMemo(() => {
@@ -106,7 +109,8 @@ export function ItemsView() {
   if (!store) return null;
   return (
     <div className="flex h-full">
-      <section className="flex min-w-0 flex-1 flex-col">
+      {editing && <EditorPanel />}
+      <section className={`min-w-0 flex-1 flex-col ${editing ? 'hidden' : 'flex'}`}>
         <div className="flex items-center gap-2 border-b border-neutral-800 p-2">
           <input
             value={query}

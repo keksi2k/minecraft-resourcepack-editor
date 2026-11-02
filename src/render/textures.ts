@@ -16,6 +16,8 @@ export interface TexInfo {
   /** For animated textures: the whole sprite sheet and its resolved animation. */
   sheet?: HTMLCanvasElement;
   animation?: TextureAnimation;
+  /** Makes an animated texture redraw its current frame on the next tick (after live edits). */
+  invalidate?: () => void;
 }
 
 const cache = new Map<string, Promise<TexInfo>>();
@@ -110,6 +112,7 @@ export function threeTexture(info: TexInfo): THREE.Texture {
       drawAnimationFrame(ctx, sheet, anim, 0);
       const tex = new THREE.CanvasTexture(canvas);
       let shown = '';
+      info.invalidate = () => (shown = '');
       subscribeTicks((ticks) => {
         const f = frameAt(anim, ticks);
         const key = anim.interpolate ? `${f.current}:${Math.round(f.progress * 16)}` : String(f.current);
@@ -129,4 +132,32 @@ export function threeTexture(info: TexInfo): THREE.Texture {
     threeCache.set(info, t);
   }
   return t;
+}
+
+/**
+ * Live preview while a texture is edited: writes pixels straight into the decoded texture that the
+ * 3D views already use, so every model shows the change at once without being rebuilt. The pixels
+ * must keep the image size. `restore` puts the original back (when editing is cancelled); saving
+ * bumps the file's revision, which replaces this texture anyway.
+ */
+export async function previewTexture(store: AssetStore, path: string) {
+  const m = /^assets\/([^/]+)\/textures\/(.+)\.png$/.exec(path);
+  if (!m) return undefined;
+  const info = await loadTexture(store, `${m[1]}:${m[2]}`);
+  if (info.missing) return undefined;
+  const target = info.sheet ?? info.canvas;
+  const g = target.getContext('2d', { willReadFrequently: true })!;
+  const original = g.getImageData(0, 0, target.width, target.height);
+  const apply = (data: Uint8ClampedArray, width: number, height: number) => {
+    if (width !== target.width || height !== target.height) return;
+    g.putImageData(new ImageData(data, width, height), 0, 0);
+    if (info.sheet && info.animation) {
+      drawAnimationFrame(info.canvas.getContext('2d')!, info.sheet, info.animation, 0);
+      info.invalidate?.();
+    }
+    info.pixels.set(info.canvas.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, info.width, info.height).data);
+    const tex = threeCache.get(info);
+    if (tex) tex.needsUpdate = true;
+  };
+  return { apply, restore: () => apply(original.data, original.width, original.height) };
 }

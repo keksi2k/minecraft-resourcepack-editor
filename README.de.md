@@ -4,7 +4,7 @@
 
 [English](README.md) · **Deutsch**
 
-Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft. Pack laden, alle Items und Mobs in 3D ansehen, Sounds anhören, Texturen und Sounds herunterladen oder ersetzen, eigene Sounds hinzufügen und das Pack wieder als ZIP exportieren.
+Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft. Pack laden, alle Items und Mobs in 3D ansehen, Sounds anhören, Texturen und Sounds herunterladen, ersetzen oder **direkt im Browser bearbeiten**, eigene Sounds aufnehmen und das Pack wieder als ZIP exportieren.
 
 ## Funktionen
 
@@ -14,6 +14,9 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 - **Item-Zustände**: Sieh dir an, wie ein Item beim Benutzen, gespannt, geladen, kaputt, mit anderem Kompasswinkel oder anderer Uhrzeit, mit anderem Rüstungsbesatz usw. aussieht. Jeder Schalter der Item-Definition lässt sich einstellen, und die Texturen dieses Zustands kannst du direkt dort ersetzen. **Alle Stadien** zeigt jedes Aussehen nebeneinander (Bogen gespannt, alle 64 Uhrzeiten, Kompasswinkel …) und spielt sie auf Wunsch nacheinander ab.
 - **61 Mobs in 3D** (Creeper, Zombie, Skelett, Spinne, Schwein, Kuh, Schaf, Fuchs, Axolotl, Spieler-Skins … inkl. Varianten und 23 Babys) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört. Ein Klick auf den Mob markiert den Texturpixel an genau dieser Stelle.
 - **Texturen-Browser** für alle ~4000 Texturen (Blöcke, Items, Entities, GUI …).
+- **Textur-Editor**: Stift, Radierer, Füllen und Farbpipette, die Farbpalette der Textur, Spiegeln/Kippen/Drehen, Verschieben mit Umbruch für nahtlose Blöcke, Farbton/Sättigung/Helligkeit, Graustufen und Invertieren, mit Rückgängig. Das 3D-Modell und die Item- bzw. Mob-Details bleiben daneben offen und zeigen jeden Strich live. Animierte Texturen werden Frame für Frame auf ihrem Sheet bearbeitet.
+- **Sound-Editor**: Wellenform mit Auswahl und Zoom; schneiden, zuschneiden, Stille einfügen, Stille abschneiden, ein-/ausblenden, rückwärts, Mono; Verstärkung, Kompressor, Normalisieren; **Tonhöhe** (Halbtöne, gleiche Länge), **Tempo** (gleiche Tonhöhe) und Geschwindigkeit wie bei einer Schallplatte; Bass, Höhen, Tief- und Hochpass; Hall, Echo und Verzerrung. Jeder Effekt lässt sich vor dem Anwenden vorhören und wirkt auf die Auswahl oder den ganzen Sound. Gespeichert wird als Ogg Vorbis.
+- **Mikrofon-Aufnahme**: eine neue Sound-Variante für jedes Event aufnehmen oder am Cursor in einen bestehenden Sound hinein. MP3, WAV, FLAC und andere Audiodateien werden automatisch in Ogg Vorbis umgewandelt.
 - **Sounds**: alle ~2000 Sound-Events durchsuchen und abspielen, einzelne Dateien ersetzen, **eigene Sounds zu Events hinzufügen** (z. B. weitere Schrittgeräusche), **Lautstärke und Tonhöhe pro Variante** einstellen oder die Vanilla-Varianten komplett ersetzen. Jedes Event zeigt, welche **Blöcke, Items und Mobs** es abspielen (Bruchstein und Andesit klingen nach `block.stone`), und lässt sich über deren Namen finden; Item- und Mob-Details listen ihre Sounds.
 - **Bearbeiten ohne Risiko**: Jede Datei zeigt, ob sie aus Vanilla, dem Pack oder einer eigenen Änderung stammt. Änderungen lassen sich einzeln verwerfen oder auf Vanilla zurücksetzen. Deine Arbeit wird **automatisch im Browser gespeichert**; nach einem Neuladen oder Absturz machst du dort weiter, wo du aufgehört hast.
 - **✨ Funny**: alle passenden Texturen und Sounds durchmischen (das Schwert sieht aus wie eine Karotte, die Kuh klingt wie ein Ghast) oder jede Textur knallbunt machen (Zufallsfarben, Regenbogen, Neon, invertiert). Texturen tauschen nur mit passenden (gleiche Art und Größe, Mobs nur mit gleich gebauten, optional Chaos-Modus); Sounds werden in der sounds.json umgeleitet, ohne Audiodateien zu kopieren. Deine eigenen Änderungen bleiben unberührt, ein Seed macht Ergebnisse wiederholbar, und ein Klick entfernt alles wieder.
@@ -46,7 +49,7 @@ Die ausführliche Anleitung für Windows, macOS und Linux, für Server-Hosting, 
 1. Resourcepack-ZIP auf die Startseite ziehen. Die passende Minecraft-Version wird anhand von `pack_format` vorgeschlagen und kann geändert werden.
 2. **Pack öffnen**. Beim ersten Mal wird die client.jar der Version geladen (~40 MB), danach kommt sie aus dem Browser-Cache.
 3. In den Tabs **Items**, **Mobs**, **Texturen** und **Sounds** stöbern. Blauer Rahmen = vom Pack verändert, orange = von dir bearbeitet.
-4. **⬆ Ersetzen** bei einer Textur oder einem Sound wählt eine eigene Datei. **+ Sound hinzufügen** hängt eine `.ogg` an ein Sound-Event an.
+4. **⬆ Ersetzen** bei einer Textur oder einem Sound wählt eine eigene Datei, **✎ Bearbeiten** öffnet sie im Editor. **+ Sound hinzufügen** hängt eine Audiodatei an ein Sound-Event an, **🎤 Aufnehmen** nimmt eine neue auf.
 5. **Pack exportieren** lädt das fertige ZIP herunter. Das kommt in den Ordner `.minecraft/resourcepacks`.
 
 ## Sprachen
@@ -101,6 +104,7 @@ Auch die Doku lässt sich übersetzen: `README.<code>.md` und `docs/INSTALLATION
 | Mobs | Mob-Modelle stehen im Java-Code des Spiels, nicht im Pack. `scripts/DumpEntityModels.java` lässt die Modell-Builder des Spiels laufen und schreibt die Geometrie nach `src/entities/entityModels.json`. `catalog.ts` ordnet Mobs Layer und Texturen zu. |
 | Sounds | Vanilla-Sounds liegen auf `resources.download.minecraft.net`, das **kein CORS** sendet. `vite.config.ts` (Dev) und `scripts/serve.mjs` (Produktion) leiten `/mcres/<hash>` dorthin weiter. Alternativ geht ein lokaler `.minecraft/assets`-Ordner. Welcher Block welchen Sound spielt, legt der Spielcode fest: `scripts/DumpBlockSounds.java` liest die Sound-Typen aller Blöcke (plus Tür-, Knopf- und Zauntor-Sounds) nach `src/sounds/blockSounds.json`; `src/sounds/soundLinks.ts` ergänzt Namenstreffer für Items und Mobs. |
 | Spezialmodelle | Item-Definitionen beschreiben Truhen, Shulkerkisten, Banner, Schilde, Köpfe, Krüge und mehr als `minecraft:special`-Modelle, die per `transformation` platziert werden. `src/entities/specials.ts` ordnet sie den Modell-Layern und Texturen des Spiels zu, inklusive Banner-/Schildmustern und Krugscherben. |
+| Editoren | `src/render/pixelEdit.ts` und `src/sounds/audioEdit.ts` enthalten die Bearbeitungsfunktionen auf rohen Pixeln und Samples (ohne Browser getestet). Während eine Textur bearbeitet wird, schreibt `previewTexture` die Pixel in die dekodierte Textur, die die 3D-Ansichten schon nutzen, sodass sie sich ohne Neuaufbau aktualisieren. Sounds werden mit dem Ogg-Vorbis-Encoder aus [wasm-media-encoders](https://github.com/arseneyr/wasm-media-encoders) (MIT) kodiert, der beim ersten Speichern geladen wird; Filter, Hall und Kompressor laufen in einem `OfflineAudioContext`. |
 | Automatisch speichern | `src/state/session.ts`: Das Original-ZIP und deine Änderungen liegen in IndexedDB und werden auf der Startseite zum Fortsetzen angeboten. |
 | Sprachen | `src/i18n/`: Texte pro Sprache, typgeprüfte Schlüssel, Plurale über `Intl.PluralRules`. Item- und Mob-Namen kommen aus Minecrafts Sprachdatei (über denselben Proxy wie die Sounds, mit Englisch als Rückfall). |
 
@@ -128,6 +132,8 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 - Bannermuster und Töpferscherben sind nur eine Vorschau: Im Spiel stehen sie am Item und gehören deshalb nicht zum exportierten Pack (ihre Texturen schon).
 - Bewegungen in der Hand (Essen, Bogen spannen, Blocken) stecken im Spielcode und nicht im Pack, deshalb sind sie nicht animiert; die Modelle dieser Zustände lassen sich aber ansehen.
 - Block-Sounds kommen direkt aus dem Spiel; bei Items und Mobs ordnet der Editor nach dem Sound-Namen zu (`entity.wolf_angry.*` → Wolf). Sounds, die ein Mob oder Item unter einem ganz anderen Namen spielt, fehlen deshalb.
+- Das Mikrofon funktioniert nur über `localhost`/`127.0.0.1` oder https. Öffnest du den Editor von einem anderen Gerät im LAN (`--host 0.0.0.0`), blockiert der Browser die Aufnahme.
+- Beim Bearbeiten eines flachen Items (Schwert, Apfel …) ändern sich die Farben live in 3D, die Seiten des Items folgen neu gemalten oder radierten Pixeln aber erst nach dem Speichern.
 - Bedrock Edition wird nicht unterstützt.
 
 ## Rechtliches

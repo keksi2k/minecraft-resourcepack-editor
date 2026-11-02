@@ -105,7 +105,7 @@ export function packSoundNames(json: SoundsJsonFile | undefined, eventId: string
 export function newSoundName(eventId: string, fileName: string, taken: (name: string) => boolean): string {
   const base =
     fileName
-      .replace(/\.ogg$/i, '')
+      .replace(/\.(ogg|oga|mp3|wav|flac|m4a|aac|opus|webm)$/i, '')
       .toLowerCase()
       .replace(/[^a-z0-9_.-]+/g, '_')
       .replace(/^_+|_+$/g, '') || 'sound';

@@ -12,6 +12,8 @@ import { useApp } from '../state/appStore';
 import { AssetActions, Btn, pickFile, SourceBadge } from './common';
 import { ItemThumb } from './ItemsView';
 import { mobName, MobThumb } from './MobsView';
+import { EditorPanel } from './EditorPanel';
+import { useEditing, useEditor } from '../state/editorStore';
 
 const PAGE = 300;
 const CHIPS = 6;
@@ -177,7 +179,8 @@ function AttributeInput({ label, title, value, min, max, editable, onCommit }: {
 export function SoundEventRow({ event, compact, links }: { event: SoundEvent; compact?: boolean; links?: SoundLink[] }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
-  const { store, objects, addEventSound, setEventReplace, adoptEvent } = useApp();
+  const { store, objects, addEventSound, addEventSoundBytes, setEventReplace, adoptEvent, tab } = useApp();
+  const openEditor = useEditor((s) => s.open);
   const hasVanillaVariants = event.files.some((f) => !f.fromPack);
   const t = useT();
   const add = async () => {
@@ -218,6 +221,22 @@ export function SoundEventRow({ event, compact, links }: { event: SoundEvent; co
             <Btn tone="primary" onClick={() => void add()} title={t('sounds.addTitle')}>
               {t('sounds.add')}
             </Btn>
+            <Btn
+              onClick={() =>
+                openEditor(
+                  {
+                    kind: 'sound',
+                    path: t('editor.sound.newVariant', { event: event.id.replace(/^minecraft:/, '') }),
+                    load: async () => new Uint8Array(0),
+                    onSave: (bytes) => addEventSoundBytes(event.id, bytes, 'recording'),
+                  },
+                  tab,
+                )
+              }
+              title={t('sounds.recordTitle')}
+            >
+              {t('sounds.record')}
+            </Btn>
             <label className="flex items-center gap-1 text-[11px] text-neutral-300" title={t('sounds.replaceVanillaTitle')}>
               <input type="checkbox" checked={!!event.replaced} onChange={(e) => setEventReplace(event.id, e.target.checked)} />
               {t('sounds.replaceVanilla')}
@@ -252,6 +271,7 @@ export function SoundsView() {
   const [limit, setLimit] = useState(PAGE);
   const [base, setBase] = useState(getResourcesBase());
   const q = useDeferredValue(query.trim().toLowerCase());
+  const editing = useEditing('sounds');
 
   // what an event can be found by: its id, its file names and the names of what plays it
   const searchText = useMemo(
@@ -276,6 +296,7 @@ export function SoundsView() {
     return q ? [...found.filter((e) => e.id.includes(q)), ...found.filter((e) => !e.id.includes(q))] : found;
   }, [soundEvents, q, onlyPack, linkFilter, links, searchText]);
 
+  if (editing) return <EditorPanel />;
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 p-2">

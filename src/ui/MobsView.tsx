@@ -13,6 +13,8 @@ import { ObjectViewer } from './ItemViewer';
 import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
 import { UVOverlay } from './UVOverlay';
+import { EditorPanel } from './EditorPanel';
+import { useEditing } from '../state/editorStore';
 
 const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 
@@ -57,6 +59,7 @@ export function MobsView() {
   const [query, setQuery] = useState('');
   const [babies, setBabies] = useState(true);
   const q = useDeferredValue(query.trim().toLowerCase());
+  const editing = useEditing('mobs');
   const mobs = useMemo(
     () =>
       store
@@ -71,7 +74,8 @@ export function MobsView() {
 
   return (
     <div className="flex h-full">
-      <section className="flex min-w-0 flex-1 flex-col">
+      {editing && <EditorPanel />}
+      <section className={`min-w-0 flex-1 flex-col ${editing ? 'hidden' : 'flex'}`}>
         <div className="flex items-center gap-2 border-b border-neutral-800 p-2">
           <input
             value={query}

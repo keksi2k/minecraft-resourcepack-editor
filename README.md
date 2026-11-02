@@ -4,7 +4,7 @@
 
 **English** · [Deutsch](README.de.md)
 
-A browser-based editor for **Minecraft Java Edition resource packs**. Load a pack, view every item and mob in 3D, listen to sounds, download or replace textures and sounds, add your own sounds, and export the pack as a ZIP again.
+A browser-based editor for **Minecraft Java Edition resource packs**. Load a pack, view every item and mob in 3D, listen to sounds, download, replace or **edit textures and sounds right in the browser**, record your own sounds, and export the pack as a ZIP again.
 
 ## Features
 
@@ -14,6 +14,9 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 - **Item states**: preview what an item looks like in use, pulled, loaded, broken, at another compass angle or time of day, with another trim and so on. Every switch in the item definition can be set, and the textures of that state can be replaced right there. **All stages** shows every look side by side (bow pulling, all 64 clock times, compass angles …) and can play them in turn.
 - **61 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants and 23 babies) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on. Click the mob to mark the exact texture pixel at that spot.
 - **Texture browser** for all ~4000 textures (blocks, items, entities, GUI …).
+- **Texture editor**: pencil, eraser, fill and colour picker, the texture's own palette, mirror/flip/rotate, wrap-around move for seamless blocks, hue/saturation/lightness, grayscale and invert, with undo. The 3D model and the item or mob details stay open next to it and show every stroke live. Animated textures are edited frame by frame on their sheet.
+- **Sound editor**: waveform with selection and zoom; cut, crop, insert silence, trim silence, fade in/out, reverse, make mono; gain, compressor, normalise; **pitch** (semitones, same length), **tempo** (same pitch) and record-style speed; bass, treble, low-pass and high-pass; reverb, echo and distortion. Every effect can be previewed before applying it, and works on the selection or the whole sound. Saved as Ogg Vorbis.
+- **Microphone recording**: record a new sound variant for any event, or record into an existing sound at the cursor. MP3, WAV, FLAC and other audio files are converted to Ogg Vorbis automatically.
 - **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely. Every event shows which **blocks, items and mobs** play it (cobblestone and andesite sound like `block.stone`), and you can search by their names; item and mob details list their sounds.
 - **Safe editing**: every file shows whether it comes from vanilla, the pack or your own change. Changes can be discarded one by one or reset to vanilla. Your work is **saved automatically** in the browser; after a reload or crash you can continue where you left off.
 - **✨ Funny**: shuffle all matching textures and sounds (the sword looks like a carrot, the cow sounds like a ghast) or make every texture as colourful as possible (random colours, rainbow, neon, inverted). Textures only swap with ones that fit (same kind and size, mobs only with mobs built the same way, optional chaos mode); sounds are redirected in sounds.json without copying audio. Your own edits are left alone, a seed makes results repeatable, and one click removes it all again.
@@ -46,7 +49,7 @@ The detailed guide for Windows, macOS and Linux, server hosting, updates and tro
 1. Drop a resource pack ZIP onto the start page. A matching Minecraft version is suggested from `pack_format`; you can change it.
 2. **Open pack**. The first time, the version's client.jar (~40 MB) is downloaded. After that it comes from the browser cache.
 3. Browse the **Items**, **Mobs**, **Textures** and **Sounds** tabs. Blue frame = changed by the pack, orange = edited by you.
-4. **⬆ Replace** on a texture or sound lets you pick your own file. **+ Add sound** attaches an `.ogg` to a sound event.
+4. **⬆ Replace** on a texture or sound lets you pick your own file, **✎ Edit** opens it in the editor. **+ Add sound** attaches an audio file to a sound event, **🎤 Record** records a new one.
 5. **Export pack** downloads the finished ZIP. Put it into your `.minecraft/resourcepacks` folder.
 
 ## Languages
@@ -101,6 +104,7 @@ The docs can be translated too: add `README.<code>.md` and `docs/INSTALLATION.<c
 | Mobs | Mob models live in the game's Java code, not in packs. `scripts/DumpEntityModels.java` runs the game's model builders and writes the geometry to `src/entities/entityModels.json`. `catalog.ts` maps mobs to layers and textures. |
 | Sounds | Vanilla sounds live on `resources.download.minecraft.net`, which sends **no CORS** headers. `vite.config.ts` (dev) and `scripts/serve.mjs` (production) forward `/mcres/<hash>` there. A local `.minecraft/assets` folder works as an alternative. Which block plays which sound is set in the game's code: `scripts/DumpBlockSounds.java` reads each block's sound type (and door/button/fence gate sounds) into `src/sounds/blockSounds.json`; `src/sounds/soundLinks.ts` adds name matches for items and mobs. |
 | Special models | Item definitions describe chests, shulker boxes, banners, shields, heads, pots and more as `minecraft:special` models placed with a `transformation`. `src/entities/specials.ts` maps them to the game's model layers and textures, including banner/shield pattern layers and pot sherds. |
+| Editors | `src/render/pixelEdit.ts` and `src/sounds/audioEdit.ts` hold the editing operations on raw pixels and samples (tested without a browser). While a texture is edited, `previewTexture` writes the pixels into the decoded texture the 3D views already use, so they update without being rebuilt. Sounds are encoded with the Ogg Vorbis encoder from [wasm-media-encoders](https://github.com/arseneyr/wasm-media-encoders) (MIT), loaded on first save; filters, reverb and the compressor run in an `OfflineAudioContext`. |
 | Autosave | `src/state/session.ts`: the original pack ZIP and your edits are kept in IndexedDB and offered for resuming on the start page. |
 | Languages | `src/i18n/`: messages per language, type-checked keys, plurals via `Intl.PluralRules`. Item and mob names come from Minecraft's language file (through the same proxy as sounds, falling back to English). |
 
@@ -128,6 +132,8 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 - Banner patterns and pottery sherds are a preview only: in game they are stored on the item, so they aren't part of the exported pack (their textures are).
 - Movements in hand (eating, drawing a bow, blocking) are coded in the game and not part of a pack, so they aren't animated; the models of these states can be previewed.
 - Block sounds come straight from the game; for items and mobs the editor matches sound names (`entity.wolf_angry.*` → wolf), so sounds a mob or item plays under an unrelated name are not linked.
+- The microphone only works on `localhost`/`127.0.0.1` or over https. If you open the editor from another device on the LAN (`--host 0.0.0.0`), the browser blocks recording.
+- While editing a flat item (sword, apple …), colours update live in 3D, but the item's sides only follow newly painted or erased pixels after saving.
 - Bedrock Edition is not supported.
 
 ## Legal

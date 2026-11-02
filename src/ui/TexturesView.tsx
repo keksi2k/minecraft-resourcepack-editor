@@ -8,6 +8,8 @@ import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { mobName } from './MobsView';
 import { UVOverlay } from './UVOverlay';
+import { EditorPanel } from './EditorPanel';
+import { useEditing } from '../state/editorStore';
 
 const PAGE = 400;
 
@@ -77,6 +79,7 @@ export function TexturesView() {
   const [limit, setLimit] = useState(PAGE);
   const [selected, setSelected] = useState<string>();
   const q = useDeferredValue(query.trim().toLowerCase());
+  const editing = useEditing('textures');
 
   const all = useMemo(() => (store ? store.list('assets/').filter((p) => TEXTURE.test(p)) : []), [store, revision]);
   const folderOf = (p: string) => {
@@ -103,7 +106,8 @@ export function TexturesView() {
   if (!store) return null;
   return (
     <div className="flex h-full">
-      <nav className="w-52 shrink-0 overflow-y-auto border-r border-neutral-800 p-2 text-sm">
+      {editing && <EditorPanel />}
+      <nav className={`w-52 shrink-0 ${editing ? 'hidden' : ''} overflow-y-auto border-r border-neutral-800 p-2 text-sm`}>
         {[['*', all.length] as [string, number], ...folders].map(([f, n]) => (
           <button
             key={f}
@@ -115,7 +119,7 @@ export function TexturesView() {
           </button>
         ))}
       </nav>
-      <section className="flex min-w-0 flex-1 flex-col">
+      <section className={`min-w-0 flex-1 flex-col ${editing ? 'hidden' : 'flex'}`}>
         <div className="flex items-center gap-2 border-b border-neutral-800 p-2">
           <input
             value={query}
