@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { AssetStore } from '../assets/AssetStore';
 import { colorizePixels } from '../funny/colorize';
 import { applySoundShuffle, derange, planSoundShuffle, pngSize, rng, soundGroup, textureGroups } from '../funny/shuffle';
-import type { SoundEvent } from '../sounds/soundsJson';
+import { applySoundRandomizer } from '../funny/randomize';
+import { mergeSounds, type SoundEvent } from '../sounds/soundsJson';
 
 /** Just enough of a PNG for its header to be read. */
 function png(w: number, h: number): Uint8Array {
@@ -158,5 +159,48 @@ describe('funny colours', () => {
     colorizePixels(a, 2, 2, 'rainbow', 1, rng('same'));
     colorizePixels(b, 2, 2, 'rainbow', 1, rng('same'));
     expect(a).toEqual(b);
+  });
+});
+
+describe('sound randomizer', () => {
+  const events = mergeSounds(
+    {
+      'entity.cow.ambient': { subtitle: 'subtitles.entity.cow.ambient', sounds: ['mob/cow/say1', { name: 'mob/cow/say2', volume: 0.5, attenuation_distance: 32 }] },
+      'block.stone.step': { sounds: ['step/stone1', 'step/stone2'] },
+      'block.stone.hit': { sounds: [{ name: 'block.stone.step', type: 'event' }] },
+      'music.game': { sounds: [{ name: 'music/game/calm1', stream: true }] },
+    },
+    {},
+  );
+  const opts = { strength: 1, direction: 'both' as const, perVariant: false, surprises: 0 };
+
+  it('gives every event one random pitch within 0.5–2 and keeps the other settings', () => {
+    const { files, pitched } = applySoundRandomizer({}, events, opts, rng('a'));
+    const cow = files.minecraft['entity.cow.ambient'];
+    expect(cow.replace).toBe(true);
+    expect(cow.subtitle).toBe('subtitles.entity.cow.ambient');
+    const [a, b] = cow.sounds as any[];
+    const pa = typeof a === 'string' ? 1 : a.pitch ?? 1;
+    expect(pa).toBeGreaterThanOrEqual(0.5);
+    expect(pa).toBeLessThanOrEqual(2);
+    expect(b).toMatchObject({ name: 'minecraft:mob/cow/say2', volume: 0.5, attenuation_distance: 32, pitch: pa });
+    // music is left alone, event references are kept
+    expect(files.minecraft['music.game']).toBeUndefined();
+    expect(pitched).toBe(2);
+    expect(files.minecraft['block.stone.hit']).toBeUndefined();
+  });
+
+  it('respects the direction and is repeatable per seed', () => {
+    const up = applySoundRandomizer({}, events, { ...opts, direction: 'higher', perVariant: true }, rng('b')).files.minecraft;
+    for (const e of Object.values(up)) for (const s of e.sounds ?? []) expect(typeof s === 'string' ? 1 : (s as any).pitch ?? 1).toBeGreaterThanOrEqual(1);
+    const again = applySoundRandomizer({}, events, { ...opts, direction: 'higher', perVariant: true }, rng('b')).files.minecraft;
+    expect(again).toEqual(up);
+  });
+
+  it('adds surprise variants from other events', () => {
+    const { files, surprises } = applySoundRandomizer({}, events, { ...opts, surprises: 1 }, rng('c'));
+    expect(surprises).toBeGreaterThan(0);
+    const all = Object.values(files.minecraft).map((e) => e.sounds!.length);
+    expect(Math.max(...all)).toBeGreaterThan(2);
   });
 });

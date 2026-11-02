@@ -3,6 +3,7 @@ import { parseLenientJson } from '../assets/AssetStore';
 import type { SoundsJsonFile } from '../sounds/editSounds';
 import type { SoundEvent } from '../sounds/soundsJson';
 import { colorizePng, type ColorStyle } from './colorize';
+import { applySoundRandomizer, type PitchDirection } from './randomize';
 import { applySoundShuffle, planSoundShuffle, planTextureShuffle, rng, textureScope, type SoundMode, type TextureScope } from './shuffle';
 
 export interface FunnySettings {
@@ -13,6 +14,16 @@ export interface FunnySettings {
     mobChaos: boolean;
     sounds: boolean;
     soundMode: SoundMode;
+  };
+  /** Random pitch for every sound, plus surprise variants from other events. */
+  randomizer: {
+    enabled: boolean;
+    /** 0–1 octaves */
+    strength: number;
+    direction: PitchDirection;
+    perVariant: boolean;
+    /** 0–1 */
+    surprises: number;
   };
   colors: {
     enabled: boolean;
@@ -30,14 +41,24 @@ export const randomSeed = () => Math.random().toString(36).slice(2, 8);
 export const defaultFunny = (): FunnySettings => ({
   seed: randomSeed(),
   shuffle: { enabled: true, scopes: ['item', 'block', 'entity'], mobChaos: false, sounds: true, soundMode: 'similar' },
+  randomizer: { enabled: false, strength: 0.5, direction: 'both', perVariant: false, surprises: 0.1 },
   colors: { enabled: false, scopes: ['item', 'block', 'entity'], style: 'hue', strength: 1 },
   includeEdits: false,
 });
+
+/** Settings saved by older versions lack newer sections; fills them in with defaults. */
+export const withDefaults = (s: Partial<FunnySettings>): FunnySettings => {
+  const d = defaultFunny();
+  return { ...d, ...s, shuffle: { ...d.shuffle, ...s.shuffle }, randomizer: { ...d.randomizer, ...s.randomizer }, colors: { ...d.colors, ...s.colors } };
+};
 
 export interface FunnyStats {
   textures: number;
   sounds: number;
   colored: number;
+  /** Sound events given a random pitch, and surprise variants added (both missing in older records). */
+  pitched?: number;
+  surprises?: number;
 }
 
 export interface FunnyResult {
@@ -90,19 +111,38 @@ export async function computeFunny(
     stats.textures = plan.size;
   }
 
-  if (s.shuffle.enabled && s.shuffle.sounds && events.length) {
+  const shuffleSounds = s.shuffle.enabled && s.shuffle.sounds;
+  const randomize = !!s.randomizer?.enabled;
+  if ((shuffleSounds || randomize) && events.length) {
     const namespaces = [...new Set(events.map((e) => e.id.split(':')[0]))];
-    const files = Object.fromEntries(namespaces.map((ns) => [ns, store.json<SoundsJsonFile>(`assets/${ns}/sounds.json`) ?? {}]));
+    let files: Record<string, SoundsJsonFile> = Object.fromEntries(
+      namespaces.map((ns) => [ns, store.json<SoundsJsonFile>(`assets/${ns}/sounds.json`) ?? {}]),
+    );
+    const touched = new Set<string>();
     const edited = new Map(namespaces.map((ns) => [ns, s.includeEdits ? new Set<string>() : editedEvents(store, `assets/${ns}/sounds.json`)]));
     const skipEvent = (id: string) => {
       const [ns, path] = id.split(':');
       return edited.get(ns)!.has(path);
     };
-    const plan = planSoundShuffle(events, s.shuffle.soundMode, rng(`${s.seed}:sounds`), skipEvent);
-    for (const [ns, json] of Object.entries(applySoundShuffle(files, plan, events))) {
-      changes.set(`assets/${ns}/sounds.json`, encoder.encode(JSON.stringify(json, null, 2)));
+    let sounding = events;
+    if (shuffleSounds) {
+      const plan = planSoundShuffle(events, s.shuffle.soundMode, rng(`${s.seed}:sounds`), skipEvent);
+      const shuffled = applySoundShuffle(files, plan, events);
+      files = { ...files, ...shuffled };
+      Object.keys(shuffled).forEach((ns) => touched.add(ns));
+      // the randomizer works on what each event plays after the swap
+      const byId = new Map(events.map((e) => [e.id, e]));
+      sounding = events.map((e) => (plan.has(e.id) ? { ...e, files: byId.get(plan.get(e.id)!)!.files, refs: [] } : e));
+      stats.sounds = plan.size;
     }
-    stats.sounds = plan.size;
+    if (randomize) {
+      const r = applySoundRandomizer(files, sounding, s.randomizer, rng(`${s.seed}:randomizer`), skipEvent);
+      files = { ...files, ...r.files };
+      Object.keys(r.files).forEach((ns) => touched.add(ns));
+      stats.pitched = r.pitched;
+      stats.surprises = r.surprises;
+    }
+    for (const ns of touched) changes.set(`assets/${ns}/sounds.json`, encoder.encode(JSON.stringify(files[ns], null, 2)));
   }
 
   if (s.colors.enabled && s.colors.scopes.length) {

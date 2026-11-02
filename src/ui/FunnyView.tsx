@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { COLOR_STYLES, type ColorStyle } from '../funny/colorize';
-import { defaultFunny, randomSeed, type FunnySettings } from '../funny/funny';
+import { defaultFunny, randomSeed, withDefaults, type FunnySettings } from '../funny/funny';
+import { PITCH_DIRECTIONS, type PitchDirection } from '../funny/randomize';
 import { SOUND_MODES, TEXTURE_SCOPES, type SoundMode, type TextureScope } from '../funny/shuffle';
 import { useT } from '../i18n';
 import { useApp } from '../state/appStore';
@@ -39,16 +40,18 @@ function Scopes({ value, onChange }: { value: TextureScope[]; onChange: (v: Text
 export function FunnyView() {
   const t = useT();
   const { funny, applyFunny, removeFunny, vanillaSounds, soundsLoading } = useApp();
-  const [s, setS] = useState<FunnySettings>(() => funny?.settings ?? defaultFunny());
+  const [s, setS] = useState<FunnySettings>(() => (funny ? withDefaults(funny.settings) : defaultFunny()));
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
   const shuffle = (p: Partial<FunnySettings['shuffle']>) => setS({ ...s, shuffle: { ...s.shuffle, ...p } });
   const colors = (p: Partial<FunnySettings['colors']>) => setS({ ...s, colors: { ...s.colors, ...p } });
+  const randomizer = (p: Partial<FunnySettings['randomizer']>) => setS({ ...s, randomizer: { ...s.randomizer, ...p } });
   const soundsAvailable = !!vanillaSounds;
-  const settings: FunnySettings = soundsAvailable ? s : { ...s, shuffle: { ...s.shuffle, sounds: false } };
+  const settings: FunnySettings = soundsAvailable ? s : { ...s, shuffle: { ...s.shuffle, sounds: false }, randomizer: { ...s.randomizer, enabled: false } };
   const nothing =
     !(settings.shuffle.enabled && (settings.shuffle.scopes.length || settings.shuffle.sounds)) &&
-    !(settings.colors.enabled && settings.colors.scopes.length);
+    !(settings.colors.enabled && settings.colors.scopes.length) &&
+    !settings.randomizer.enabled;
 
   const apply = async (next = settings) => {
     setBusy(t('funny.working'));
@@ -112,6 +115,60 @@ export function FunnyView() {
           </div>
           <p className="text-xs text-neutral-500">
             {soundsAvailable ? t('funny.soundsInfo') : soundsLoading ? t('funny.soundsLoading') : t('funny.soundsUnavailable')}
+          </p>
+        </Card>
+
+        <Card title={t('funny.randomizerTitle')} enabled={settings.randomizer.enabled} onToggle={(enabled) => soundsAvailable && randomizer({ enabled })}>
+          <p className="text-neutral-400">{t('funny.randomizerInfo')}</p>
+          <label className="flex items-center gap-2">
+            <span className="w-28 text-neutral-400">{t('funny.pitchStrength')}</span>
+            <input
+              type="range"
+              min={5}
+              max={100}
+              step={5}
+              value={Math.round(s.randomizer.strength * 100)}
+              onChange={(e) => randomizer({ strength: Number(e.target.value) / 100 })}
+              className="w-48"
+            />
+            <span className="text-xs text-neutral-400">{t('funny.pitchRange', { semitones: Math.round(s.randomizer.strength * 12) })}</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="w-28 text-neutral-400">{t('funny.pitchDirection')}</span>
+            <select
+              value={s.randomizer.direction}
+              onChange={(e) => randomizer({ direction: e.target.value as PitchDirection })}
+              className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs"
+            >
+              {PITCH_DIRECTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {t(`funny.pitchDirections.${d}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-start gap-2">
+            <input type="checkbox" className="mt-1" checked={s.randomizer.perVariant} onChange={(e) => randomizer({ perVariant: e.target.checked })} />
+            <span>
+              {t('funny.perVariant')}
+              <span className="block text-xs text-neutral-500">{t('funny.perVariantInfo')}</span>
+            </span>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="w-28 text-neutral-400">{t('funny.surprises')}</span>
+            <input
+              type="range"
+              min={0}
+              max={50}
+              step={5}
+              value={Math.round(s.randomizer.surprises * 100)}
+              onChange={(e) => randomizer({ surprises: Number(e.target.value) / 100 })}
+              className="w-48"
+            />
+            <span className="w-10 text-right font-mono text-xs">{Math.round(s.randomizer.surprises * 100)} %</span>
+          </label>
+          <p className="text-xs text-neutral-500">
+            {soundsAvailable ? t('funny.surprisesInfo') : soundsLoading ? t('funny.soundsLoading') : t('funny.soundsUnavailable')}
           </p>
         </Card>
 
@@ -180,6 +237,7 @@ export function FunnyView() {
           {funny && !busy && (
             <p className="text-xs text-emerald-400">
               {t('funny.applied', { textures: funny.stats.textures, sounds: funny.stats.sounds, colored: funny.stats.colored, seed: funny.settings.seed })}
+              {!!funny.stats.pitched && ` ${t('funny.appliedRandomizer', { pitched: funny.stats.pitched, surprises: funny.stats.surprises ?? 0 })}`}
             </p>
           )}
           <p className="text-xs text-neutral-500">{t('funny.undoInfo')}</p>

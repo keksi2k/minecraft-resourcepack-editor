@@ -11,6 +11,8 @@ export interface SoundFileRef {
   pitch?: number;
   /** Listed by the pack's sounds.json (as opposed to vanilla's). */
   fromPack?: boolean;
+  /** Other settings of the entry (stream, attenuation_distance, weight, preload …), kept when rewriting it. */
+  extra?: Record<string, unknown>;
 }
 
 export interface SoundEvent {
@@ -28,7 +30,7 @@ export interface SoundEvent {
 
 type SoundsJson = Record<string, { replace?: boolean; subtitle?: string; sounds?: unknown[] }>;
 
-function fileRef(name: string, extra: { volume?: number; pitch?: number; fromPack?: boolean } = {}): SoundFileRef {
+function fileRef(name: string, extra: { volume?: number; pitch?: number; fromPack?: boolean; extra?: Record<string, unknown> } = {}): SoundFileRef {
   const id = normalizeRL(name);
   const path = soundPath(id);
   return { name: id, path, key: path.replace(/^assets\//, ''), ...extra };
@@ -52,8 +54,10 @@ function addEvents(target: Map<string, SoundEvent>, ns: string, json: SoundsJson
       } else if (s && typeof s === 'object' && typeof (s as any).name === 'string') {
         const o = s as { name: string; type?: string; volume?: number; pitch?: number };
         const sid = o.name.includes(':') ? o.name : `${ns}:${o.name}`;
+        const { name: _n, type: _t, volume: _v, pitch: _p, ...rest } = o as Record<string, unknown>;
+        const extra = Object.keys(rest).length ? rest : undefined;
         if (o.type === 'event') ev.refs.push(sid);
-        else ev.files.push(fileRef(sid, { volume: o.volume, pitch: o.pitch, fromPack: fromPack || undefined }));
+        else ev.files.push(fileRef(sid, { volume: o.volume, pitch: o.pitch, fromPack: fromPack || undefined, extra }));
       }
     }
     target.set(id, ev);

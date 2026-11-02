@@ -197,7 +197,7 @@ export function applySoundShuffle(
     const { ns, path } = parseRL(target);
     const json = (out[ns] ??= { ...files[ns] });
     const sounds = d.files.map((f) => {
-      const entry: { name: string; volume?: number; pitch?: number; stream?: boolean } = { name: f.name };
+      const entry: { name: string; volume?: number; pitch?: number; stream?: boolean } = { name: f.name, ...f.extra };
       if (f.volume !== undefined && f.volume !== 1) entry.volume = f.volume;
       if (f.pitch !== undefined && f.pitch !== 1) entry.pitch = f.pitch;
       if (isMusic(donor)) entry.stream = true;
