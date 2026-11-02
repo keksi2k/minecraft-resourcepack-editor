@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { APP_VERSION } from '../update/updateCheck';
 import { suggestVersion } from '../mojang/versions';
 import { loadPackZip, type LoadedPack } from '../pack/loadPack';
 import { useLocale, useT } from '../i18n';
@@ -54,7 +55,9 @@ export function LoadScreen() {
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 p-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold">{t('app.title')}</h1>
+        <h1 className="text-3xl font-bold">
+          {t('app.title')} <span className="align-middle text-sm font-normal text-neutral-500">{APP_VERSION}</span>
+        </h1>
         <LanguageSelect />
       </div>
       <p className="text-sm text-neutral-400">{t('app.tagline')}</p>

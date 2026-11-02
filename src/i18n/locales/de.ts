@@ -395,6 +395,13 @@ const de: Translation = {
       saveHint: 'Wird als Ogg Vorbis ins Pack gespeichert. Ein Vanilla-Sound wird damit für alle Events ersetzt, die diese Datei nutzen.',
     },
   },
+  update: {
+    available: 'Version {version} ist erschienen (du nutzt {current}).',
+    download: 'Herunterladen',
+    howTo: 'Alten Ordner durch den neuen ersetzen; deine Arbeit im Browser bleibt erhalten.',
+    dismiss: 'Nicht jetzt ✕',
+    dismissTitle: 'Diesen Hinweis bis zur nächsten Version ausblenden',
+  },
   errors: {
     http: 'HTTP {status} beim Laden von {url}',
     versionList: 'Versionsliste nicht erreichbar (HTTP {status})',

@@ -396,6 +396,13 @@ const en = {
       saveHint: 'Saved as Ogg Vorbis into the pack. A vanilla sound is overridden for every event that uses this file.',
     },
   },
+  update: {
+    available: 'Version {version} is out (you are using {current}).',
+    download: 'Download',
+    howTo: 'Replace the old folder with the new one; your work in the browser is kept.',
+    dismiss: 'Not now ✕',
+    dismissTitle: 'Hide this notice until the next version',
+  },
   errors: {
     http: 'HTTP {status} while loading {url}',
     versionList: 'Version list unreachable (HTTP {status})',

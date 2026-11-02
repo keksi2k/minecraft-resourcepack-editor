@@ -7,6 +7,7 @@ import { LoadScreen } from './LoadScreen';
 import { MobsView } from './MobsView';
 import { SoundsView } from './SoundsView';
 import { TexturesView } from './TexturesView';
+import { UpdateBanner } from './UpdateBanner';
 
 export function App() {
   const { phase, tab, loadManifest } = useApp();
@@ -14,9 +15,16 @@ export function App() {
     void loadManifest();
   }, [loadManifest]);
 
-  if (phase !== 'ready') return <LoadScreen />;
+  if (phase !== 'ready')
+    return (
+      <>
+        <UpdateBanner />
+        <LoadScreen />
+      </>
+    );
   return (
     <div className="flex h-screen flex-col">
+      <UpdateBanner />
       <Header />
       <main className="min-h-0 flex-1">
         {tab === 'items' && <ItemsView />}
