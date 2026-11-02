@@ -349,7 +349,16 @@ function afterEdit(path: string) {
   if (path.endsWith('sounds.json')) patch.soundEvents = mergeSounds(vanillaSounds, packSoundFiles(store));
   useApp.setState(patch);
   if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
+  if (path === 'pack.png') refreshIcon();
   persistEdits();
+}
+
+/** Shows the current pack.png (after it was uploaded, edited, removed or restored). */
+function refreshIcon() {
+  const { store, packIcon } = useApp.getState();
+  if (packIcon) URL.revokeObjectURL(packIcon);
+  const icon = store?.get('pack.png');
+  useApp.setState({ packIcon: icon ? URL.createObjectURL(new Blob([icon], { type: 'image/png' })) : undefined });
 }
 
 /** Puts files back to a recorded edit state (`undefined` = not edited). */
@@ -365,6 +374,7 @@ function refreshDerived() {
   const { store, vanillaSounds, revision, names } = useApp.getState();
   if (!store) return;
   useApp.setState({ revision: revision + 1, items: listItems(store, names), soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
+  refreshIcon();
 }
 
 // Item and mob names follow the UI language.

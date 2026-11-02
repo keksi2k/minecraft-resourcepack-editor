@@ -38,6 +38,13 @@ const de: Translation = {
     newPackDescription: 'Erstellt mit Resource Pack Editor',
   },
   header: {
+    icon: {
+      title: 'Pack-Bild',
+      hint: 'Wird in Minecraft neben dem Pack in der Resourcepack-Liste angezeigt. Jedes Bild geht: Es wird quadratisch zugeschnitten, große Bilder auf 256×256 verkleinert.',
+      upload: '⬆ Bild hochladen …',
+      remove: 'Entfernen',
+      notImage: 'Das Bild konnte nicht gelesen werden.',
+    },
     tabs: { items: 'Items', mobs: 'Mobs', textures: 'Texturen', sounds: 'Sounds', funny: '✨ Funny' },
     format: 'Format {format}',
     packFormat: 'Pack-Format {format}',

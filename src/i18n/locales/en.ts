@@ -39,6 +39,13 @@ const en = {
     newPackDescription: 'Created with Resource Pack Editor',
   },
   header: {
+    icon: {
+      title: 'Pack icon',
+      hint: 'Shown next to the pack in Minecraft\'s resource pack list. Any image works: it is cropped to a square, large pictures are scaled down to 256×256.',
+      upload: '⬆ Upload image …',
+      remove: 'Remove',
+      notImage: 'The image could not be read.',
+    },
     tabs: { items: 'Items', mobs: 'Mobs', textures: 'Textures', sounds: 'Sounds', funny: '✨ Funny' },
     format: 'format {format}',
     packFormat: 'pack format {format}',
