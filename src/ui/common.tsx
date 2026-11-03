@@ -91,6 +91,22 @@ async function imageSize(bytes: Uint8Array | Blob): Promise<[number, number] | u
   }
 }
 
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** Minecraft only reads PNG textures; JPG, WebP, GIF, BMP … are re-encoded as PNG (pixels unchanged). */
+async function ensurePng(bytes: Uint8Array): Promise<Uint8Array> {
+  if (PNG_SIGNATURE.every((b, i) => bytes[i] === b)) return bytes;
+  const bmp = await createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+  const c = document.createElement('canvas');
+  c.width = bmp.width;
+  c.height = bmp.height;
+  c.getContext('2d')!.drawImage(bmp, 0, 0);
+  bmp.close();
+  const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('PNG encoding failed');
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
 export function Btn({ children, onClick, title, disabled, tone = 'default' }: {
   children: ReactNode;
   onClick?: () => void;
@@ -135,7 +151,7 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
   const [busy, setBusy] = useState(false);
   const edited = store?.edits.has(path) ?? false;
   const openEditor = useEditor((s) => s.open);
-  const accept = kind === 'texture' ? 'image/png,.png' : kind === 'sound' ? 'audio/*,.ogg' : '*/*';
+  const accept = kind === 'texture' ? 'image/*' : kind === 'sound' ? 'audio/*,.ogg' : '*/*';
 
   const run = (fn: () => Promise<void>) => async () => {
     setBusy(true);
@@ -168,6 +184,7 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
         const ok = confirm(t('actions.aspectMismatch', { oldW: prev[0], oldH: prev[1], newW: next[0], newH: next[1] }));
         if (!ok) return;
       }
+      bytes = await ensurePng(bytes);
     }
     setFile(path, bytes);
   });

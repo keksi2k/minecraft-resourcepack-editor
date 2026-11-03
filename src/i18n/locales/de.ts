@@ -111,7 +111,7 @@ const de: Translation = {
     discardTitle: 'Eigene Änderung verwerfen',
     vanilla: 'Vanilla',
     vanillaTitle: 'Datei aus dem Pack entfernen, Vanilla wird wieder sichtbar',
-    notAPng: 'Datei ist kein gültiges PNG.',
+    notAPng: 'Die Datei ist kein Bild, das der Browser lesen kann.',
     aspectMismatch:
       'Seitenverhältnis weicht ab: bisher {oldW}×{oldH}, neu {newW}×{newH}. Animierte Texturen oder UV-Mapping könnten kaputtgehen. Trotzdem übernehmen?',
     close: 'Schließen',

@@ -112,7 +112,7 @@ const en = {
     discardTitle: 'Discard your change',
     vanilla: 'Vanilla',
     vanillaTitle: 'Remove the file from the pack so the vanilla version shows again',
-    notAPng: 'The file is not a valid PNG.',
+    notAPng: 'The file is not an image this browser can read.',
     aspectMismatch:
       'Aspect ratio differs: currently {oldW}×{oldH}, new {newW}×{newH}. Animated textures or UV mapping may break. Use it anyway?',
     close: 'Close',
