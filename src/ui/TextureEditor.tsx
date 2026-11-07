@@ -256,7 +256,12 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     const p = pixelAt(e);
     if (!inside(p)) return;
     const active: Tool = e.altKey ? 'picker' : e.button === 2 ? 'eraser' : tool;
-    if (active === 'picker') return useColor(getPixel(img, ...p));
+    if (active === 'picker') {
+      useColor(getPixel(img, ...p));
+      // Alt+click keeps the current tool, so only the picker tool itself hands over to the pencil
+      if (tool === 'picker') setTool('pencil');
+      return;
+    }
     if (active === 'fill') {
       const f = Math.floor(p[1] / frameHeight) * frameHeight;
       edit((px) => floodFill(px, p[0], p[1], color, !fillAll, tolerance, { y0: f, y1: f + frameHeight }) > 0);
