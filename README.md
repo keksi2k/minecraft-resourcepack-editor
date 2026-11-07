@@ -12,7 +12,7 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 - **3D viewer** for each item, orbitable, with the game's display contexts (inventory, 1st/3rd person hand, ground, item frame, head). Renders can be downloaded as PNG.
 - **Pattern preview** for banners and shields (pattern layers and colours) and pottery sherds for decorated pots, so you can check your pattern textures on the real model.
 - **Item states**: preview what an item looks like in use, pulled, loaded, broken, at another compass angle or time of day, with another trim and so on. Every switch in the item definition can be set, and the textures of that state can be replaced right there. **All stages** shows every look side by side (bow pulling, all 64 clock times, compass angles …) and can play them in turn.
-- **61 mobs in 3D** (creeper, zombie, skeleton, spider, pig, cow, sheep, fox, axolotl, player skins … including variants and 23 babies) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on. Click the mob to mark the exact texture pixel at that spot.
+- **All 91 mobs in 3D, 281 entries with their colour and biome variants and 94 babies** (from creeper and axolotl to warden and ender dragon) using the real vanilla models, plus a **UV overlay** that shows which part of the texture belongs to the head, body, legs and so on. Click the mob to mark the exact texture pixel at that spot.
 - **Texture browser** for all ~4000 textures (blocks, items, entities, GUI …).
 - **Texture editor**: pencil, eraser, fill and colour picker, the texture's own palette, mirror/flip/rotate, wrap-around move for seamless blocks, hue/saturation/lightness, grayscale and invert, with undo. The 3D model and the item or mob details stay open next to it and show every stroke live. Animated textures are edited frame by frame on their sheet.
 - **Sound editor**: waveform with selection and zoom; cut, crop, insert silence, trim silence, fade in/out, reverse, make mono; gain, compressor, normalise; **pitch** (semitones, same length), **tempo** (same pitch) and record-style speed; bass, treble, low-pass and high-pass; reverb, echo and distortion. Every effect can be previewed before applying it, and works on the selection or the whole sound. Saved as Ogg Vorbis.
@@ -128,7 +128,7 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 
 ## Limitations
 
-- Mobs are shown in a static pose without animation. Armour, saddles, collars, villager professions and mooshroom mushrooms are missing for now.
+- Mobs are shown in a static pose without animation. Armour, saddles, collars, horse markings, villager professions and mooshroom mushrooms are missing for now, as are states like angry wolves or charging vexes (their textures are in the texture browser).
 - Banner patterns and pottery sherds are a preview only: in game they are stored on the item, so they aren't part of the exported pack (their textures are).
 - Movements in hand (eating, drawing a bow, blocking) are coded in the game and not part of a pack, so they aren't animated; the models of these states can be previewed.
 - Block sounds come straight from the game; for items and mobs the editor matches sound names (`entity.wolf_angry.*` → wolf), so sounds a mob or item plays under an unrelated name are not linked.

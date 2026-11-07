@@ -21,7 +21,8 @@ const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 /** Mob name from Minecraft's language files (in the UI language), plus the translated variant. */
 export function mobName(names: Record<string, string>, mob: MobDef, t: TFunction): string {
   const base = names[`entity.minecraft.${mob.entity}`] ?? (mob.entity === 'player' ? t('mobs.player') : mob.entity.replace(/_/g, ' '));
-  const extras = [mob.variant && t(`mobs.variant.${mob.variant}`), mob.babyOf && t('mobs.baby')].filter(Boolean);
+  const variant = mob.variantLang ? names[mob.variantLang] ?? mob.variantLang.split('.').pop() : mob.variant && t(`mobs.variant.${mob.variant}`);
+  const extras = [variant, mob.babyOf && t('mobs.baby')].filter(Boolean);
   return extras.length ? `${base} (${extras.join(', ')})` : base;
 }
 

@@ -25,6 +25,9 @@ export const ENTITY_MODELS = models as unknown as Record<string, LayerJson>;
 
 type Vec3 = [number, number, number];
 
+/** How a mob differs from its model's default: posed and hidden parts. */
+type MobLook = Pick<MobDef, 'pose' | 'hidden'>;
+
 interface PolygonVisit {
   part: string;
   /** Vertices in entity model space (pixels, y down). */
@@ -38,12 +41,13 @@ function walk(
   part: PartJson,
   parent: THREE.Matrix4,
   name: string,
-  pose: MobDef['pose'],
+  look: MobLook | undefined,
   visit: (p: PolygonVisit) => void,
 ) {
-  if (!part.visible) return;
+  const own = name.split('/').pop()!;
+  if (!part.visible || look?.hidden?.includes(own)) return;
   const [x, y, z, xr, yr, zr, xs, ys, zs] = part.pose;
-  const extra = pose?.[name.split('/').pop()!] ?? [0, 0, 0];
+  const extra = look?.pose?.[own] ?? [0, 0, 0];
   const m = parent
     .clone()
     .multiply(new THREE.Matrix4().makeTranslation(x, y, z))
@@ -71,7 +75,7 @@ function walk(
       });
     }
   }
-  for (const [child, p] of Object.entries(part.children)) walk(p, m, name ? `${name}/${child}` : child, pose, visit);
+  for (const [child, p] of Object.entries(part.children)) walk(p, m, name ? `${name}/${child}` : child, look, visit);
 }
 
 /** Directional shading Minecraft-style: top 1.0, bottom 0.5, north/south 0.8, east/west 0.6. */
@@ -110,7 +114,7 @@ export async function buildLayerMesh(
   layer: LayerSpec,
   index: number,
   outer: THREE.Matrix4,
-  pose?: MobDef['pose'],
+  look?: MobLook,
 ): Promise<THREE.Mesh | undefined> {
   const model = ENTITY_MODELS[layer.model];
   if (!model) return undefined;
@@ -119,7 +123,7 @@ export async function buildLayerMesh(
   const batch = new MeshBatch();
   const parts: string[] = [];
   const inPart = (name: string) => !layer.part || name === layer.part || name.startsWith(`${layer.part}/`);
-  walk(withRootPose(model.root, layer.rootPose), new THREE.Matrix4(), '', pose, ({ part, verts, uvs, normal }) => {
+  walk(withRootPose(model.root, layer.rootPose), new THREE.Matrix4(), '', look, ({ part, verts, uvs, normal }) => {
     if (!inPart(part)) return;
     parts.push(part);
     const s = layer.emissive ? 1 : shade(normal.clone().applyMatrix3(outerNormal).normalize());
@@ -131,7 +135,9 @@ export async function buildLayerMesh(
       vertexColor(s, layer.tint ?? 0xffffff),
     );
   });
-  const mesh = batch.toMesh(tex, THREE.FrontSide, index);
+  // the game draws cutout entity textures without culling, so flat parts show from both sides (tadpole tail)
+  const side = tex.translucent || layer.emissive ? THREE.FrontSide : THREE.DoubleSide;
+  const mesh = batch.toMesh(tex, side, index);
   if (layer.emissive) {
     const mat = mesh.material as THREE.MeshBasicMaterial;
     mat.blending = THREE.AdditiveBlending;
@@ -206,7 +212,7 @@ export async function buildMobObject(store: AssetStore, mob: MobDef): Promise<TH
   root.matrixAutoUpdate = false;
   root.matrix.copy(MOB_ROOT);
   for (let li = 0; li < mob.layers.length; li++) {
-    const mesh = await buildLayerMesh(store, mob.layers[li], li, MOB_ROOT, mob.pose);
+    const mesh = await buildLayerMesh(store, mob.layers[li], li, MOB_ROOT, mob);
     if (mesh) root.add(mesh);
   }
   const wrapper = new THREE.Group();
@@ -231,7 +237,8 @@ export function layerUVRects(modelKey: string): { tex: [number, number]; rects: 
   walk(model.root, new THREE.Matrix4(), '', undefined, ({ part, uvs }) => {
     const us = uvs.map((u) => u[0] * w);
     const vs = uvs.map((u) => u[1] * h);
-    const r = { part, x0: Math.min(...us), y0: Math.min(...vs), x1: Math.max(...us), y1: Math.max(...vs) };
+    // some vanilla models reach past their texture (a baby llama's chests)
+    const r = { part, x0: Math.max(0, Math.min(...us)), y0: Math.max(0, Math.min(...vs)), x1: Math.min(w, Math.max(...us)), y1: Math.min(h, Math.max(...vs)) };
     if (r.x1 > r.x0 && r.y1 > r.y0) rects.push(r);
   });
   return { tex: model.tex, rects };

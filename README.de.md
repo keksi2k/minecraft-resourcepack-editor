@@ -12,7 +12,7 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 - **3D-Viewer** pro Item, drehbar, mit den Display-Ansichten des Spiels (Inventar, Hand 1st/3rd Person, Boden, Rahmen, Kopf). Render als PNG herunterladbar.
 - **Muster-Vorschau** für Banner und Schilde (Musterebenen und Farben) sowie Töpferscherben für verzierte Krüge, damit du deine Mustertexturen am echten Modell prüfen kannst.
 - **Item-Zustände**: Sieh dir an, wie ein Item beim Benutzen, gespannt, geladen, kaputt, mit anderem Kompasswinkel oder anderer Uhrzeit, mit anderem Rüstungsbesatz usw. aussieht. Jeder Schalter der Item-Definition lässt sich einstellen, und die Texturen dieses Zustands kannst du direkt dort ersetzen. **Alle Stadien** zeigt jedes Aussehen nebeneinander (Bogen gespannt, alle 64 Uhrzeiten, Kompasswinkel …) und spielt sie auf Wunsch nacheinander ab.
-- **61 Mobs in 3D** (Creeper, Zombie, Skelett, Spinne, Schwein, Kuh, Schaf, Fuchs, Axolotl, Spieler-Skins … inkl. Varianten und 23 Babys) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört. Ein Klick auf den Mob markiert den Texturpixel an genau dieser Stelle.
+- **Alle 91 Mobs in 3D, 281 Einträge mit ihren Farb- und Biom-Varianten und 94 Babys** (von Creeper und Axolotl bis Warden und Enderdrache) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört. Ein Klick auf den Mob markiert den Texturpixel an genau dieser Stelle.
 - **Texturen-Browser** für alle ~4000 Texturen (Blöcke, Items, Entities, GUI …).
 - **Textur-Editor**: Stift, Radierer, Füllen und Farbpipette, die Farbpalette der Textur, Spiegeln/Kippen/Drehen, Verschieben mit Umbruch für nahtlose Blöcke, Farbton/Sättigung/Helligkeit, Graustufen und Invertieren, mit Rückgängig. Das 3D-Modell und die Item- bzw. Mob-Details bleiben daneben offen und zeigen jeden Strich live. Animierte Texturen werden Frame für Frame auf ihrem Sheet bearbeitet.
 - **Sound-Editor**: Wellenform mit Auswahl und Zoom; schneiden, zuschneiden, Stille einfügen, Stille abschneiden, ein-/ausblenden, rückwärts, Mono; Verstärkung, Kompressor, Normalisieren; **Tonhöhe** (Halbtöne, gleiche Länge), **Tempo** (gleiche Tonhöhe) und Geschwindigkeit wie bei einer Schallplatte; Bass, Höhen, Tief- und Hochpass; Hall, Echo und Verzerrung. Jeder Effekt lässt sich vor dem Anwenden vorhören und wirkt auf die Auswahl oder den ganzen Sound. Gespeichert wird als Ogg Vorbis.
@@ -128,7 +128,7 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 
 ## Grenzen
 
-- Mobs stehen in einer statischen Pose ohne Animation. Rüstung, Sattel, Halsband, Villager-Berufe und Mooshroom-Pilze fehlen noch.
+- Mobs stehen in einer statischen Pose ohne Animation. Rüstung, Sattel, Halsband, Pferdemuster, Villager-Berufe und Mooshroom-Pilze fehlen noch, ebenso Zustände wie wütende Wölfe oder angreifende Plagegeister (ihre Texturen findest du im Texturen-Browser).
 - Bannermuster und Töpferscherben sind nur eine Vorschau: Im Spiel stehen sie am Item und gehören deshalb nicht zum exportierten Pack (ihre Texturen schon).
 - Bewegungen in der Hand (Essen, Bogen spannen, Blocken) stecken im Spielcode und nicht im Pack, deshalb sind sie nicht animiert; die Modelle dieser Zustände lassen sich aber ansehen.
 - Block-Sounds kommen direkt aus dem Spiel; bei Items und Mobs ordnet der Editor nach dem Sound-Namen zu (`entity.wolf_angry.*` → Wolf). Sounds, die ein Mob oder Item unter einem ganz anderen Namen spielt, fehlen deshalb.

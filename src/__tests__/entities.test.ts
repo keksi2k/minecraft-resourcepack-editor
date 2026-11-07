@@ -12,6 +12,12 @@ describe('entity catalog', () => {
     expect(new Set(MOBS.map((m) => m.id)).size).toBe(MOBS.length);
   });
 
+  it('covers every mob of the game', () => {
+    const entities = new Set(MOBS.map((m) => m.entity));
+    const all = 'allay armadillo axolotl bat bee blaze bogged breeze camel camel_husk cat cave_spider chicken cod copper_golem cow creaking creeper dolphin donkey drowned elder_guardian ender_dragon enderman endermite evoker fox frog ghast giant glow_squid goat guardian happy_ghast hoglin horse husk illusioner iron_golem llama magma_cube mooshroom mule nautilus ocelot panda parched parrot phantom pig piglin piglin_brute pillager player polar_bear pufferfish rabbit ravager salmon sheep shulker silverfish skeleton skeleton_horse slime sniffer snow_golem spider squid stray strider sulfur_cube tadpole trader_llama tropical_fish turtle vex villager vindicator wandering_trader warden witch wither wither_skeleton wolf zoglin zombie zombie_horse zombie_nautilus zombie_villager zombified_piglin'.split(' ');
+    expect(all.filter((e) => !entities.has(e))).toEqual([]);
+  });
+
   it('finds mobs by texture', () => {
     expect(mobsForTexture('minecraft:entity/spider/spider_eyes').map((m) => m.mob.id)).toEqual(['spider', 'cave_spider']);
   });
