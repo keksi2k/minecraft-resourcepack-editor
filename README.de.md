@@ -11,6 +11,7 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 - **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel. Truhen, Shulkerkisten, Banner, Schilde, Köpfe, Betten, verzierte Krüge, Aquisitoren, Dreizacke und Kupfergolem-Statuen werden ebenfalls mit ihren echten Modellen gezeichnet, und animierte Texturen (Wasser, Lava, Feuer, Portale …) laufen im Grid, im 3D-Viewer und in der Texturvorschau.
 - **3D-Viewer** pro Item, drehbar, mit den Display-Ansichten des Spiels (Inventar, Hand 1st/3rd Person, Boden, Rahmen, Kopf). Render als PNG herunterladbar.
 - **Muster-Vorschau** für Banner und Schilde (Musterebenen und Farben) sowie Töpferscherben für verzierte Krüge, damit du deine Mustertexturen am echten Modell prüfen kannst.
+- **Pflanzen mit ihren Wachstumsstufen**: Weizen, Möhren, Kartoffeln, Rote Bete, Stiele, Kakao, Kannenpflanzen und mehr in 3D, so wie sie in der Welt stehen. Alle Stufen nebeneinander, als Wachstumsanimation abspielbar, und die Texturen jeder Stufe lassen sich direkt dort bearbeiten.
 - **Item-Zustände**: Sieh dir an, wie ein Item beim Benutzen, gespannt, geladen, kaputt, mit anderem Kompasswinkel oder anderer Uhrzeit, mit anderem Rüstungsbesatz usw. aussieht. Jeder Schalter der Item-Definition lässt sich einstellen, und die Texturen dieses Zustands kannst du direkt dort ersetzen. **Alle Stadien** zeigt jedes Aussehen nebeneinander (Bogen gespannt, alle 64 Uhrzeiten, Kompasswinkel …) und spielt sie auf Wunsch nacheinander ab.
 - **Alle 91 Mobs in 3D, 281 Einträge mit ihren Farb- und Biom-Varianten und 94 Babys** (von Creeper und Axolotl bis Warden und Enderdrache) mit dem echten Vanilla-Modell, plus **UV-Overlay**: Auf der Textur sieht man, welcher Bereich zu Kopf, Körper, Beinen usw. gehört. Ein Klick auf den Mob markiert den Texturpixel an genau dieser Stelle.
 - **Texturen-Browser** für alle ~4000 Texturen (Blöcke, Items, Entities, GUI …).
@@ -97,7 +98,7 @@ Auch die Doku lässt sich übersetzen: `README.<code>.md` und `docs/INSTALLATION
 
 | Bereich | Umsetzung |
 | --- | --- |
-| Vanilla-Basis | Die client.jar wird von `piston-data.mojang.com` geladen (CORS erlaubt). Behalten werden nur `textures`, `models`, `items` und `lang/en_us.json`, gespeichert pro Version in IndexedDB. |
+| Vanilla-Basis | Die client.jar wird von `piston-data.mojang.com` geladen (CORS erlaubt). Behalten werden nur `textures`, `models`, `items`, `atlases`, `blockstates` und `lang/en_us.json`, gespeichert pro Version in IndexedDB. |
 | Layering | `src/assets/AssetStore.ts`: Vanilla ← Pack ← eigene Änderungen. Der Export enthält nur Pack-Dateien plus Änderungen. |
 | Items | `src/models/`: Item-Definitionen (`assets/*/items/*.json`, ab 1.21.4) bzw. `models/item/*.json` bei älteren Versionen, Parent-Ketten, Textur-Variablen, Display-Transforms, Tints. |
 | Rendering | `src/render/`: three.js mit Minecraft-Flächenschattierung. `item/generated` wird zum extrudierten 1-px-Sprite. Thumbnails laufen über einen geteilten Offscreen-Renderer. |
@@ -131,6 +132,7 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 
 - Mobs stehen in einer statischen Pose ohne Animation. Rüstung, Sattel, Halsband, Pferdemuster, Villager-Berufe und Mooshroom-Pilze fehlen noch, ebenso Zustände wie wütende Wölfe oder angreifende Plagegeister (ihre Texturen findest du im Texturen-Browser).
 - Bannermuster und Töpferscherben sind nur eine Vorschau: Im Spiel stehen sie am Item und gehören deshalb nicht zum exportierten Pack (ihre Texturen schon).
+- Der Pflanzen-Tab zeigt Blöcke, deren Aussehen sich mit ihrem `age` ändert. Bambus (`multipart`), Höhlenranken (`berries`) und Stiele, die an einer Melone oder einem Kürbis hängen, fehlen; ihre Texturen findest du im Texturen-Browser.
 - Bewegungen in der Hand (Essen, Bogen spannen, Blocken) stecken im Spielcode und nicht im Pack, deshalb sind sie nicht animiert; die Modelle dieser Zustände lassen sich aber ansehen.
 - Block-Sounds kommen direkt aus dem Spiel; bei Items und Mobs ordnet der Editor nach dem Sound-Namen zu (`entity.wolf_angry.*` → Wolf). Sounds, die ein Mob oder Item unter einem ganz anderen Namen spielt, fehlen deshalb.
 - Das Mikrofon funktioniert nur über `localhost`/`127.0.0.1` oder https. Öffnest du den Editor von einem anderen Gerät im LAN (`--host 0.0.0.0`), blockiert der Browser die Aufnahme.

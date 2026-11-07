@@ -17,8 +17,8 @@ interface CachedVanilla {
 }
 
 /** Raise when KEEP changes, so cached versions get the new files. */
-const CACHE_VERSION = 2;
-const KEEP = /^assets\/[^/]+\/(textures|models|items|atlases)\/.+\.(png|json|mcmeta)$|^assets\/minecraft\/lang\/en_us\.json$/;
+const CACHE_VERSION = 3;
+const KEEP = /^assets\/[^/]+\/(textures|models|items|atlases|blockstates)\/.+\.(png|json|mcmeta)$|^assets\/minecraft\/lang\/en_us\.json$/;
 
 export type LoadStep = (status: string, progress?: number) => void;
 

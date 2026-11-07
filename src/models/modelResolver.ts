@@ -16,6 +16,8 @@ export interface ModelElement {
   rotation?: { origin: Vec3; axis?: 'x' | 'y' | 'z'; angle?: number; x?: number; y?: number; z?: number; rescale?: boolean };
   faces: Partial<Record<FaceDir, ModelFace>>;
   shade?: boolean;
+  /** Shaded as if facing this way (crops are lit evenly on all sides). */
+  shade_direction_override?: FaceDir;
 }
 
 export interface DisplayTransform {

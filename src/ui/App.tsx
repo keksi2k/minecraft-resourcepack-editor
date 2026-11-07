@@ -5,6 +5,7 @@ import { FunnyView } from './FunnyView';
 import { ItemsView } from './ItemsView';
 import { LoadScreen } from './LoadScreen';
 import { MobsView } from './MobsView';
+import { PlantsView } from './PlantsView';
 import { SoundsView } from './SoundsView';
 import { TexturesView } from './TexturesView';
 import { UpdateBanner } from './UpdateBanner';
@@ -28,6 +29,7 @@ export function App() {
       <Header />
       <main className="min-h-0 flex-1">
         {tab === 'items' && <ItemsView />}
+        {tab === 'plants' && <PlantsView />}
         {tab === 'mobs' && <MobsView />}
         {tab === 'textures' && <TexturesView />}
         {tab === 'sounds' && <SoundsView />}

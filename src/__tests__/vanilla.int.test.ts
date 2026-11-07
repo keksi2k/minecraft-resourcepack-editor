@@ -8,6 +8,7 @@ import { availablePatterns, availableSherds, specialLayers } from '../entities/s
 import { ENTITY_MODELS } from '../render/entityMesh';
 import type { ItemState } from '../models/itemDefinition';
 import { itemStages, itemStateSwitches, listItems, resolveItemModels } from '../models/items';
+import { listPlants } from '../models/plants';
 import { texturePath } from '../models/resourceLocation';
 import { textureGroups } from '../funny/shuffle';
 import { texturePermutation } from '../models/atlasPermutations';
@@ -19,7 +20,7 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     const zip = await JSZip.loadAsync(readFileSync(jarPath!));
     const files = new Map<string, Uint8Array>();
     for (const f of Object.values(zip.files)) {
-      if (!f.dir && /^assets\/[^/]+\/(textures|models|items|atlases)\/|^assets\/minecraft\/lang\/en_us\.json$/.test(f.name)) {
+      if (!f.dir && /^assets\/[^/]+\/(textures|models|items|atlases|blockstates)\/|^assets\/minecraft\/lang\/en_us\.json$/.test(f.name)) {
         files.set(f.name, await f.async('uint8array'));
       }
     }
@@ -34,6 +35,14 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     const missingTex = items.filter((i) => i.id !== 'minecraft:air').flatMap((i) => i.textures.filter((t) => !store.has(texturePath(t))).map((t) => `${i.id} -> ${t}`));
     const special = [...new Set(items.flatMap((i) => i.models.filter((m) => m.ref.special).map((m) => m.ref.special)))];
     console.log({ items: items.length, ms: Math.round(ms), kinds, noModels, missingTex: missingTex.slice(0, 20), special });
+
+    const plants = listPlants(store);
+    console.log(Object.fromEntries(plants.map((p) => [p.id.split(':')[1], p.stages.map((s) => s.ages.join('+')).join(' ')])));
+    const looks = (id: string) => plants.find((p) => p.id === `minecraft:${id}`)?.stages.length;
+    expect([looks('wheat'), looks('carrots'), looks('potatoes'), looks('beetroots')]).toEqual([8, 4, 4, 4]);
+    expect(plants.find((p) => p.id === 'minecraft:pitcher_crop')?.height).toBe(2);
+    expect(looks('frosted_ice')).toBeUndefined();
+    expect(plants.flatMap((p) => p.stages.flatMap((s) => s.textures)).filter((t) => !store.has(texturePath(t)))).toEqual([]);
 
     expect(items.length).toBeGreaterThan(1000);
     expect(items.filter((i) => i.models.some((m) => m.model.kind === 'missing'))).toEqual([]);

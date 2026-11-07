@@ -143,7 +143,7 @@ async function buildElements(store: AssetStore, model: ResolvedModel, tints: num
       const rotated = uvs.map((_, i) => uvs[(i - k + 4) % 4]);
       const corners = faceCorners(dir, el.from, el.to).map((c) => xf(c).map((n) => n / 16 - 0.5) as Vec3);
       const tint = face.tintindex !== undefined && face.tintindex >= 0 ? (tints[face.tintindex] ?? 0xffffff) : 0xffffff;
-      batch.quad(corners, rotated, vertexColor(el.shade === false ? 1 : SHADE[dir], tint));
+      batch.quad(corners, rotated, vertexColor(el.shade === false ? 1 : SHADE[el.shade_direction_override ?? dir], tint));
     }
   }
   const group = new THREE.Group();

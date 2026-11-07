@@ -45,7 +45,7 @@ const de: Translation = {
       remove: 'Entfernen',
       notImage: 'Das Bild konnte nicht gelesen werden.',
     },
-    tabs: { items: 'Items', mobs: 'Mobs', textures: 'Texturen', sounds: 'Sounds', funny: '✨ Funny' },
+    tabs: { items: 'Items', plants: 'Pflanzen', mobs: 'Mobs', textures: 'Texturen', sounds: 'Sounds', funny: '✨ Funny' },
     format: 'Format {format}',
     packFormat: 'Pack-Format {format}',
     formatMismatch: 'passt evtl. nicht zur Version',
@@ -116,6 +116,13 @@ const de: Translation = {
       'Seitenverhältnis weicht ab: bisher {oldW}×{oldH}, neu {newW}×{newH}. Animierte Texturen oder UV-Mapping könnten kaputtgehen. Trotzdem übernehmen?',
     close: 'Schließen',
     render: '⬇ Render',
+  },
+  plants: {
+    search: 'Pflanzen suchen …',
+    age: 'Alter {ages}',
+    stagesInfo: 'Jede Wachstumsstufe nebeneinander. Klicke eine an, um sie in der Vorschau zu sehen und ihre Texturen zu bearbeiten.',
+    blockState: 'Blockzustand',
+    renderTitle: 'Render dieser Stufe als PNG (512 px)',
   },
   items: {
     search: 'Items suchen …',

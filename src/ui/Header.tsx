@@ -6,7 +6,7 @@ import { Btn, LanguageSelect, pickFile } from './common';
 import { makePackIcon, PACK_ICON } from '../pack/packIcon';
 import { useEditor } from '../state/editorStore';
 
-const TABS: Tab[] = ['items', 'mobs', 'textures', 'sounds', 'funny'];
+const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'funny'];
 
 export function Header() {
   const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision } = useApp();

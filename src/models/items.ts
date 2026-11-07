@@ -57,6 +57,16 @@ export function resolveItemModels(
 
 const RANK: Record<Source, number> = { vanilla: 0, pack: 1, edited: 2 };
 
+/** The strongest source among `paths`: edited > pack > vanilla. */
+export function strongestSource(store: AssetStore, paths: string[]): Source {
+  let source: Source = 'vanilla';
+  for (const p of paths) {
+    const s = store.source(p);
+    if (s && RANK[s] > RANK[source]) source = s;
+  }
+  return source;
+}
+
 const texturesOf = (models: ResolvedItemModel[]) => [
   ...new Set(
     models.flatMap((m) => {
@@ -82,14 +92,9 @@ function buildEntry(store: AssetStore, id: string, defPath: string, lang: Record
     if (permutation) deps.push(...permutationFiles(permutation));
   }
 
-  let source: Source = 'vanilla';
-  for (const d of deps) {
-    const s = store.source(d);
-    if (s && RANK[s] > RANK[source]) source = s;
-  }
   const { ns, path } = parseRL(id);
   const name = lang[`item.${ns}.${path}`] ?? lang[`block.${ns}.${path}`] ?? path.replace(/_/g, ' ');
-  return { id, name, defPath, models, textures, deps, source, depsKey: deps.map((d) => store.rev(d)).join('.') };
+  return { id, name, defPath, models, textures, deps, source: strongestSource(store, deps), depsKey: deps.map((d) => store.rev(d)).join('.') };
 }
 
 /** The item as it looks in `state`: models and textures of that state, same name and dependencies. */

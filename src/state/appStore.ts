@@ -5,6 +5,7 @@ import { loadVanillaAssets } from '../mojang/clientJar';
 import { fetchAssetIndex, VanillaObjects } from '../mojang/soundAssets';
 import { fetchManifest, fetchVersionJson, type VersionJson, type VersionManifest } from '../mojang/versions';
 import { gameNames, listItems, type ItemEntry } from '../models/items';
+import { listPlants, type PlantEntry } from '../models/plants';
 import { loadPackZip, type LoadedPack, type PackMeta } from '../pack/loadPack';
 import { clearSession, debounce, loadSession, loadSessionMeta, saveEdits, saveFunny, startSession, type SessionMeta } from './session';
 import { computeFunny, type FunnySettings } from '../funny/funny';
@@ -25,7 +26,7 @@ import { useEditor } from './editorStore';
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
 
-export type Tab = 'items' | 'mobs' | 'textures' | 'sounds' | 'funny';
+export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'funny';
 
 interface AppState {
   phase: 'start' | 'loading' | 'ready';
@@ -45,6 +46,7 @@ interface AppState {
   /** Bumped on every edit so components re-read from the store. */
   revision: number;
   items: ItemEntry[];
+  plants: PlantEntry[];
   /** Minecraft display names (lang keys → text) in the UI language, falling back to English. */
   names: Record<string, string>;
 
@@ -59,6 +61,7 @@ interface AppState {
   /** A saved session from before a reload, offered on the start screen. */
   resumable?: SessionMeta;
   selectedItem?: string;
+  selectedPlant?: string;
   selectedMob?: string;
   /** The applied funny changes (shuffle, colours), if any. */
   funny?: FunnyRecord;
@@ -88,6 +91,7 @@ interface AppState {
   loadGameNames(): Promise<void>;
   setTab(tab: Tab): void;
   select(id: string | undefined): void;
+  selectPlant(id: string | undefined): void;
   selectMob(id: string | undefined): void;
   close(): void;
 }
@@ -106,6 +110,7 @@ export const useApp = create<AppState>((set, get) => ({
   packName: '',
   revision: 0,
   items: [],
+  plants: [],
   names: {},
   soundEvents: [],
   soundsLoading: false,
@@ -140,8 +145,10 @@ export const useApp = create<AppState>((set, get) => ({
         store,
         names: gameNames(store),
         items: listItems(store),
+        plants: listPlants(store),
         revision: 0,
         selectedItem: undefined,
+        selectedPlant: undefined,
         selectedMob: undefined,
         soundEvents: [],
         objects: undefined,
@@ -191,7 +198,7 @@ export const useApp = create<AppState>((set, get) => ({
     }
     if (get().store !== store) return;
     const names = gameNames(store, translated);
-    set({ names, items: listItems(store, names) });
+    set({ names, items: listItems(store, names), plants: listPlants(store, names) });
   },
 
   async resume() {
@@ -317,6 +324,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ tab });
   },
   select: (selectedItem) => set({ selectedItem }),
+  selectPlant: (selectedPlant) => set({ selectedPlant }),
   selectMob: (selectedMob) => set({ selectedMob }),
 
   close() {
@@ -324,7 +332,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (icon) URL.revokeObjectURL(icon);
     void clearSession();
     useEditor.getState().close();
-    set({ phase: 'start', store: undefined, items: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, funny: undefined });
+    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined });
   },
 }));
 
@@ -345,7 +353,8 @@ const persistEdits = debounce(() => {
 function afterEdit(path: string) {
   const { store, vanillaSounds, revision } = useApp.getState();
   if (!store) return;
-  const patch: Partial<AppState> = { revision: revision + 1, items: listItems(store, useApp.getState().names) };
+  const { names } = useApp.getState();
+  const patch: Partial<AppState> = { revision: revision + 1, items: listItems(store, names), plants: listPlants(store, names) };
   if (path.endsWith('sounds.json')) patch.soundEvents = mergeSounds(vanillaSounds, packSoundFiles(store));
   useApp.setState(patch);
   if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
@@ -373,7 +382,7 @@ function restoreFiles(store: AssetStore, before: FunnyRecord['before']) {
 function refreshDerived() {
   const { store, vanillaSounds, revision, names } = useApp.getState();
   if (!store) return;
-  useApp.setState({ revision: revision + 1, items: listItems(store, names), soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
+  useApp.setState({ revision: revision + 1, items: listItems(store, names), plants: listPlants(store, names), soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
   refreshIcon();
 }
 

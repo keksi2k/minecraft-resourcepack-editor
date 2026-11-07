@@ -11,6 +11,7 @@ import { t as translate, useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, pickFile, SourceBadge } from './common';
 import { ItemThumb } from './ItemsView';
+import { PlantThumb } from './PlantsView';
 import { mobName, MobThumb } from './MobsView';
 import { EditorPanel } from './EditorPanel';
 import { useEditing, useEditor } from '../state/editorStore';
@@ -49,7 +50,7 @@ function linkName(link: SoundLink, items: ItemEntry[], names: Record<string, str
 
 /** Small buttons for what plays a sound; items and mobs open in their tab. */
 function SoundLinkChips({ links }: { links: SoundLink[] }) {
-  const { store, items, names, setTab, select, selectMob } = useApp();
+  const { store, items, plants, names, setTab, select, selectPlant, selectMob } = useApp();
   const t = useT();
   const [all, setAll] = useState(false);
   if (!store || links.length === 0) return null;
@@ -60,6 +61,7 @@ function SoundLinkChips({ links }: { links: SoundLink[] }) {
         const name = linkName(l, items, names, t);
         const item = l.kind === 'item' ? items.find((i) => i.id === l.id) : undefined;
         const mob = l.kind === 'mob' ? mobForEntity(l.id) : undefined;
+        const plant = l.kind === 'block' ? plants.find((p) => p.id === l.id) : undefined;
         const open = item
           ? () => {
               setTab('items');
@@ -70,11 +72,17 @@ function SoundLinkChips({ links }: { links: SoundLink[] }) {
                 setTab('mobs');
                 selectMob(mob.id);
               }
-            : undefined;
+            : plant
+              ? () => {
+                  setTab('plants');
+                  selectPlant(plant.id);
+                }
+              : undefined;
         const body = (
           <>
             {item && <ItemThumb store={store} item={item} className="h-4 w-4" />}
             {mob && <MobThumb store={store} mob={mob} className="h-4 w-4" />}
+            {plant && <PlantThumb store={store} plant={plant} className="h-4 w-4" />}
             <span className="max-w-[140px] truncate">{name}</span>
           </>
         );

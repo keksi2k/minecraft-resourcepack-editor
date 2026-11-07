@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
 import type { ItemEntry } from '../models/items';
+import type { PlantEntry, PlantStage } from '../models/plants';
 import type { MobDef } from '../entities/catalog';
 import type { SpecialOptions } from '../entities/specials';
 import { texturePath } from '../models/resourceLocation';
@@ -134,8 +135,8 @@ export function animateThumbnail(store: AssetStore, item: ItemEntry, canvas: HTM
 }
 
 /** Orthographic camera from the front-right and slightly above, framed tightly around the object. */
-export function fitCamera(obj: THREE.Object3D, aspect = 1, margin = 1.08): THREE.OrthographicCamera {
-  const box = new THREE.Box3().setFromObject(obj);
+export function fitCamera(target: THREE.Object3D | THREE.Box3, aspect = 1, margin = 1.08): THREE.OrthographicCamera {
+  const box = target instanceof THREE.Box3 ? target : new THREE.Box3().setFromObject(target);
   const center = box.getCenter(new THREE.Vector3());
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   cam.position.copy(center).add(new THREE.Vector3(1, 0.75, 1.6).normalize().multiplyScalar(10));
@@ -152,6 +153,31 @@ export function fitCamera(obj: THREE.Object3D, aspect = 1, margin = 1.08): THREE
   [cam.left, cam.right, cam.top, cam.bottom] = [cx - half * aspect, cx + half * aspect, cy + half, cy - half];
   cam.updateProjectionMatrix();
   return cam;
+}
+
+/** A stage framed like the whole plant's space, so the stages of a plant line up and visibly grow. */
+async function renderPlant(store: AssetStore, plant: PlantEntry, stage: PlantStage, size: number): Promise<string> {
+  const obj = await buildItemObject(store, stage.models, 'none');
+  const scene = new THREE.Scene();
+  scene.add(obj);
+  scene.updateMatrixWorld();
+  const r = getRenderer();
+  r.setSize(size, size, false);
+  r.render(scene, fitCamera(new THREE.Box3(new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, plant.height - 0.5, 0.5))));
+  const url = r.domElement.toDataURL();
+  disposeObject(obj);
+  return url;
+}
+
+export function plantThumbnail(store: AssetStore, plant: PlantEntry, stage: PlantStage, size = 128): Promise<string> {
+  const key = `plant:${plant.id}|${stage.key}|${plant.depsKey}|${size}`;
+  let p = cache.get(key);
+  if (!p) {
+    p = queue.then(() => renderPlant(store, plant, stage, size));
+    queue = p.catch(() => {});
+    cache.set(key, p);
+  }
+  return p;
 }
 
 async function renderMob(store: AssetStore, mob: MobDef, size: number): Promise<string> {

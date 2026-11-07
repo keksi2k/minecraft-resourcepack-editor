@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import { availablePatterns, availableSherds, DYE, PATTERNED, POT_SIDES, specialLayers, type SpecialOptions } from '../entities/specials';
 import type { ItemState, StateSwitch } from '../models/itemDefinition';
-import { appearanceKey, itemStages, itemStateSwitches, itemVariant, type ItemEntry, type ItemStage } from '../models/items';
+import { appearanceKey, itemStages, itemStateSwitches, itemVariant, type ItemEntry } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
@@ -17,7 +17,7 @@ import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
 import { texturePermutation } from '../models/atlasPermutations';
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-t border-neutral-800 p-3">
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{title}</h3>
@@ -111,8 +111,8 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
       {stages.length > 0 && (
         <Section title={t('items.stages', { count: stages.length })}>
           <StageStrip
-            store={store}
             stages={stages}
+            info={t('items.stagesInfo')}
             current={stageIndex}
             playing={playing}
             onPlay={setPlaying}
@@ -120,6 +120,8 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
               setPlaying(false);
               setState(s.state);
             }}
+            title={(s, i) => `${i + 1}: ${s.item.textures.join('\n')}`}
+            thumb={(s) => <ItemThumb store={store} item={s.item} className="checker aspect-square w-full rounded-sm" />}
           />
         </Section>
       )}
@@ -195,7 +197,7 @@ function TextureActions({ store, path }: { store: AssetStore; path: string }) {
 }
 
 /** A texture of the item. One the game generates can't be edited itself, only the files it's made from. */
-function TextureRow({ store, id }: { store: AssetStore; id: string }) {
+export function TextureRow({ store, id }: { store: AssetStore; id: string }) {
   const t = useT();
   const path = texturePath(id);
   const generated = store.has(path) ? undefined : texturePermutation(store, id);
@@ -237,20 +239,22 @@ function TextureRow({ store, id }: { store: AssetStore; id: string }) {
   );
 }
 
-/** Thumbnails of every stage of an item; the shown one is highlighted, and they can play in turn. */
-function StageStrip({ store, stages, current, playing, onPlay, onPick }: {
-  store: AssetStore;
-  stages: ItemStage[];
+/** Thumbnails of every stage of an item or plant; the shown one is highlighted, and they can play in turn. */
+export function StageStrip<S extends { key: string }>({ stages, info, current, playing, onPlay, onPick, title, thumb }: {
+  stages: S[];
+  info: string;
   current: number;
   playing: boolean;
   onPlay: (playing: boolean) => void;
-  onPick: (stage: ItemStage) => void;
+  onPick: (stage: S) => void;
+  title: (stage: S, index: number) => string;
+  thumb: (stage: S) => React.ReactNode;
 }) {
   const t = useT();
   return (
     <div className="flex flex-col gap-2 text-xs">
       <div className="flex items-start gap-2">
-        <p className="flex-1 text-neutral-400">{t('items.stagesInfo')}</p>
+        <p className="flex-1 text-neutral-400">{info}</p>
         <Btn onClick={() => onPlay(!playing)}>{playing ? `⏸ ${t('items.pauseStages')}` : `▶ ${t('items.playStages')}`}</Btn>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] gap-1">
@@ -258,10 +262,10 @@ function StageStrip({ store, stages, current, playing, onPlay, onPick }: {
           <button
             key={s.key}
             onClick={() => onPick(s)}
-            title={`${i + 1}: ${s.item.textures.join('\n')}`}
+            title={title(s, i)}
             className={`relative rounded p-0.5 ring-1 ${i === current ? 'bg-neutral-600 ring-emerald-500' : 'bg-neutral-800 ring-transparent hover:bg-neutral-700'}`}
           >
-            <ItemThumb store={store} item={s.item} className="checker aspect-square w-full rounded-sm" />
+            {thumb(s)}
             <span className="absolute bottom-0 right-0.5 font-mono text-[9px] text-neutral-400">{i + 1}</span>
           </button>
         ))}
@@ -449,7 +453,7 @@ function SherdEditor({ store, value, onChange }: { store: AssetStore; value: Spe
   );
 }
 
-function FileRow({ store, path, label }: { store: AssetStore; path: string; label: string }) {
+export function FileRow({ store, path, label }: { store: AssetStore; path: string; label: string }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-neutral-300" title={path}>

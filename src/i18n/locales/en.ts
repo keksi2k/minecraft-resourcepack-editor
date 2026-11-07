@@ -46,7 +46,7 @@ const en = {
       remove: 'Remove',
       notImage: 'The image could not be read.',
     },
-    tabs: { items: 'Items', mobs: 'Mobs', textures: 'Textures', sounds: 'Sounds', funny: '✨ Funny' },
+    tabs: { items: 'Items', plants: 'Plants', mobs: 'Mobs', textures: 'Textures', sounds: 'Sounds', funny: '✨ Funny' },
     format: 'format {format}',
     packFormat: 'pack format {format}',
     formatMismatch: 'may not match this version',
@@ -117,6 +117,13 @@ const en = {
       'Aspect ratio differs: currently {oldW}×{oldH}, new {newW}×{newH}. Animated textures or UV mapping may break. Use it anyway?',
     close: 'Close',
     render: '⬇ Render',
+  },
+  plants: {
+    search: 'Search plants …',
+    age: 'Age {ages}',
+    stagesInfo: 'Every growth stage side by side. Click one to preview it and edit its textures.',
+    blockState: 'Block state',
+    renderTitle: 'Render of this stage as PNG (512 px)',
   },
   items: {
     search: 'Search items …',
