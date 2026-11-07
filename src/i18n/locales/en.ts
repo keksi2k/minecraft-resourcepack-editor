@@ -127,6 +127,8 @@ const en = {
     renderTitle: 'Inventory render as PNG (512 px)',
     textures: 'Textures ({count})',
     noTextures: 'No textures.',
+    generated: 'generated',
+    generatedInfo: 'The game generates this texture when it loads, by recolouring {template} with {palette}. Change those files to change it:',
     models: 'Models',
     itemDefinition: 'Item definition',
     kind: {

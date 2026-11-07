@@ -24,6 +24,7 @@ export class AssetStore {
   readonly edits = new Map<string, Uint8Array | null>();
   private readonly revs = new Map<string, number>();
   private jsonCache = new Map<string, unknown>();
+  private changeCount = 0;
 
   constructor(
     readonly vanilla: Map<string, Uint8Array>,
@@ -49,6 +50,11 @@ export class AssetStore {
   /** Revision counter of a single path, bumped on every edit. Used as cache key by renderers. */
   rev(path: string): number {
     return this.revs.get(path) ?? 0;
+  }
+
+  /** Goes up with every edit of any file; for caches built from many files. */
+  get changes(): number {
+    return this.changeCount;
   }
 
   json<T = unknown>(path: string): T | undefined {
@@ -107,6 +113,7 @@ export class AssetStore {
 
   private touch(path: string) {
     this.revs.set(path, this.rev(path) + 1);
+    this.changeCount++;
     this.jsonCache.delete(path);
   }
 }

@@ -15,6 +15,7 @@ import { ItemThumb } from './ItemsView';
 import { CONTEXTS, ItemViewer } from './ItemViewer';
 import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
+import { texturePermutation } from '../models/atlasPermutations';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -148,29 +149,9 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
 
       <Section title={t('items.textures', { count: textures.length })}>
         <div className="flex flex-col gap-2">
-          {textures.map((t) => {
-            const path = texturePath(t);
-            return (
-              <div key={t} className="flex items-center gap-2">
-                <TextureThumb store={store} path={path} className="checker h-10 w-10 shrink-0 rounded" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate font-mono text-xs">{t}</span>
-                    <SourceBadge source={store.source(path)} />
-                  </div>
-                  <div className="mt-1">
-                    <AssetActions
-                      path={path}
-                      source={store.source(path)}
-                      load={async () => store.get(path)}
-                      kind="texture"
-                      vanillaAvailable={store.vanilla.has(path)}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {textures.map((id) => (
+            <TextureRow key={id} store={store} id={id} />
+          ))}
           {textures.length === 0 && <div className="text-xs text-neutral-500">{t('items.noTextures')}</div>}
         </div>
       </Section>
@@ -203,6 +184,55 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+function TextureActions({ store, path }: { store: AssetStore; path: string }) {
+  return (
+    <AssetActions path={path} source={store.source(path)} load={async () => store.get(path)} kind="texture" vanillaAvailable={store.vanilla.has(path)} />
+  );
+}
+
+/** A texture of the item. One the game generates can't be edited itself, only the files it's made from. */
+function TextureRow({ store, id }: { store: AssetStore; id: string }) {
+  const t = useT();
+  const path = texturePath(id);
+  const generated = store.has(path) ? undefined : texturePermutation(store, id);
+  const name = (file: string) => file.replace(/^assets\/[^/]+\/textures\//, '').replace(/\.png$/, '');
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <TextureThumb store={store} path={path} className="checker h-10 w-10 shrink-0 rounded" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate font-mono text-xs">{id}</span>
+            {generated ? <span className="shrink-0 text-[10px] text-neutral-500">{t('items.generated')}</span> : <SourceBadge source={store.source(path)} />}
+          </div>
+          {generated ? (
+            <p className="mt-1 text-[11px] text-neutral-400">{t('items.generatedInfo', { template: name(generated.template), palette: name(generated.palette) })}</p>
+          ) : (
+            <div className="mt-1">
+              <TextureActions store={store} path={path} />
+            </div>
+          )}
+        </div>
+      </div>
+      {generated &&
+        ([generated.template, generated.palette, generated.key] as const).map((file) => (
+          <div key={file} className="ml-6 flex items-center gap-2">
+            <TextureThumb store={store} path={file} className="checker h-8 w-8 shrink-0 rounded" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate font-mono text-[11px]">{name(file)}</span>
+                <SourceBadge source={store.source(file)} />
+              </div>
+              <div className="mt-1">
+                <TextureActions store={store} path={file} />
+              </div>
+            </div>
+          </div>
+        ))}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import type { ItemState } from '../models/itemDefinition';
 import { itemStages, itemStateSwitches, listItems, resolveItemModels } from '../models/items';
 import { texturePath } from '../models/resourceLocation';
 import { textureGroups } from '../funny/shuffle';
+import { texturePermutation } from '../models/atlasPermutations';
 
 const jarPath = process.env.MC_JAR;
 
@@ -18,7 +19,7 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     const zip = await JSZip.loadAsync(readFileSync(jarPath!));
     const files = new Map<string, Uint8Array>();
     for (const f of Object.values(zip.files)) {
-      if (!f.dir && /^assets\/[^/]+\/(textures|models|items)\/|^assets\/minecraft\/lang\/en_us\.json$/.test(f.name)) {
+      if (!f.dir && /^assets\/[^/]+\/(textures|models|items|atlases)\/|^assets\/minecraft\/lang\/en_us\.json$/.test(f.name)) {
         files.set(f.name, await f.async('uint8array'));
       }
     }
@@ -111,6 +112,13 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     expect(groupOf('block/water_still')).not.toContain('block/stone');
     expect(groupOf('item/diamond_sword')).toContain('item/carrot');
     console.log({ shuffleGroups: groups.length, shuffleTextures: groups.reduce((n, g) => n + g.length, 0) });
+
+    // armour trims exist only in the item atlas, but every one the game's models use can be generated
+    const trimModels = store.list('assets/minecraft/models/item/').filter((p) => p.includes('_trim.json'));
+    expect(trimModels.length).toBeGreaterThan(50);
+    const trimTextures = [...new Set(trimModels.flatMap((p) => Object.values(store.json<{ textures: Record<string, string> }>(p)?.textures ?? {})))].filter((t) => t.includes('trims/'));
+    expect(trimTextures.length).toBeGreaterThan(30);
+    expect(trimTextures.filter((t) => !store.has(texturePath(t)) && !texturePermutation(store, t))).toEqual([]);
 
     // every pattern exists for banners and shields
     const paths = store.list('assets/minecraft/textures/entity/');

@@ -126,6 +126,8 @@ const de: Translation = {
     renderTitle: 'Inventar-Render als PNG (512 px)',
     textures: 'Texturen ({count})',
     noTextures: 'Keine Texturen.',
+    generated: 'erzeugt',
+    generatedInfo: 'Das Spiel erzeugt diese Textur beim Laden, indem es {template} mit {palette} umfärbt. Ändere diese Dateien, um sie zu ändern:',
     models: 'Modelle',
     itemDefinition: 'Item-Definition',
     kind: {

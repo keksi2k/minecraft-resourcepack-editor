@@ -10,6 +10,7 @@ import { mobName } from './MobsView';
 import { UVOverlay } from './UVOverlay';
 import { EditorPanel } from './EditorPanel';
 import { useEditing } from '../state/editorStore';
+import { permutationFiles, texturePermutation } from '../models/atlasPermutations';
 
 const PAGE = 400;
 
@@ -47,8 +48,31 @@ function AnimatedThumb({ store, path, className }: { store: AssetStore; path: st
 }
 
 export function TextureThumb({ store, path, className = 'h-12 w-12' }: { store: AssetStore; path: string; className?: string }) {
+  if (!store.has(path)) return <GeneratedThumb store={store} path={path} className={className} />;
   if (store.has(`${path}.mcmeta`)) return <AnimatedThumb store={store} path={path} className={className} />;
   return <StaticThumb store={store} path={path} className={className} />;
+}
+
+/** A texture without a file of its own, which the game generates (armour trims). */
+function GeneratedThumb({ store, path, className }: { store: AssetStore; path: string; className: string }) {
+  const [ref, inView] = useInView<HTMLDivElement>();
+  const [url, setUrl] = useState<string>();
+  const id = path.replace(TEXTURE, '$1:$2');
+  const permutation = texturePermutation(store, id);
+  const rev = permutation ? permutationFiles(permutation).map((f) => store.rev(f)).join('.') : undefined;
+  useEffect(() => {
+    if (!inView || rev === undefined) return setUrl(undefined);
+    let alive = true;
+    void loadTexture(store, id).then((info) => alive && setUrl(info.canvas.toDataURL()));
+    return () => {
+      alive = false;
+    };
+  }, [inView, store, id, rev]);
+  return (
+    <div ref={ref} className={`flex items-center justify-center overflow-hidden ${className}`}>
+      {url && <img src={url} alt="" className="pixelated max-h-full max-w-full object-contain" draggable={false} />}
+    </div>
+  );
 }
 
 function StaticThumb({ store, path, className }: { store: AssetStore; path: string; className: string }) {

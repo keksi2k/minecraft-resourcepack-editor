@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
 import { texturePath } from '../models/resourceLocation';
 import { drawAnimationFrame, frameAt, parseAnimation, subscribeTicks, type TextureAnimation } from './animation';
+import { permutationFiles, recolor, texturePermutation, type TexturePermutation } from '../models/atlasPermutations';
 
 export interface TexInfo {
   /** First animation frame (or the whole image). */
@@ -48,7 +49,10 @@ function missingTexture(): TexInfo {
 }
 
 async function decode(bytes: Uint8Array, mcmeta: any): Promise<TexInfo> {
-  const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+  return decodeBitmap(await createImageBitmap(new Blob([bytes], { type: 'image/png' })), mcmeta);
+}
+
+async function decodeBitmap(bmp: ImageBitmap, mcmeta: any): Promise<TexInfo> {
   const animation = parseAnimation(mcmeta?.animation, bmp.width, bmp.height);
   const fw = animation?.fw ?? bmp.width;
   const fh = animation?.fh ?? bmp.height;
@@ -83,15 +87,39 @@ async function decode(bytes: Uint8Array, mcmeta: any): Promise<TexInfo> {
   };
 }
 
+/** Exact pixels of a PNG: palette colours must match the template's to the bit. */
+async function readPixels(store: AssetStore, path: string): Promise<ImageData> {
+  const bmp = await createImageBitmap(new Blob([store.get(path)!], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const g = canvasOf(bmp.width, bmp.height).getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(bmp, 0, 0);
+  bmp.close();
+  return g.getImageData(0, 0, g.canvas.width, g.canvas.height);
+}
+
+/** A texture the game generates for its atlas: the template in the palette's colours. */
+async function decodePermutation(store: AssetStore, { template, key, palette }: TexturePermutation): Promise<TexInfo> {
+  const [image, from, to] = await Promise.all([template, key, palette].map((p) => readPixels(store, p)));
+  const pixels = recolor(image.data, from.data, to.data);
+  if (!pixels) return missingTexture();
+  const bmp = await createImageBitmap(new ImageData(new Uint8ClampedArray(pixels), image.width, image.height));
+  return decodeBitmap(bmp, store.json(`${template}.mcmeta`));
+}
+
 export function loadTexture(store: AssetStore, textureId: string): Promise<TexInfo> {
   const path = texturePath(textureId);
-  const key = `${path}|${store.rev(path)}|${store.rev(`${path}.mcmeta`)}`;
+  const permutation = store.has(path) ? undefined : texturePermutation(store, textureId);
+  const files = permutation ? permutationFiles(permutation) : [path, `${path}.mcmeta`];
+  const key = `${path}|${files.map((f) => store.rev(f)).join('|')}`;
   let p = cache.get(key);
   if (!p) {
     const bytes = store.get(path);
-    p = bytes
-      ? decode(bytes, store.json(`${path}.mcmeta`)).catch(() => missingTexture())
-      : Promise.resolve(missingTexture());
+    p = (
+      permutation
+        ? decodePermutation(store, permutation)
+        : bytes
+          ? decode(bytes, store.json(`${path}.mcmeta`))
+          : Promise.resolve(missingTexture())
+    ).catch(() => missingTexture());
     cache.set(key, p);
   }
   return p;

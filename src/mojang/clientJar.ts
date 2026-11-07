@@ -1,4 +1,4 @@
-import { get, set } from 'idb-keyval';
+import { del, get, set } from 'idb-keyval';
 import JSZip from 'jszip';
 import { t } from '../i18n';
 import { fetchBytes, type Progress } from './fetchUtil';
@@ -16,8 +16,9 @@ interface CachedVanilla {
   packFormat?: number;
 }
 
-const CACHE_VERSION = 1;
-const KEEP = /^assets\/[^/]+\/(textures|models|items)\/.+\.(png|json|mcmeta)$|^assets\/minecraft\/lang\/en_us\.json$/;
+/** Raise when KEEP changes, so cached versions get the new files. */
+const CACHE_VERSION = 2;
+const KEEP = /^assets\/[^/]+\/(textures|models|items|atlases)\/.+\.(png|json|mcmeta)$|^assets\/minecraft\/lang\/en_us\.json$/;
 
 export type LoadStep = (status: string, progress?: number) => void;
 
@@ -57,5 +58,7 @@ export async function loadVanillaAssets(version: VersionJson, onStep: LoadStep):
   await set(cacheKey, { entries: [...files], packFormat } satisfies CachedVanilla).catch((e) =>
     console.warn('Could not cache vanilla assets', e),
   );
+  // the copy from before the last CACHE_VERSION change would stay in storage forever
+  await del(`vanilla:v${CACHE_VERSION - 1}:${version.id}`).catch(() => undefined);
   return { versionId: version.id, files, packFormat };
 }

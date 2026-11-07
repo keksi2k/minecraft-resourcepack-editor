@@ -3,6 +3,7 @@ import { specialLayers } from '../entities/specials';
 import { allItemModels, itemStatePaths, legacyTints, resolveItemModel, type ItemState, type ModelRef, type StateSwitch } from './itemDefinition';
 import { modelTextures, resolveModel, type DisplayContext, type ResolvedModel } from './modelResolver';
 import { itemDefinitionPath, modelPath, parseRL, texturePath } from './resourceLocation';
+import { permutationFiles, texturePermutation } from './atlasPermutations';
 
 export interface ResolvedItemModel {
   ref: ModelRef;
@@ -74,7 +75,12 @@ function buildEntry(store: AssetStore, id: string, defPath: string, lang: Record
     : [];
   const otherModels = others.map((m) => resolveModel(store, m));
   const deps = [defPath, ...[...models.map((m) => m.model), ...otherModels].flatMap((m) => m.chain.map(modelPath))];
-  for (const t of new Set([...textures, ...otherModels.flatMap(modelTextures)])) deps.push(texturePath(t), `${texturePath(t)}.mcmeta`);
+  for (const t of new Set([...textures, ...otherModels.flatMap(modelTextures)])) {
+    deps.push(texturePath(t), `${texturePath(t)}.mcmeta`);
+    // generated textures (armour trims) change with the files they're made from
+    const permutation = store.has(texturePath(t)) ? undefined : texturePermutation(store, t);
+    if (permutation) deps.push(...permutationFiles(permutation));
+  }
 
   let source: Source = 'vanilla';
   for (const d of deps) {
