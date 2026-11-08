@@ -37,12 +37,16 @@ describe.skipIf(!jarPath)('vanilla client jar', () => {
     console.log({ items: items.length, ms: Math.round(ms), kinds, noModels, missingTex: missingTex.slice(0, 20), special });
 
     const plants = listPlants(store);
-    console.log(Object.fromEntries(plants.map((p) => [p.id.split(':')[1], p.stages.map((s) => s.ages.join('+')).join(' ')])));
+    console.log(Object.fromEntries(plants.map((p) => [p.id.split(':')[1], p.property ? `${p.property} ${p.stages.map((s) => s.values.join('+')).join(' ')}` : '-'])));
     const looks = (id: string) => plants.find((p) => p.id === `minecraft:${id}`)?.stages.length;
     expect([looks('wheat'), looks('carrots'), looks('potatoes'), looks('beetroots')]).toEqual([8, 4, 4, 4]);
     expect(plants.find((p) => p.id === 'minecraft:pitcher_crop')?.height).toBe(2);
     expect(looks('frosted_ice')).toBeUndefined();
-    expect(plants.flatMap((p) => p.stages.flatMap((s) => s.textures)).filter((t) => !store.has(texturePath(t)))).toEqual([]);
+    expect(looks('pink_petals')).toBe(4);
+    expect(plants.find((p) => p.id === 'minecraft:cave_vines')?.property).toBe('berries');
+    for (const id of ['poppy', 'oak_sapling', 'short_grass', 'sugar_cane', 'kelp', 'cactus', 'vine', 'bamboo', 'red_mushroom']) expect(looks(id), id).toBeGreaterThan(0);
+    for (const id of ['cobweb', 'tube_coral', 'amethyst_cluster', 'potted_poppy', 'stone', 'oak_leaves']) expect(looks(id), id).toBeUndefined();
+    expect(plants.flatMap((p) => p.textures).filter((t) => !store.has(texturePath(t)))).toEqual([]);
 
     expect(items.length).toBeGreaterThan(1000);
     expect(items.filter((i) => i.models.some((m) => m.model.kind === 'missing'))).toEqual([]);

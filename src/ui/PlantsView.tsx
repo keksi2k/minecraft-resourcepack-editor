@@ -102,6 +102,12 @@ export function PlantsView() {
   );
 }
 
+/** What sets a stage apart: its ages, or the values of the property the plant grows by. */
+function stageLabel(t: ReturnType<typeof useT>, plant: PlantEntry, stage: PlantStage) {
+  const values = stage.values.join(', ');
+  return plant.property === 'age' ? t('plants.age', { ages: values }) : `${plant.property}: ${values}`;
+}
+
 function PlantDetail({ store, plant }: { store: AssetStore; plant: PlantEntry }) {
   const { soundEvents, selectPlant } = useApp();
   const t = useT();
@@ -117,6 +123,7 @@ function PlantDetail({ store, plant }: { store: AssetStore; plant: PlantEntry })
   }, [plant.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = Math.min(picked, last);
   const stage = plant.stages[current];
+  const otherTextures = useMemo(() => plant.textures.filter((id) => !stage.textures.includes(id)), [plant.textures, stage.textures]);
   useEffect(() => {
     if (!playing) return;
     const id = setTimeout(() => setPicked((current + 1) % plant.stages.length), 500);
@@ -158,28 +165,30 @@ function PlantDetail({ store, plant }: { store: AssetStore; plant: PlantEntry })
           />
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 text-xs text-neutral-400">
-          <span>{t('plants.age', { ages: stage.ages.join(', ') })}</span>
+          <span>{plant.property && stageLabel(t, plant, stage)}</span>
           <Btn onClick={() => void downloadRender()} title={t('plants.renderTitle')}>
             {t('actions.render')}
           </Btn>
         </div>
       </div>
 
-      <Section title={t('items.stages', { count: plant.stages.length })}>
-        <StageStrip
-          stages={plant.stages}
-          info={t('plants.stagesInfo')}
-          current={current}
-          playing={playing}
-          onPlay={setPlaying}
-          onPick={(s) => {
-            setPlaying(false);
-            setPicked(plant.stages.indexOf(s));
-          }}
-          title={(s) => `${t('plants.age', { ages: s.ages.join(', ') })}\n${s.textures.join('\n')}`}
-          thumb={(s) => <PlantThumb store={store} plant={plant} stage={s} className="checker aspect-square w-full rounded-sm" />}
-        />
-      </Section>
+      {plant.stages.length > 1 && (
+        <Section title={t('items.stages', { count: plant.stages.length })}>
+          <StageStrip
+            stages={plant.stages}
+            info={t('plants.stagesInfo')}
+            current={current}
+            playing={playing}
+            onPlay={setPlaying}
+            onPick={(s) => {
+              setPlaying(false);
+              setPicked(plant.stages.indexOf(s));
+            }}
+            title={(s) => `${stageLabel(t, plant, s)}\n${s.textures.join('\n')}`}
+            thumb={(s) => <PlantThumb store={store} plant={plant} stage={s} className="checker aspect-square w-full rounded-sm" />}
+          />
+        </Section>
+      )}
 
       <Section title={t('items.textures', { count: stage.textures.length })}>
         <div className="flex flex-col gap-2">
@@ -189,6 +198,17 @@ function PlantDetail({ store, plant }: { store: AssetStore; plant: PlantEntry })
           {stage.textures.length === 0 && <div className="text-xs text-neutral-500">{t('items.noTextures')}</div>}
         </div>
       </Section>
+
+      {otherTextures.length > 0 && (
+        <Section title={t('plants.otherTextures', { count: otherTextures.length })}>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-neutral-400">{t('plants.otherTexturesInfo')}</p>
+            {otherTextures.map((id) => (
+              <TextureRow key={id} store={store} id={id} />
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title={t('items.models')}>
         <div className="flex flex-col gap-3">

@@ -123,6 +123,8 @@ const de: Translation = {
     stagesInfo: 'Jede Wachstumsstufe nebeneinander. Klicke eine an, um sie in der Vorschau zu sehen und ihre Texturen zu bearbeiten.',
     blockState: 'Blockzustand',
     renderTitle: 'Render dieser Stufe als PNG (512 px)',
+    otherTextures: 'Weitere Texturen des Blocks ({count})',
+    otherTexturesInfo: 'Kommen in Zuständen vor, die keine der Stufen zeigt.',
   },
   items: {
     search: 'Items suchen …',

@@ -124,6 +124,8 @@ const en = {
     stagesInfo: 'Every growth stage side by side. Click one to preview it and edit its textures.',
     blockState: 'Block state',
     renderTitle: 'Render of this stage as PNG (512 px)',
+    otherTextures: 'More textures of this block ({count})',
+    otherTexturesInfo: 'Used in states none of the stages shows.',
   },
   items: {
     search: 'Search items …',

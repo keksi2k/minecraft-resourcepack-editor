@@ -91,8 +91,8 @@ function stateSwitch(node: Json, kind: StateSwitch['kind']): StateSwitch {
   return { key: `${kind}:${property}:${JSON.stringify(params)}:${shape}`, kind, property, params, options, default: def };
 }
 
-const GRASS = 0x91bd59;
-const FOLIAGE = 0x77ab2f;
+export const GRASS = 0x91bd59;
+export const FOLIAGE = 0x77ab2f;
 const WHITE = 0xffffff;
 
 /** Accepts the forms Minecraft uses for colours: signed ARGB ints, or [r, g, b] floats. */
