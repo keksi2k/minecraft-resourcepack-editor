@@ -7,6 +7,7 @@ import { loadTexture } from '../render/textures';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { mobName } from './MobsView';
+import { TextureMetaPanel } from './TextureMetaPanel';
 import { UVOverlay } from './UVOverlay';
 import { EditorPanel } from './EditorPanel';
 import { useEditing } from '../state/editorStore';
@@ -251,6 +252,7 @@ function TextureDetail({ store, path, names, onClose }: { store: AssetStore; pat
           <AssetActions path={meta} source={store.source(meta)} load={async () => store.get(meta)} kind="file" vanillaAvailable={store.vanilla.has(meta)} />
         </div>
       )}
+      {m && <TextureMetaPanel store={store} path={path} />}
     </div>
   );
 }

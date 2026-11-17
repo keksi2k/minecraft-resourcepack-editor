@@ -197,7 +197,7 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
           {t('actions.edit')}
         </Btn>
       )}
-      {kind !== 'file' && <Btn onClick={replace} disabled={busy} title={t('actions.replaceTitle')}>{t('actions.replace')}</Btn>}
+      <Btn onClick={replace} disabled={busy} title={t('actions.replaceTitle')}>{t('actions.replace')}</Btn>
       {edited && allowDiscard && <Btn onClick={() => resetFile(path)} title={t('actions.discardTitle')}>{t('actions.discard')}</Btn>}
       {store?.pack.has(path) && store.edits.get(path) !== null && vanillaAvailable && (
         <Btn onClick={() => setFile(path, null)} tone="danger" title={t('actions.vanillaTitle')}>

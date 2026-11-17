@@ -29,6 +29,13 @@ describe('animated textures on export', () => {
     expect(new AssetStore(vanilla, new Map()).exportFiles().size).toBe(0);
   });
 
+  it('adds the vanilla texture when only its .mcmeta was changed', () => {
+    const tex = png(16, 80);
+    const s = new AssetStore(new Map([[TEX, tex], [`${TEX}.mcmeta`, json({ animation: {} })]]), new Map());
+    s.setEdit(`${TEX}.mcmeta`, json({ animation: { frametime: 2 } }));
+    expect(s.exportFiles().get(TEX)).toBe(tex);
+  });
+
   it('drops frames the new image does not have', () => {
     const meta = json({ animation: { frametime: 1, frames: [0, 1, { index: 3, time: 4 }, 2] } });
     expect(read(animationMetaFor(png(16, 48), meta)).animation.frames).toEqual([0, 1, 2]);

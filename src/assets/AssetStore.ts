@@ -16,10 +16,15 @@ export function parseLenientJson(text: string): unknown {
 }
 
 /** Width and height from a PNG's IHDR chunk. */
-function pngSize(png: Uint8Array): [number, number] | undefined {
+export function pngSize(png: Uint8Array): [number, number] | undefined {
   if (png.length < 24 || png[0] !== 0x89 || png[1] !== 0x50) return undefined;
   const v = new DataView(png.buffer, png.byteOffset, png.byteLength);
   return [v.getUint32(16), v.getUint32(20)];
+}
+
+/** Frame size of an animation the way Minecraft works it out: explicit width/height, else square frames of the shorter side. */
+export function frameSize(anim: { width?: number; height?: number }, w: number, h: number): [number, number] {
+  return [anim.width ?? (anim.height !== undefined ? w : Math.min(w, h)), anim.height ?? (anim.width !== undefined ? h : Math.min(w, h))];
 }
 
 /**
@@ -38,9 +43,7 @@ export function animationMetaFor(png: Uint8Array, vanillaMeta: Uint8Array): Uint
   const anim = meta?.animation;
   if (!size || !anim || typeof anim !== 'object') return undefined;
   const [w, h] = size;
-  // Minecraft's frame size rule: explicit width/height, otherwise square frames of the shorter side
-  const fw = anim.width ?? (anim.height !== undefined ? w : Math.min(w, h));
-  const fh = anim.height ?? (anim.width !== undefined ? h : Math.min(w, h));
+  const [fw, fh] = frameSize(anim, w, h);
   if (!fw || !fh || w % fw || h % fh) return undefined;
   const count = (w / fw) * (h / fh);
   if (!Array.isArray(anim.frames)) return vanillaMeta;
@@ -154,6 +157,12 @@ export class AssetStore {
       const meta = this.vanilla.get(`${path}.mcmeta`);
       const fixed = meta && animationMetaFor(out.get(path)!, meta);
       if (fixed) out.set(`${path}.mcmeta`, fixed);
+    }
+    // …and the other way round: a .mcmeta without its texture in the pack would be ignored.
+    for (const path of [...out.keys()]) {
+      const png = path.endsWith('.png.mcmeta') ? path.slice(0, -'.mcmeta'.length) : undefined;
+      const vanilla = png && !out.has(png) ? this.vanilla.get(png) : undefined;
+      if (png && vanilla) out.set(png, vanilla);
     }
     return out;
   }
