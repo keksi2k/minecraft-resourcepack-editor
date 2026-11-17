@@ -466,8 +466,12 @@ export function SoundEditor({ path, bytes, onSave, onDone }: {
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         <div className="flex flex-wrap items-center gap-1">
-          <Btn tone="primary" onClick={() => clip && play(sel.a < clipLength(clip) && !hasSel ? sel.a : 0, clipLength(clip))} disabled={!clip}>
-            {t('editor.sound.play')}
+          <Btn
+            tone="primary"
+            onClick={() => (isPlaying ? stop() : clip && play(sel.a < clipLength(clip) && !hasSel ? sel.a : 0, clipLength(clip)))}
+            disabled={!clip}
+          >
+            {isPlaying ? t('editor.sound.stop') : t('editor.sound.play')}
           </Btn>
           <Btn onClick={() => play(selA, selB)} disabled={!hasSel}>{t('editor.sound.playSelection')}</Btn>
           <Btn onClick={stop} disabled={!isPlaying}>{t('editor.sound.stop')}</Btn>

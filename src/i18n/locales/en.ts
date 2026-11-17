@@ -313,6 +313,7 @@ const en = {
     files: { one: '{count} file', other: '{count} files' },
     play: 'Play',
     playRandom: 'Play a random variant',
+    stop: 'Stop',
     playFailed: 'Playback failed: {error}',
     noFiles: 'No sound files.',
     add: '+ Add sound',

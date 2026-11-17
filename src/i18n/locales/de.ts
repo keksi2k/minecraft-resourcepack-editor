@@ -312,6 +312,7 @@ const de: Translation = {
     files: { one: '{count} Datei', other: '{count} Dateien' },
     play: 'Abspielen',
     playRandom: 'Zufällige Variante abspielen',
+    stop: 'Stoppen',
     playFailed: 'Abspielen fehlgeschlagen: {error}',
     noFiles: 'Keine Sound-Dateien.',
     add: '+ Sound hinzufügen',

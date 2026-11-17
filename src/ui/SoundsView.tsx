@@ -4,7 +4,7 @@ import { MOBS, type MobDef } from '../entities/catalog';
 import type { ItemEntry } from '../models/items';
 import { parseRL } from '../models/resourceLocation';
 import { getResourcesBase, setResourcesBase } from '../mojang/soundAssets';
-import { playSound } from '../sounds/player';
+import { playSound, stopSound, useIsPlaying } from '../sounds/player';
 import { linkSounds, type SoundLink, type SoundLinks } from '../sounds/soundLinks';
 import type { SoundEvent, SoundFileRef } from '../sounds/soundsJson';
 import { t as translate, useT, type TFunction } from '../i18n';
@@ -113,13 +113,24 @@ function useSoundFile(ref: SoundFileRef) {
   return { source, load, vanillaAvailable: !!objects?.has(ref.key) };
 }
 
-async function play(load: () => Promise<Uint8Array | undefined>, volume?: number, pitch?: number) {
+async function play(load: () => Promise<Uint8Array | undefined>, volume: number | undefined, pitch: number | undefined, id: string) {
   try {
     const bytes = await load();
-    if (bytes) await playSound(bytes, volume ?? 1, pitch ?? 1);
+    if (bytes) await playSound(bytes, volume ?? 1, pitch ?? 1, id);
   } catch (e) {
     alert(translate('sounds.playFailed', { error: (e as Error).message }));
   }
+}
+
+/** ▶ that turns into ⏹ while its own sound is playing. */
+function PlayButton({ id, onPlay, disabled, title }: { id: string; onPlay: () => void; disabled?: boolean; title: string }) {
+  const t = useT();
+  const playing = useIsPlaying(id);
+  return (
+    <Btn onClick={playing ? stopSound : onPlay} disabled={disabled && !playing} title={playing ? t('sounds.stop') : title}>
+      {playing ? '⏹' : '▶'}
+    </Btn>
+  );
 }
 
 function SoundFileRow({ file, eventId }: { file: SoundFileRef; eventId: string }) {
@@ -131,7 +142,7 @@ function SoundFileRow({ file, eventId }: { file: SoundFileRef; eventId: string }
   useApp((s) => s.revision); // re-render after edits
   return (
     <div className="flex items-center gap-2 py-0.5 pl-6">
-      <Btn onClick={() => void play(load, file.volume, file.pitch)} disabled={!source} title={t('sounds.play')}>▶</Btn>
+      <PlayButton id={`file:${eventId}:${file.path}`} onPlay={() => void play(load, file.volume, file.pitch, `file:${eventId}:${file.path}`)} disabled={!source} title={t('sounds.play')} />
       <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={file.path}>
         {file.name}
       </span>
@@ -203,7 +214,7 @@ export function SoundEventRow({ event, compact, links }: { event: SoundEvent; co
   };
   const playRandom = () => {
     const f = event.files[Math.floor(Math.random() * event.files.length)];
-    if (f) void play(async () => store?.get(f.path) ?? objects?.fetch(f.key), f.volume, f.pitch);
+    if (f) void play(async () => store?.get(f.path) ?? objects?.fetch(f.key), f.volume, f.pitch, `event:${event.id}`);
   };
   return (
     <div className={compact ? '' : 'border-b border-neutral-800/60'}>
@@ -211,7 +222,7 @@ export function SoundEventRow({ event, compact, links }: { event: SoundEvent; co
         <button onClick={() => setOpen(!open)} className="w-4 text-neutral-500">
           {open ? '▾' : '▸'}
         </button>
-        <Btn onClick={playRandom} disabled={event.files.length === 0} title={t('sounds.playRandom')}>▶</Btn>
+        <PlayButton id={`event:${event.id}`} onPlay={playRandom} disabled={event.files.length === 0} title={t('sounds.playRandom')} />
         <button onClick={() => setOpen(!open)} className="min-w-0 flex-1 truncate text-left font-mono text-xs">
           {event.id.replace(/^minecraft:/, '')}
         </button>
