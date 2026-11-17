@@ -15,6 +15,45 @@ export function parseLenientJson(text: string): unknown {
   }
 }
 
+/** Width and height from a PNG's IHDR chunk. */
+function pngSize(png: Uint8Array): [number, number] | undefined {
+  if (png.length < 24 || png[0] !== 0x89 || png[1] !== 0x50) return undefined;
+  const v = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  return [v.getUint32(16), v.getUint32(20)];
+}
+
+/**
+ * The vanilla `.mcmeta` of an animated texture, made to fit a replacement image: frames the image
+ * doesn't have are dropped. Undefined if the image can't be cut into frames the way Minecraft
+ * would (it would then reject the texture, which is worse than showing the strip).
+ */
+export function animationMetaFor(png: Uint8Array, vanillaMeta: Uint8Array): Uint8Array | undefined {
+  const size = pngSize(png);
+  let meta: any;
+  try {
+    meta = parseLenientJson(decoder.decode(vanillaMeta));
+  } catch {
+    return undefined;
+  }
+  const anim = meta?.animation;
+  if (!size || !anim || typeof anim !== 'object') return undefined;
+  const [w, h] = size;
+  // Minecraft's frame size rule: explicit width/height, otherwise square frames of the shorter side
+  const fw = anim.width ?? (anim.height !== undefined ? w : Math.min(w, h));
+  const fh = anim.height ?? (anim.width !== undefined ? h : Math.min(w, h));
+  if (!fw || !fh || w % fw || h % fh) return undefined;
+  const count = (w / fw) * (h / fh);
+  if (!Array.isArray(anim.frames)) return vanillaMeta;
+  const frames = anim.frames.filter((f: any) => {
+    const i = typeof f === 'number' ? f : f?.index;
+    return Number.isInteger(i) && i >= 0 && i < count;
+  });
+  if (frames.length === anim.frames.length) return vanillaMeta;
+  const next = { ...meta, animation: { ...anim, frames } };
+  if (!frames.length) delete next.animation.frames;
+  return new TextEncoder().encode(JSON.stringify(next, null, 2));
+}
+
 /**
  * Layered view over a resource pack: vanilla files from the client jar, the loaded pack on top,
  * and the user's edits on top of that. An edit of `null` removes the pack's file so the vanilla
@@ -107,6 +146,14 @@ export class AssetStore {
     for (const [path, data] of this.edits) {
       if (data) out.set(path, data);
       else out.delete(path);
+    }
+    // Minecraft reads a texture's .mcmeta only from the pack that provides the texture. Without
+    // it, a replaced animated texture (sea lantern, fire, prismarine…) shows its whole strip.
+    for (const path of [...out.keys()]) {
+      if (!path.endsWith('.png') || out.has(`${path}.mcmeta`)) continue;
+      const meta = this.vanilla.get(`${path}.mcmeta`);
+      const fixed = meta && animationMetaFor(out.get(path)!, meta);
+      if (fixed) out.set(`${path}.mcmeta`, fixed);
     }
     return out;
   }
