@@ -6,7 +6,7 @@ import { fetchAssetIndex, VanillaObjects } from '../mojang/soundAssets';
 import { fetchManifest, fetchVersionJson, type VersionJson, type VersionManifest } from '../mojang/versions';
 import { gameNames, listItems, type ItemEntry } from '../models/items';
 import { listPlants, type PlantEntry } from '../models/plants';
-import { loadPackZip, type LoadedPack, type PackMeta } from '../pack/loadPack';
+import { loadPackZip, parsePackMeta, type LoadedPack, type PackMeta } from '../pack/loadPack';
 import { clearSession, debounce, loadSession, loadSessionMeta, saveEdits, saveFunny, startSession, type SessionMeta } from './session';
 import { computeFunny, type FunnySettings } from '../funny/funny';
 import type { FunnyRecord } from '../funny/record';
@@ -26,7 +26,10 @@ import { useEditor } from './editorStore';
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
 
-export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'funny';
+export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'texts' | 'progress' | 'funny';
+
+/** Files as they were before a batch change (`undefined` = not edited), for undoing it. */
+export type FileStates = [string, Uint8Array | null | undefined][];
 
 interface AppState {
   phase: 'start' | 'loading' | 'ready';
@@ -65,6 +68,10 @@ interface AppState {
   selectedMob?: string;
   /** The applied funny changes (shuffle, colours), if any. */
   funny?: FunnyRecord;
+  /** A texture to show in the texture tab (bumped `n` re-triggers the same path). */
+  textureFocus?: { path: string; n: number };
+  /** The last batch change, so it can be undone in one go. */
+  lastBatch?: { before: FileStates; count: number };
 
   loadManifest(): Promise<void>;
   open(pack: LoadedPack | null, versionId: string, restoredEdits?: [string, Uint8Array | null][]): Promise<void>;
@@ -90,6 +97,11 @@ interface AppState {
   /** (Re)loads item/mob names for the current UI language. */
   loadGameNames(): Promise<void>;
   setTab(tab: Tab): void;
+  /** Opens the texture tab with this texture selected. */
+  focusTexture(path: string): void;
+  /** Writes many files at once and remembers how they were, for `undoBatch`. */
+  applyBatch(changes: Map<string, Uint8Array | null>): void;
+  undoBatch(): void;
   select(id: string | undefined): void;
   selectPlant(id: string | undefined): void;
   selectMob(id: string | undefined): void;
@@ -155,6 +167,7 @@ export const useApp = create<AppState>((set, get) => ({
         vanillaSounds: undefined,
         resumable: undefined,
         funny: undefined,
+        lastBatch: undefined,
       });
       if (restoredEdits) {
         for (const [path, data] of restoredEdits) store.setEdit(path, data);
@@ -323,6 +336,30 @@ export const useApp = create<AppState>((set, get) => ({
     }
     set({ tab });
   },
+  focusTexture(path) {
+    get().setTab('textures');
+    if (get().tab === 'textures') set({ textureFocus: { path, n: (get().textureFocus?.n ?? 0) + 1 } });
+  },
+
+  applyBatch(changes) {
+    const store = get().store;
+    if (!store || !changes.size) return;
+    const before: FileStates = [...changes.keys()].map((p) => [p, store.edits.has(p) ? store.edits.get(p)! : undefined]);
+    for (const [path, data] of changes) store.setEdit(path, data);
+    set({ lastBatch: { before, count: changes.size } });
+    refreshDerived();
+    persistEdits();
+  },
+
+  undoBatch() {
+    const { store, lastBatch } = get();
+    if (!store || !lastBatch) return;
+    restoreFiles(store, lastBatch.before);
+    set({ lastBatch: undefined });
+    refreshDerived();
+    persistEdits();
+  },
+
   select: (selectedItem) => set({ selectedItem }),
   selectPlant: (selectedPlant) => set({ selectedPlant }),
   selectMob: (selectedMob) => set({ selectedMob }),
@@ -332,7 +369,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (icon) URL.revokeObjectURL(icon);
     void clearSession();
     useEditor.getState().close();
-    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined });
+    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined, lastBatch: undefined, textureFocus: undefined });
   },
 }));
 
@@ -359,6 +396,7 @@ function afterEdit(path: string) {
   useApp.setState(patch);
   if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
   if (path === 'pack.png') refreshIcon();
+  if (path === 'pack.mcmeta') useApp.setState({ packMeta: parsePackMeta(store.get(path)) });
   persistEdits();
 }
 
@@ -371,7 +409,7 @@ function refreshIcon() {
 }
 
 /** Puts files back to a recorded edit state (`undefined` = not edited). */
-function restoreFiles(store: AssetStore, before: FunnyRecord['before']) {
+function restoreFiles(store: AssetStore, before: FileStates) {
   for (const [path, data] of before) {
     if (data === undefined) store.clearEdit(path);
     else store.setEdit(path, data);
@@ -382,7 +420,13 @@ function restoreFiles(store: AssetStore, before: FunnyRecord['before']) {
 function refreshDerived() {
   const { store, vanillaSounds, revision, names } = useApp.getState();
   if (!store) return;
-  useApp.setState({ revision: revision + 1, items: listItems(store, names), plants: listPlants(store, names), soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
+  useApp.setState({
+    revision: revision + 1,
+    items: listItems(store, names),
+    plants: listPlants(store, names),
+    soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)),
+    packMeta: parsePackMeta(store.get('pack.mcmeta')),
+  });
   refreshIcon();
 }
 

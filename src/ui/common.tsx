@@ -80,6 +80,17 @@ export function pickFile(accept: string): Promise<File | undefined> {
   });
 }
 
+export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.multiple = multiple;
+    input.onchange = () => resolve([...(input.files ?? [])]);
+    input.click();
+  });
+}
+
 async function imageSize(bytes: Uint8Array | Blob): Promise<[number, number] | undefined> {
   try {
     const bmp = await createImageBitmap(bytes instanceof Blob ? bytes : new Blob([bytes]));
@@ -94,7 +105,7 @@ async function imageSize(bytes: Uint8Array | Blob): Promise<[number, number] | u
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 /** Minecraft only reads PNG textures; JPG, WebP, GIF, BMP … are re-encoded as PNG (pixels unchanged). */
-async function ensurePng(bytes: Uint8Array): Promise<Uint8Array> {
+export async function ensurePng(bytes: Uint8Array): Promise<Uint8Array> {
   if (PNG_SIGNATURE.every((b, i) => bytes[i] === b)) return bytes;
   const bmp = await createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
   const c = document.createElement('canvas');

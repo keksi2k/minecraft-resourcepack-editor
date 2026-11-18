@@ -2,15 +2,16 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { frameSize, parseLenientJson, pngSize, type AssetStore } from '../assets/AssetStore';
 import { useT } from '../i18n';
 import { useApp } from '../state/appStore';
-import { Btn } from './common';
+import { isAtlasTexture } from '../models/atlasMembership';
+import { animationToGif, buildAnimation, readFrames } from '../render/animationIO';
+import { basename } from '../models/resourceLocation';
+import { Btn, downloadBytes, pickFiles } from './common';
 
 /**
  * GUI for a texture's `.mcmeta`: only the settings Minecraft reads for this kind of texture
  * (animation, GUI scaling, villager hats, blur/clamp), plus a raw text editor for everything else.
  */
 
-// Textures drawn on their own rather than from an atlas: they can't be animated but read blur/clamp.
-const STANDALONE = /^(entity|environment|misc|colormap|font|effect|models|gui\/(?!sprites\/))/;
 const VILLAGER = /^entity\/(zombie_)?villager\/(type|profession)\//;
 
 const encoder = new TextEncoder();
@@ -59,7 +60,8 @@ export function TextureMetaPanel({ store, path }: { store: AssetStore; path: str
     write(next);
   };
 
-  const standalone = STANDALONE.test(rel);
+  // textures drawn on their own rather than from an atlas can't be animated but read blur/clamp
+  const standalone = !isAtlasTexture(store, path);
   return (
     <div className="flex flex-col gap-3 rounded border border-neutral-800 p-2 text-xs">
       <div>
@@ -76,6 +78,16 @@ export function TextureMetaPanel({ store, path }: { store: AssetStore; path: str
             setFile(path, await resizeStrip(png!, frameSize(anim, ...size)[1], delta));
             setSection('animation', anim);
           }}
+          onImport={async () => {
+            const files = await pickFiles('image/*', true);
+            if (!files.length) return;
+            const { frames, delaysMs } = await readFrames(files);
+            if (frames.length < 2) throw new Error(t('meta.anim.importTooFew'));
+            const result = await buildAnimation(frames, delaysMs, { png, meta });
+            setFile(path, result.png);
+            write(result.meta);
+          }}
+          onGif={async () => downloadBytes(await animationToGif(png!, meta.animation), basename(path).replace(/\.png$/, '.gif'))}
         />
       )}
       {rel.startsWith('gui/sprites/') && size && (
@@ -104,11 +116,13 @@ async function resizeStrip(png: Uint8Array, fh: number, delta: 1 | -1): Promise<
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-function AnimationSection({ anim, size, onChange, onFrames }: {
+function AnimationSection({ anim, size, onChange, onFrames, onImport, onGif }: {
   anim: Animation | undefined;
   size: [number, number];
   onChange: (a: Animation | undefined) => void;
   onFrames: (delta: 1 | -1, a: Animation) => Promise<void>;
+  onImport: () => Promise<void>;
+  onGif: () => Promise<void>;
 }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
@@ -117,16 +131,22 @@ function AnimationSection({ anim, size, onChange, onFrames }: {
   const fits = w % fw === 0 && h % fh === 0;
   const count = Math.max(1, Math.floor(w / fw) * Math.floor(h / fh));
   const strip = fw === w;
-  const frames = (f: (a: Animation) => Animation, delta: 1 | -1) => async () => {
+  const busyWhile = (fn: () => Promise<void>) => async () => {
     setBusy(true);
     try {
-      await onFrames(delta, f(anim ?? {}));
+      await fn();
     } catch (e) {
       alert((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
+  const frames = (f: (a: Animation) => Animation, delta: 1 | -1) => busyWhile(() => onFrames(delta, f(anim ?? {})));
+  const importButton = (
+    <Btn onClick={busyWhile(onImport)} disabled={busy} title={t('meta.anim.importTitle')}>
+      {t('meta.anim.import')}
+    </Btn>
+  );
 
   if (!anim) {
     // Only frames stacked top to bottom: a tall image of square frames is animated as it is,
@@ -144,6 +164,7 @@ function AnimationSection({ anim, size, onChange, onFrames }: {
             </Btn>
           )}
         </div>
+        <div>{importButton}</div>
       </Section>
     );
   }
@@ -164,12 +185,16 @@ function AnimationSection({ anim, size, onChange, onFrames }: {
     <Section title={t('meta.anim.title')}>
       <div className="text-neutral-400">{t('meta.anim.frames', { count, w: fw, h: fh })}</div>
       {!fits && <div className="rounded bg-amber-950 p-2 text-amber-200">{t('meta.anim.badSize')}</div>}
-      {strip && (
-        <div className="flex flex-wrap gap-1">
-          <Btn onClick={frames((a) => (a.frames ? { ...a, frames: [...a.frames, count] } : a), 1)} disabled={busy} title={t('meta.anim.addFrameTitle')}>{t('meta.anim.addFrame')}</Btn>
-          <Btn onClick={frames(withoutLast, -1)} disabled={busy || count <= 1}>{t('meta.anim.removeFrame')}</Btn>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-1">
+        {strip && (
+          <>
+            <Btn onClick={frames((a) => (a.frames ? { ...a, frames: [...a.frames, count] } : a), 1)} disabled={busy} title={t('meta.anim.addFrameTitle')}>{t('meta.anim.addFrame')}</Btn>
+            <Btn onClick={frames(withoutLast, -1)} disabled={busy || count <= 1}>{t('meta.anim.removeFrame')}</Btn>
+          </>
+        )}
+        {importButton}
+        <Btn onClick={busyWhile(onGif)} disabled={busy || !fits || count < 2} title={t('meta.anim.gifTitle')}>{t('meta.anim.gif')}</Btn>
+      </div>
       <label className="flex items-center gap-2">
         <span className="w-28">{t('meta.anim.speed')}</span>
         <NumberField value={anim.frametime} placeholder="1" min={1} max={10000} onCommit={(v) => set({ frametime: v })} />
@@ -389,7 +414,7 @@ function Check({ checked, onChange, label, hint }: { checked: boolean; onChange:
 }
 
 /** Whole-number field that commits on blur or Enter; empty means "default" (undefined). */
-function NumberField({ value, onCommit, min, max, placeholder, title }: {
+export function NumberField({ value, onCommit, min, max, placeholder, title }: {
   value: number | undefined;
   onCommit: (v: number | undefined) => void;
   min: number;

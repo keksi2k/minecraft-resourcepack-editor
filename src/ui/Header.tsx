@@ -5,13 +5,16 @@ import { useApp, type Tab } from '../state/appStore';
 import { Btn, LanguageSelect, pickFile } from './common';
 import { makePackIcon, PACK_ICON } from '../pack/packIcon';
 import { useEditor } from '../state/editorStore';
+import { checkPack, type Issue } from '../pack/checks';
+import { ExportCheck } from './ExportCheck';
 
-const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'funny'];
+const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'texts', 'progress', 'funny'];
 
 export function Header() {
-  const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision } = useApp();
+  const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision, objects } = useApp();
   const t = useT();
   const [exporting, setExporting] = useState(false);
+  const [issues, setIssues] = useState<Issue[]>();
   const edits = store?.editCount ?? 0;
   void revision; // re-render on edits so the counter stays current
 
@@ -22,9 +25,18 @@ export function Header() {
     setExporting(true);
     try {
       downloadBlob(await exportPackZip(store, gameFormat), `${packName}${edits ? t('header.editedSuffix') : ''}.zip`);
+      setIssues(undefined);
     } finally {
       setExporting(false);
     }
+  };
+
+  /** Checks the pack first; problems are shown before anything is downloaded. */
+  const check = (always: boolean) => {
+    if (!store) return;
+    const found = checkPack(store, store.exportFiles(), { gameFormat, vanillaSound: objects && ((key) => objects.has(key)) });
+    if (always || found.some((i) => i.level !== 'info')) setIssues(found);
+    else void doExport();
   };
 
   return (
@@ -57,7 +69,8 @@ export function Header() {
           </span>
         )}
         <LanguageSelect />
-        <Btn tone="primary" onClick={() => void doExport()} disabled={exporting}>
+        <Btn onClick={() => check(true)} title={t('check.checkTitle')}>{t('check.check')}</Btn>
+        <Btn tone="primary" onClick={() => check(false)} disabled={exporting}>
           {exporting ? t('header.exporting') : t('header.export')}
         </Btn>
         <Btn
@@ -68,6 +81,7 @@ export function Header() {
           {t('header.close')}
         </Btn>
       </div>
+      {issues && <ExportCheck issues={issues} exporting={exporting} onExport={() => void doExport()} onClose={() => setIssues(undefined)} />}
     </header>
   );
 }

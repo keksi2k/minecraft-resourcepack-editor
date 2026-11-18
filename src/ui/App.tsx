@@ -8,6 +8,8 @@ import { MobsView } from './MobsView';
 import { PlantsView } from './PlantsView';
 import { SoundsView } from './SoundsView';
 import { TexturesView } from './TexturesView';
+import { TextsView } from './TextsView';
+import { ProgressView } from './ProgressView';
 import { UpdateBanner } from './UpdateBanner';
 
 export function App() {
@@ -33,6 +35,8 @@ export function App() {
         {tab === 'mobs' && <MobsView />}
         {tab === 'textures' && <TexturesView />}
         {tab === 'sounds' && <SoundsView />}
+        {tab === 'texts' && <TextsView />}
+        {tab === 'progress' && <ProgressView />}
         {tab === 'funny' && <FunnyView />}
       </main>
     </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../i18n';
-import { parseAnimation } from '../render/animation';
+import { drawAnimationFrame, parseAnimation, subscribeTicks } from '../render/animation';
+import { blankPixels, isIdentity, remapFrameOrder, splitFrames, stackFrames } from '../render/frames';
 import {
   adjustHsl,
   copyPixels,
@@ -18,6 +19,7 @@ import {
   type Pixels,
   type RGBA,
 } from '../render/pixelEdit';
+import { decodeImage, encodePng } from '../render/png';
 import { previewTexture } from '../render/textures';
 import { useApp } from '../state/appStore';
 import { useEditor } from '../state/editorStore';
@@ -33,28 +35,6 @@ const TOOLS: [Tool, string, string][] = [
 const HISTORY = 100;
 const MAX_CANVAS = 12000;
 
-async function decodePng(bytes: Uint8Array): Promise<Pixels> {
-  const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-  const c = document.createElement('canvas');
-  c.width = bmp.width;
-  c.height = bmp.height;
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  g.drawImage(bmp, 0, 0);
-  bmp.close();
-  const img = g.getImageData(0, 0, c.width, c.height);
-  return { width: img.width, height: img.height, data: img.data };
-}
-
-async function encodePng(p: Pixels): Promise<Uint8Array> {
-  const c = document.createElement('canvas');
-  c.width = p.width;
-  c.height = p.height;
-  c.getContext('2d')!.putImageData(new ImageData(p.data.slice(), p.width, p.height), 0, 0);
-  const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, 'image/png'));
-  if (!blob) throw new Error('PNG encoding failed');
-  return new Uint8Array(await blob.arrayBuffer());
-}
-
 /** Paints pixels onto a 1:1 canvas, used as the source for scaled drawing. */
 function toCanvas(p: Pixels, into?: HTMLCanvasElement): HTMLCanvasElement {
   const c = into ?? document.createElement('canvas');
@@ -65,6 +45,13 @@ function toCanvas(p: Pixels, into?: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 const sameColor = (a: RGBA, b: RGBA) => a.every((v, i) => v === b[i]);
+
+/** An undo step: the whole sheet (its height changes when frames are added or removed). */
+interface Snapshot {
+  data: Uint8ClampedArray;
+  height: number;
+  origin: number[];
+}
 
 export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Uint8Array; onDone: () => void }) {
   const t = useT();
@@ -84,8 +71,16 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const [hover, setHover] = useState<[number, number]>();
   const [rev, setRev] = useState(0); // bumped on every change to redraw
   const [saving, setSaving] = useState(false);
-  const undo = useRef<Uint8ClampedArray[]>([]);
-  const redo = useRef<Uint8ClampedArray[]>([]);
+  // animated textures: frame height, the frame being edited, and how frames are shown
+  const [fh, setFh] = useState(1);
+  const [cur, setCur] = useState(0);
+  const [sheetView, setSheetView] = useState(false);
+  const [onion, setOnion] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  /** Old index of every frame (-1 for added ones), to keep a custom frame order in the .mcmeta valid. */
+  const origin = useRef<number[]>([]);
+  const undo = useRef<Snapshot[]>([]);
+  const redo = useRef<Snapshot[]>([]);
   const dirty = useRef(false);
   const stroke = useRef<{ last: [number, number]; erase: boolean } | null>(null);
   const lastPoint = useRef<[number, number]>();
@@ -95,23 +90,20 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const area = useRef<HTMLDivElement>(null);
   const live = useRef<Awaited<ReturnType<typeof previewTexture>>>();
   const liveFrame = useRef(0);
-
-  // frame height of an animated texture (vertical strips), so tools can work per frame
-  const frameHeight = useMemo(() => {
-    if (!img) return 1;
-    const anim = parseAnimation(store?.json<any>(`${path}.mcmeta`)?.animation, img.width, img.height);
-    return anim && anim.columns === 1 ? anim.fh : img.height;
-  }, [img?.width, img?.height, store, path]);
-  const frames = img ? Math.max(1, Math.floor(img.height / frameHeight)) : 1;
+  const metaAnim = store?.json<any>(`${path}.mcmeta`)?.animation;
 
   useEffect(() => {
-    decodePng(bytes).then(
+    decodeImage(bytes).then(
       (p) => {
+        // vertical strips are edited frame by frame; other sheets as a whole
+        const anim = parseAnimation(metaAnim, p.width, p.height);
+        const frameH = anim && anim.columns === 1 ? anim.fh : p.height;
+        setFh(frameH);
+        origin.current = Array.from({ length: Math.floor(p.height / frameH) }, (_, i) => i);
         setImg(p);
         // fit the frame (not the whole animation strip) into the editing area
         const box = area.current?.getBoundingClientRect();
-        const fh = Math.min(p.height, p.width);
-        const fit = box ? Math.min((box.width - 48) / p.width, (box.height - 48) / fh) : 560 / p.width;
+        const fit = box ? Math.min((box.width - 48) / p.width, (box.height - 48) / frameH) : 560 / p.width;
         const z = Math.max(1, Math.min(48, Math.floor(fit), Math.floor(MAX_CANVAS / Math.max(p.width, p.height))));
         setZoom(z);
         const c = usedColors(p, 1)[0];
@@ -121,13 +113,43 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     );
   }, [bytes]);
 
+  const frames = img ? Math.max(1, Math.floor(img.height / fh)) : 1;
+  const animated = frames > 1;
+  const single = animated && !sheetView;
+  const region = { y0: single ? cur * fh : 0, h: single ? fh : (img?.height ?? 1) };
+  useEffect(() => {
+    if (cur >= frames) setCur(frames - 1);
+  }, [cur, frames]);
+
+  /** Limits an operation to the frame being edited (in single-frame view). */
+  const scoped = useCallback(
+    (fn: (p: Pixels) => void | boolean) =>
+      (p: Pixels): void | boolean => {
+        if (!single) return fn(p);
+        const row = p.width * 4;
+        const start = cur * fh * row;
+        const part = { width: p.width, height: fh, data: p.data.slice(start, start + fh * row) };
+        if (fn(part) === false) return false;
+        p.data.set(part.data, start);
+      },
+    [single, cur, fh],
+  );
+
+  /** Pixels a colour adjustment touches: the current frame in single-frame view. */
+  const frameMask = useMemo(() => {
+    if (!img || !single) return undefined;
+    const m = new Uint8Array(img.width * img.height);
+    m.fill(1, cur * fh * img.width, (cur + 1) * fh * img.width);
+    return m;
+  }, [img, single, cur, fh]);
+
   /** What's shown: the image, with an unapplied colour adjustment previewed on top. */
   const shown = useMemo(() => {
     if (!img || hsl.every((v) => v === 0)) return img;
     const p = copyPixels(img);
-    adjustHsl(p, ...hsl);
+    adjustHsl(p, ...hsl, frameMask);
     return p;
-  }, [img, rev, hsl]);
+  }, [img, rev, hsl, frameMask]);
 
   // live preview: the 3D views (and everything else using the decoded texture) follow every change
   useEffect(() => {
@@ -158,32 +180,37 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const [paletteRev, setPaletteRev] = useState(0);
   const palette = useMemo(() => (img ? usedColors(img, 48) : []), [img, paletteRev]);
 
-  // redraw the zoomed view
+  // redraw the zoomed view: the current frame (with the previous one faintly below it), or the whole sheet
   useEffect(() => {
     const c = view.current;
     if (!c || !shown) return;
     src.current = toCanvas(shown, src.current);
     const w = shown.width * zoom;
-    const h = shown.height * zoom;
+    const h = region.h * zoom;
     if (c.width !== w) c.width = w;
     if (c.height !== h) c.height = h;
     const g = c.getContext('2d')!;
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, w, h);
-    g.drawImage(src.current, 0, 0, w, h);
+    if (single && onion) {
+      g.globalAlpha = 0.3;
+      g.drawImage(src.current, 0, ((cur - 1 + frames) % frames) * fh, shown.width, fh, 0, 0, w, h);
+      g.globalAlpha = 1;
+    }
+    g.drawImage(src.current, 0, region.y0, shown.width, region.h, 0, 0, w, h);
     if (grid && zoom >= 6) {
       g.strokeStyle = 'rgba(255,255,255,0.12)';
       g.lineWidth = 1;
       g.beginPath();
       for (let x = 1; x < shown.width; x++) g.moveTo(x * zoom + 0.5, 0), g.lineTo(x * zoom + 0.5, h);
-      for (let y = 1; y < shown.height; y++) g.moveTo(0, y * zoom + 0.5), g.lineTo(w, y * zoom + 0.5);
+      for (let y = 1; y < region.h; y++) g.moveTo(0, y * zoom + 0.5), g.lineTo(w, y * zoom + 0.5);
       g.stroke();
     }
-    if (frames > 1) {
+    if (animated && !single) {
       g.strokeStyle = 'rgba(16,185,129,0.9)';
       g.lineWidth = 2;
       g.beginPath();
-      for (let f = 1; f < frames; f++) g.moveTo(0, f * frameHeight * zoom), g.lineTo(w, f * frameHeight * zoom);
+      for (let f = 1; f < frames; f++) g.moveTo(0, f * fh * zoom), g.lineTo(w, f * fh * zoom);
       g.stroke();
     }
     if (hover) {
@@ -191,24 +218,45 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
       g.lineWidth = 1;
       const off = tool === 'pencil' || tool === 'eraser' ? Math.floor((size - 1) / 2) : 0;
       const s = tool === 'pencil' || tool === 'eraser' ? size : 1;
-      g.strokeRect((hover[0] - off) * zoom + 0.5, (hover[1] - off) * zoom + 0.5, s * zoom - 1, s * zoom - 1);
+      g.strokeRect((hover[0] - off) * zoom + 0.5, (hover[1] - region.y0 - off) * zoom + 0.5, s * zoom - 1, s * zoom - 1);
     }
-  }, [shown, rev, zoom, grid, hover, frames, frameHeight, tool, size]);
+  }, [shown, rev, zoom, grid, hover, frames, fh, tool, size, single, onion, cur, region.y0, region.h, animated]);
 
-  // small preview: first frame at a readable size, optionally tiled 3×3 like a block surface
+  // the frame order as it will be saved, for playing the animation in the preview
+  const playAnim = useMemo(() => {
+    if (!img || !animated || !metaAnim || typeof metaAnim !== 'object') return undefined;
+    const order = Array.isArray(metaAnim.frames) ? remapFrameOrder(metaAnim.frames, origin.current) : undefined;
+    return parseAnimation({ ...metaAnim, frames: order }, img.width, img.height);
+    // origin changes together with rev
+  }, [img, animated, metaAnim, rev]);
+
+  // small preview: the current frame at a readable size, optionally tiled 3×3 like a block surface; or the animation
   useEffect(() => {
     const c = preview.current;
     if (!c || !shown || !src.current) return;
     const n = tile ? 3 : 1;
     const scale = Math.max(1, Math.floor(120 / (shown.width * n)));
-    const fw = shown.width * scale;
-    const fh = frameHeight * scale;
-    c.width = fw * n;
+    c.width = shown.width * n;
     c.height = fh * n;
+    c.style.width = `${shown.width * n * scale}px`;
+    c.style.height = `${fh * n * scale}px`;
     const g = c.getContext('2d')!;
-    g.imageSmoothingEnabled = false;
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) g.drawImage(src.current, 0, 0, shown.width, frameHeight, x * fw, y * fh, fw, fh);
-  }, [shown, rev, tile, frameHeight]);
+    const frame = document.createElement('canvas');
+    frame.width = shown.width;
+    frame.height = fh;
+    const fg = frame.getContext('2d')!;
+    const draw = (ticks?: number) => {
+      if (ticks !== undefined && playAnim) drawAnimationFrame(fg, src.current!, playAnim, ticks);
+      else {
+        fg.clearRect(0, 0, shown.width, fh);
+        fg.drawImage(src.current!, 0, (animated ? cur : 0) * fh, shown.width, fh, 0, 0, shown.width, fh);
+      }
+      g.clearRect(0, 0, c.width, c.height);
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) g.drawImage(frame, x * shown.width, y * fh);
+    };
+    if (playing && playAnim) return subscribeTicks((ticks) => draw(ticks));
+    draw();
+  }, [shown, rev, tile, fh, cur, animated, playing, playAnim]);
 
   const commit = useCallback(() => {
     dirty.current = true;
@@ -217,25 +265,74 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     if (!stroke.current) setPaletteRev((r) => r + 1);
   }, []);
 
+  const snapshot = (p: Pixels): Snapshot => ({ data: p.data.slice(), height: p.height, origin: [...origin.current] });
+  const remember = (s: Snapshot) => {
+    undo.current.push(s);
+    if (undo.current.length > HISTORY) undo.current.shift();
+    redo.current = [];
+  };
+
   /** Saves the current state for undo, then lets `fn` change the image. */
   const edit = useCallback(
     (fn: (p: Pixels) => void | boolean) => {
       if (!img) return;
-      const before = img.data.slice();
+      const before = snapshot(img);
       if (fn(img) === false) return;
-      undo.current.push(before);
-      if (undo.current.length > HISTORY) undo.current.shift();
-      redo.current = [];
+      remember(before);
       commit();
     },
     [img, commit],
   );
 
+  /** Replaces the frames (added, removed, moved); `from` is the old index of each new frame (-1 = new). */
+  const setFrames = (list: Pixels[], from: number[], select: number) => {
+    if (!img) return;
+    remember(snapshot(img));
+    origin.current = from.map((i) => (i < 0 ? -1 : origin.current[i]));
+    setImg(stackFrames(list, img.width, fh));
+    setCur(Math.max(0, Math.min(list.length - 1, select)));
+    commit();
+  };
+  const frameOps = img && {
+    add: () => {
+      const list = splitFrames(img, fh);
+      const ids = list.map((_, i) => i);
+      list.splice(cur + 1, 0, blankPixels(img.width, fh));
+      ids.splice(cur + 1, 0, -1);
+      setFrames(list, ids, cur + 1);
+    },
+    duplicate: () => {
+      const list = splitFrames(img, fh);
+      const ids = list.map((_, i) => i);
+      list.splice(cur + 1, 0, copyPixels(list[cur]));
+      ids.splice(cur + 1, 0, -1);
+      setFrames(list, ids, cur + 1);
+    },
+    remove: () => {
+      const list = splitFrames(img, fh);
+      const ids = list.map((_, i) => i);
+      list.splice(cur, 1);
+      ids.splice(cur, 1);
+      setFrames(list, ids, cur);
+    },
+    move: (by: -1 | 1) => {
+      const to = cur + by;
+      if (to < 0 || to >= frames) return;
+      const list = splitFrames(img, fh);
+      const ids = list.map((_, i) => i);
+      [list[cur], list[to]] = [list[to], list[cur]];
+      [ids[cur], ids[to]] = [ids[to], ids[cur]];
+      setFrames(list, ids, to);
+    },
+  };
+
   const step = (from: typeof undo, to: typeof undo) => {
     const prev = from.current.pop();
     if (!img || !prev) return;
-    to.current.push(img.data.slice());
-    img.data.set(prev);
+    to.current.push(snapshot(img));
+    origin.current = prev.origin;
+    if (prev.height === img.height) img.data.set(prev.data);
+    else setImg({ width: img.width, height: prev.height, data: prev.data });
     commit();
   };
 
@@ -244,11 +341,15 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     setRecent((r) => [c, ...r.filter((x) => !sameColor(x, c))].slice(0, 12));
   };
 
+  /** Pixel under the pointer, in sheet coordinates. */
   const pixelAt = (e: React.PointerEvent): [number, number] => {
     const r = view.current!.getBoundingClientRect();
-    return [Math.floor(((e.clientX - r.left) / r.width) * img!.width), Math.floor(((e.clientY - r.top) / r.height) * img!.height)];
+    return [Math.floor(((e.clientX - r.left) / r.width) * img!.width), region.y0 + Math.floor(((e.clientY - r.top) / r.height) * region.h)];
   };
-  const inside = ([x, y]: [number, number]) => !!img && x >= 0 && y >= 0 && x < img.width && y < img.height;
+  const inside = ([x, y]: [number, number]) => !!img && x >= 0 && x < img.width && y >= region.y0 && y < region.y0 + region.h;
+  /** Draws a line, kept inside the current frame in single-frame view. */
+  const line = (p: Pixels, a: [number, number], b: [number, number], c: RGBA) =>
+    scoped((q) => drawLine(q, a[0], a[1] - (single ? region.y0 : 0), b[0], b[1] - (single ? region.y0 : 0), c, size))(p);
 
   const onDown = (e: React.PointerEvent) => {
     if (!img || hsl.some((v) => v !== 0)) return;
@@ -263,15 +364,18 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
       return;
     }
     if (active === 'fill') {
-      const f = Math.floor(p[1] / frameHeight) * frameHeight;
-      edit((px) => floodFill(px, p[0], p[1], color, !fillAll, tolerance, { y0: f, y1: f + frameHeight }) > 0);
+      if (single) edit(scoped((px) => floodFill(px, p[0], p[1] - region.y0, color, !fillAll, tolerance) > 0));
+      else {
+        const f = Math.floor(p[1] / fh) * fh;
+        edit((px) => floodFill(px, p[0], p[1], color, !fillAll, tolerance, { y0: f, y1: f + fh }) > 0);
+      }
       useColor(color);
       return;
     }
     const erase = active === 'eraser';
     const c: RGBA = erase ? [0, 0, 0, 0] : color;
-    const from = e.shiftKey && lastPoint.current ? lastPoint.current : p;
-    edit((px) => drawLine(px, from[0], from[1], p[0], p[1], c, size));
+    const from = e.shiftKey && lastPoint.current && inside(lastPoint.current) ? lastPoint.current : p;
+    edit((px) => line(px, from, p, c));
     stroke.current = { last: p, erase };
     lastPoint.current = p;
     (e.target as Element).setPointerCapture(e.pointerId);
@@ -284,7 +388,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     setHover(inside(p) ? p : undefined);
     const s = stroke.current;
     if (!s || (p[0] === s.last[0] && p[1] === s.last[1])) return;
-    drawLine(img, s.last[0], s.last[1], p[0], p[1], s.erase ? [0, 0, 0, 0] : color, size);
+    line(img, s.last, p, s.erase ? [0, 0, 0, 0] : color);
     s.last = p;
     lastPoint.current = p;
     commit();
@@ -307,6 +411,12 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
       dirty.current = false;
       useEditor.setState({ dirty: false });
       setFile(path, png);
+      // a custom frame order has to follow frames that were moved, added or removed
+      if (metaAnim && Array.isArray(metaAnim.frames) && !isIdentity(origin.current, frames)) {
+        const meta = store!.json<any>(`${path}.mcmeta`);
+        const next = { ...meta, animation: { ...metaAnim, frames: remapFrameOrder(metaAnim.frames, origin.current) } };
+        setFile(`${path}.mcmeta`, new TextEncoder().encode(JSON.stringify(next, null, 2)));
+      }
       onDone();
     } catch (e) {
       alert((e as Error).message);
@@ -333,6 +443,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
       return void save();
     }
     if (e.key === 'Escape') return close();
+    if (animated && (k === ',' || k === '.')) return setCur((c) => (c + (k === ',' ? frames - 1 : 1)) % frames);
     const found = TOOLS.find(([, , key]) => key === k);
     if (found && !e.ctrlKey && !e.metaKey) setTool(found[0]);
   };
@@ -343,7 +454,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   }, []);
 
   const adjusting = hsl.some((v) => v !== 0);
-  const square = !!img && img.width === frameHeight;
+  const square = !!img && img.width === fh;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -353,7 +464,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
         {img && (
           <span className="text-xs text-neutral-500">
             {img.width}×{img.height}
-            {frames > 1 && ` · ${t('editor.texture.frames', { count: frames })}`}
+            {animated && ` · ${t('editor.texture.frames', { count: frames })}`}
           </span>
         )}
         <div className="ml-auto flex gap-1">
@@ -379,8 +490,8 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
           <input type="checkbox" checked={tile} onChange={(e) => setTile(e.target.checked)} />
           {t('editor.texture.tile')}
         </label>
-        <span className="text-neutral-500">{hover && t('editor.texture.position', { x: hover[0], y: hover[1] })}</span>
-        {frames > 1 && <span className="ml-auto text-[11px] text-neutral-500">{t('editor.texture.framesHint')}</span>}
+        <span className="text-neutral-500">{hover && t('editor.texture.position', { x: hover[0], y: hover[1] - region.y0 })}</span>
+        {animated && sheetView && <span className="ml-auto text-[11px] text-neutral-500">{t('editor.texture.framesHint')}</span>}
       </div>
       {error && <div className="m-3 rounded bg-red-950 p-2 text-xs text-red-200">{t('editor.loadFailed', { error })}</div>}
       <div className="flex min-h-0 flex-1">
@@ -437,27 +548,26 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
           {recent.length > 0 && <Swatches label={t('editor.texture.recent')} colors={recent} current={color} onPick={setColor} />}
           <Swatches label={t('editor.texture.colors')} colors={palette} current={color} onPick={setColor} />
           <p className="text-[11px] leading-snug text-neutral-500">{t('editor.texture.toolHint')}</p>
-          <Section title={t('editor.texture.transform')}>
+          <Section title={single ? t('editor.texture.transformFrame') : t('editor.texture.transform')}>
             <div className="flex flex-wrap gap-1">
-              <Btn onClick={() => edit((p) => flip(p, 'h', frameHeight))}>{t('editor.texture.flipH')}</Btn>
-              <Btn onClick={() => edit((p) => flip(p, 'v', frameHeight))}>{t('editor.texture.flipV')}</Btn>
-              <Btn onClick={() => edit((p) => rotate(p, true, frameHeight))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
+              <Btn onClick={() => edit(scoped((p) => flip(p, 'h', fh)))}>{t('editor.texture.flipH')}</Btn>
+              <Btn onClick={() => edit(scoped((p) => flip(p, 'v', fh)))}>{t('editor.texture.flipV')}</Btn>
+              <Btn onClick={() => edit(scoped((p) => rotate(p, true, fh)))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
                 {t('editor.texture.rotateCw')}
               </Btn>
-              <Btn onClick={() => edit((p) => rotate(p, false, frameHeight))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
+              <Btn onClick={() => edit(scoped((p) => rotate(p, false, fh)))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
                 {t('editor.texture.rotateCcw')}
               </Btn>
             </div>
             <div className="text-neutral-400">{t('editor.texture.shift')}</div>
             <div className="flex gap-1">
-              <Btn onClick={() => edit((p) => shift(p, -1, 0, frameHeight))}>←</Btn>
-              <Btn onClick={() => edit((p) => shift(p, 1, 0, frameHeight))}>→</Btn>
-              <Btn onClick={() => edit((p) => shift(p, 0, -1, frameHeight))}>↑</Btn>
-              <Btn onClick={() => edit((p) => shift(p, 0, 1, frameHeight))}>↓</Btn>
+              <Btn onClick={() => edit(scoped((p) => shift(p, -1, 0, fh)))}>←</Btn>
+              <Btn onClick={() => edit(scoped((p) => shift(p, 1, 0, fh)))}>→</Btn>
+              <Btn onClick={() => edit(scoped((p) => shift(p, 0, -1, fh)))}>↑</Btn>
+              <Btn onClick={() => edit(scoped((p) => shift(p, 0, 1, fh)))}>↓</Btn>
             </div>
-
           </Section>
-          <Section title={t('editor.texture.adjust')}>
+          <Section title={single ? t('editor.texture.adjustFrame') : t('editor.texture.adjust')}>
             {(['hue', 'saturation', 'lightness'] as const).map((k, i) => (
               <label key={k} className="flex items-center gap-2">
                 <span className="w-16">{t(`editor.texture.${k}`)}</span>
@@ -481,7 +591,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
                 <Btn
                   tone="primary"
                   onClick={() => {
-                    edit((p) => adjustHsl(p, ...hsl));
+                    edit((p) => adjustHsl(p, ...hsl, frameMask));
                     setHsl([0, 0, 0]);
                   }}
                 >
@@ -491,33 +601,84 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
               </div>
             )}
             <div className="flex gap-1">
-              <Btn onClick={() => edit(grayscale)} disabled={adjusting}>{t('editor.texture.grayscale')}</Btn>
-              <Btn onClick={() => edit(invert)} disabled={adjusting}>{t('editor.texture.invert')}</Btn>
+              <Btn onClick={() => edit(scoped(grayscale))} disabled={adjusting}>{t('editor.texture.grayscale')}</Btn>
+              <Btn onClick={() => edit(scoped(invert))} disabled={adjusting}>{t('editor.texture.invert')}</Btn>
             </div>
           </Section>
         </aside>
 
-        <div ref={area} className="relative min-w-0 flex-1 overflow-auto bg-neutral-900 p-6" onContextMenu={(e) => e.preventDefault()}>
-          {img && (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div ref={area} className="relative min-h-0 flex-1 overflow-auto bg-neutral-900 p-6" onContextMenu={(e) => e.preventDefault()}>
+            {img && (
+              <canvas
+                ref={view}
+                className="checker mx-auto block cursor-crosshair touch-none shadow-lg"
+                style={{ width: img.width * zoom, height: region.h * zoom }}
+                onPointerDown={onDown}
+                onPointerMove={onMove}
+                onPointerUp={onUp}
+                onPointerCancel={onUp}
+                onPointerLeave={() => setHover(undefined)}
+              />
+            )}
             <canvas
-              ref={view}
-              className="checker mx-auto block cursor-crosshair touch-none shadow-lg"
-              style={{ width: img.width * zoom, height: img.height * zoom }}
-              onPointerDown={onDown}
-              onPointerMove={onMove}
-              onPointerUp={onUp}
-              onPointerCancel={onUp}
-              onPointerLeave={() => setHover(undefined)}
+              ref={preview}
+              title={t('editor.texture.preview')}
+              className="checker pixelated pointer-events-none absolute bottom-3 right-3 rounded shadow-lg ring-1 ring-neutral-700"
             />
+          </div>
+          {img && animated && frameOps && (
+            <div className="flex flex-col gap-1.5 border-t border-neutral-800 bg-neutral-950 px-3 py-2 text-xs">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="mr-1 font-medium text-neutral-300">{t('editor.texture.frameOf', { n: cur + 1, count: frames })}</span>
+                <Btn onClick={() => setPlaying(!playing)} disabled={!playAnim}>{playing ? `⏸ ${t('editor.texture.pause')}` : `▶ ${t('editor.texture.play')}`}</Btn>
+                <Btn onClick={frameOps.add} title={t('editor.texture.addFrameTitle')}>{t('editor.texture.addFrame')}</Btn>
+                <Btn onClick={frameOps.duplicate} title={t('editor.texture.duplicateFrameTitle')}>{t('editor.texture.duplicateFrame')}</Btn>
+                <Btn onClick={() => frameOps.move(-1)} disabled={cur === 0} title={t('editor.texture.moveFrameLeft')}>◀</Btn>
+                <Btn onClick={() => frameOps.move(1)} disabled={cur === frames - 1} title={t('editor.texture.moveFrameRight')}>▶</Btn>
+                <Btn onClick={frameOps.remove} tone="danger" disabled={frames <= 2} title={t('editor.texture.removeFrameTitle')}>{t('editor.texture.removeFrame')}</Btn>
+                <label className="ml-2 flex items-center gap-1" title={t('editor.texture.onionTitle')}>
+                  <input type="checkbox" checked={onion} onChange={(e) => setOnion(e.target.checked)} disabled={sheetView} />
+                  {t('editor.texture.onion')}
+                </label>
+                <label className="flex items-center gap-1">
+                  <input type="checkbox" checked={sheetView} onChange={(e) => setSheetView(e.target.checked)} />
+                  {t('editor.texture.sheetView')}
+                </label>
+              </div>
+              <div className="flex gap-1 overflow-x-auto pb-1">
+                {Array.from({ length: frames }, (_, i) => (
+                  <FrameThumb key={i} img={img} fh={fh} index={i} rev={rev} active={i === cur} onClick={() => setCur(i)} />
+                ))}
+              </div>
+              <p className="text-[11px] text-neutral-500">{t('editor.texture.framesStripHint')}</p>
+            </div>
           )}
-          <canvas
-            ref={preview}
-            title={t('editor.texture.preview')}
-            className="checker pixelated pointer-events-none absolute bottom-3 right-3 rounded shadow-lg ring-1 ring-neutral-700"
-          />
         </div>
       </div>
     </div>
+  );
+}
+
+function FrameThumb({ img, fh, index, rev, active, onClick }: { img: Pixels; fh: number; index: number; rev: number; active: boolean; onClick: () => void }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    c.width = img.width;
+    c.height = fh;
+    const row = img.width * 4;
+    c.getContext('2d')!.putImageData(new ImageData(img.data.slice(index * fh * row, (index + 1) * fh * row), img.width, fh), 0, 0);
+  }, [img, fh, index, rev]);
+  const scale = 40 / Math.max(img.width, fh);
+  return (
+    <button
+      onClick={onClick}
+      className={`relative shrink-0 rounded p-0.5 ring-1 ${active ? 'bg-neutral-600 ring-emerald-500' : 'bg-neutral-800 ring-transparent hover:bg-neutral-700'}`}
+    >
+      <canvas ref={ref} className="checker pixelated block" style={{ width: img.width * scale, height: fh * scale }} />
+      <span className="absolute bottom-0 right-0.5 font-mono text-[9px] text-neutral-300">{index + 1}</span>
+    </button>
   );
 }
 

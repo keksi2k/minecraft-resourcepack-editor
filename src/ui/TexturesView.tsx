@@ -12,6 +12,7 @@ import { UVOverlay } from './UVOverlay';
 import { EditorPanel } from './EditorPanel';
 import { useEditing } from '../state/editorStore';
 import { permutationFiles, texturePermutation } from '../models/atlasPermutations';
+import { BatchPanel } from './BatchPanel';
 
 const PAGE = 400;
 
@@ -96,13 +97,16 @@ function StaticThumb({ store, path, className }: { store: AssetStore; path: stri
 const TEXTURE = /^assets\/([^/]+)\/textures\/(.+)\.png$/;
 
 export function TexturesView() {
-  const { store, revision, names } = useApp();
+  const { store, revision, names, textureFocus } = useApp();
   const t = useT();
   const [query, setQuery] = useState('');
   const [folder, setFolder] = useState('minecraft:item');
   const [onlyPack, setOnlyPack] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [selected, setSelected] = useState<string>();
+  /** Batch mode: textures picked for a change to all of them. */
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const q = useDeferredValue(query.trim().toLowerCase());
   const editing = useEditing('textures');
 
@@ -128,6 +132,30 @@ export function TexturesView() {
   );
   useEffect(() => setLimit(PAGE), [folder, onlyPack, q]);
 
+  // another tab asked to show a texture; the request is used up, so coming back later doesn't jump again
+  useEffect(() => {
+    if (!textureFocus) return;
+    useApp.setState({ textureFocus: undefined });
+    if (!TEXTURE.test(textureFocus.path)) return;
+    const f = folderOf(textureFocus.path);
+    setFolder(f);
+    setQuery('');
+    setOnlyPack(false);
+    setPicking(false);
+    setSelected(textureFocus.path);
+    const index = all.filter((p) => folderOf(p) === f).indexOf(textureFocus.path);
+    setLimit(Math.max(PAGE, index + PAGE));
+    requestAnimationFrame(() => document.querySelector(`[data-texture="${CSS.escape(textureFocus.path)}"]`)?.scrollIntoView({ block: 'center' }));
+  }, [textureFocus, all]);
+
+  const toggle = (p: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+
   if (!store) return null;
   return (
     <div className="flex h-full">
@@ -145,17 +173,27 @@ export function TexturesView() {
         ))}
       </nav>
       <section className={`min-w-0 flex-1 flex-col ${editing ? 'hidden' : 'flex'}`}>
-        <div className="flex items-center gap-2 border-b border-neutral-800 p-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 p-2">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('textures.search')}
-            className="w-64 rounded bg-neutral-800 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-56 rounded bg-neutral-800 px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
           />
-          <label className="flex items-center gap-1 text-xs">
+          <label className="flex items-center gap-1 whitespace-nowrap text-xs">
             <input type="checkbox" checked={onlyPack} onChange={(e) => setOnlyPack(e.target.checked)} />
             {t('textures.onlyPack')}
           </label>
+          <label className="flex items-center gap-1 whitespace-nowrap text-xs" title={t('batch.modeTitle')}>
+            <input type="checkbox" checked={picking} onChange={(e) => setPicking(e.target.checked)} />
+            {t('batch.mode')}
+          </label>
+          {picking && (
+            <>
+              <Btn onClick={() => setPicked(new Set([...picked, ...visible.filter((p) => store!.has(p))]))}>{t('batch.selectShown', { count: visible.length })}</Btn>
+              <Btn onClick={() => setPicked(new Set())} disabled={!picked.size}>{t('batch.selectNone')}</Btn>
+            </>
+          )}
           <span className="ml-auto text-xs text-neutral-500">{t('textures.count', { count: visible.length })}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -163,15 +201,18 @@ export function TexturesView() {
             {visible.slice(0, limit).map((p) => {
               const src = store.source(p);
               const ring = src === 'edited' ? 'ring-amber-500' : src === 'pack' ? 'ring-sky-600' : 'ring-transparent';
+              const on = picking ? picked.has(p) : selected === p;
               return (
                 <button
                   key={p}
-                  onClick={() => setSelected(p)}
+                  data-texture={p}
+                  onClick={() => (picking ? toggle(p) : setSelected(p))}
                   title={p}
-                  className={`flex flex-col items-center gap-1 rounded p-1.5 ring-1 ${ring} ${
-                    selected === p ? 'bg-neutral-600' : 'bg-neutral-800 hover:bg-neutral-700'
+                  className={`relative flex flex-col items-center gap-1 rounded p-1.5 ring-1 ${ring} ${
+                    on ? 'bg-neutral-600' : 'bg-neutral-800 hover:bg-neutral-700'
                   }`}
                 >
+                  {picking && <input type="checkbox" readOnly checked={picked.has(p)} className="pointer-events-none absolute left-1 top-1" />}
                   <TextureThumb store={store} path={p} />
                   <span className="w-full truncate text-center text-[10px] text-neutral-300">{p.split('/').pop()}</span>
                 </button>
@@ -185,7 +226,12 @@ export function TexturesView() {
           )}
         </div>
       </section>
-      {selected && store.has(selected) && (
+      {picking && !editing && (
+        <aside className="w-96 shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-3">
+          <BatchPanel paths={[...picked].filter((p) => store.has(p))} />
+        </aside>
+      )}
+      {!picking && selected && store.has(selected) && (
         <aside className="w-96 shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-3">
           <TextureDetail store={store} path={selected} names={names} onClose={() => setSelected(undefined)} />
         </aside>

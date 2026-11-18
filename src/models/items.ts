@@ -1,4 +1,4 @@
-import type { AssetStore, Source } from '../assets/AssetStore';
+import { parseLenientJson, type AssetStore, type Source } from '../assets/AssetStore';
 import { specialLayers } from '../entities/specials';
 import { allItemModels, itemStatePaths, legacyTints, resolveItemModel, type ItemState, type ModelRef, type StateSwitch } from './itemDefinition';
 import { modelTextures, resolveModel, type DisplayContext, type ResolvedModel } from './modelResolver';
@@ -142,9 +142,22 @@ export function itemStateSwitches(store: AssetStore, id: string, state: ItemStat
   return found;
 }
 
-/** Display names: English from the jar, overlaid with a translation (Minecraft language file) if given. */
+const EN_US = 'assets/minecraft/lang/en_us.json';
+
+/**
+ * Display names: English from the jar (with the pack's English overrides; Minecraft merges language
+ * files), overlaid with a translation (Minecraft language file) if given.
+ */
 export function gameNames(store: AssetStore, translated?: Record<string, string>): Record<string, string> {
-  return { ...(store.json<Record<string, string>>('assets/minecraft/lang/en_us.json') ?? {}), ...translated };
+  const vanilla = store.vanilla.get(EN_US);
+  let base: Record<string, string> = {};
+  try {
+    base = vanilla ? (parseLenientJson(new TextDecoder().decode(vanilla)) as Record<string, string>) : {};
+  } catch {
+    base = {};
+  }
+  const own = store.source(EN_US) === 'vanilla' ? undefined : store.json<Record<string, string>>(EN_US);
+  return { ...base, ...own, ...translated };
 }
 
 export function listItems(store: AssetStore, lang: Record<string, string> = gameNames(store)): ItemEntry[] {
