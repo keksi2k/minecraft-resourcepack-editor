@@ -4,6 +4,7 @@ import type { ItemEntry } from '../models/items';
 import type { PlantEntry, PlantStage } from '../models/plants';
 import type { MobDef } from '../entities/catalog';
 import type { SpecialOptions } from '../entities/specials';
+import type { MobOptions } from '../entities/equipment';
 import { texturePath } from '../models/resourceLocation';
 import { subscribeTicks } from './animation';
 import { buildItemObject, disposeObject } from './buildMesh';
@@ -180,8 +181,8 @@ export function plantThumbnail(store: AssetStore, plant: PlantEntry, stage: Plan
   return p;
 }
 
-async function renderMob(store: AssetStore, mob: MobDef, size: number): Promise<string> {
-  const obj = await buildMobObject(store, mob);
+async function renderMob(store: AssetStore, mob: MobDef, size: number, options?: MobOptions): Promise<string> {
+  const obj = await buildMobObject(store, mob, options);
   const scene = new THREE.Scene();
   scene.add(obj);
   scene.updateMatrixWorld();
@@ -193,11 +194,11 @@ async function renderMob(store: AssetStore, mob: MobDef, size: number): Promise<
   return url;
 }
 
-export function mobThumbnail(store: AssetStore, mob: MobDef, size = 160): Promise<string> {
-  const key = `mob:${mob.id}|${mobDeps(mob).map((d) => store.rev(d)).join('.')}|${size}`;
+export function mobThumbnail(store: AssetStore, mob: MobDef, size = 160, options?: MobOptions): Promise<string> {
+  const key = `mob:${mob.id}|${mobDeps(mob, store, options).map((d) => store.rev(d)).join('.')}|${size}|${JSON.stringify(options ?? {})}`;
   let p = cache.get(key);
   if (!p) {
-    p = queue.then(() => renderMob(store, mob, size));
+    p = queue.then(() => renderMob(store, mob, size, options));
     queue = p.catch(() => {});
     cache.set(key, p);
   }

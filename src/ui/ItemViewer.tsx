@@ -1,5 +1,5 @@
 import { Bounds, OrbitControls } from '@react-three/drei';
-import { Canvas, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
@@ -22,12 +22,14 @@ const CLICK_SLOP = 4;
  * `onPick` gets everything under a click (nearest first), not called when the view was dragged;
  * `marker` shows a point (world space), e.g. the picked one.
  */
-export function ObjectViewer({ build, buildKey, fit, onPick, marker }: {
+export function ObjectViewer({ build, buildKey, fit, onPick, marker, animate }: {
   build: () => Promise<THREE.Object3D>;
   buildKey: string;
   fit?: boolean;
   onPick?: (hits: THREE.Intersection[]) => void;
   marker?: [number, number, number];
+  /** Called every frame with the built object and the time in seconds (for animated mobs). */
+  animate?: (obj: THREE.Object3D, seconds: number) => void;
 }) {
   const [obj, setObj] = useState<THREE.Object3D | null>(null);
 
@@ -80,10 +82,16 @@ export function ObjectViewer({ build, buildKey, fit, onPick, marker }: {
           <meshBasicMaterial color="#fff" depthTest={false} transparent />
         </mesh>
       )}
+      {obj && animate && <Animate obj={obj} animate={animate} />}
       <gridHelper args={[fit ? 4 : 2, fit ? 64 : 32, '#555', '#3a3a3a']} position={[0, fit ? 0 : -0.5, 0]} />
       <OrbitControls makeDefault enableDamping />
     </Canvas>
   );
+}
+
+function Animate({ obj, animate }: { obj: THREE.Object3D; animate: (obj: THREE.Object3D, seconds: number) => void }) {
+  useFrame(({ clock }) => animate(obj, clock.getElapsedTime()));
+  return null;
 }
 
 export function ItemViewer({ store, item, context, options, state = {} }: {

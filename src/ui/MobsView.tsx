@@ -3,7 +3,10 @@ import type { AssetStore, Source } from '../assets/AssetStore';
 import { MOBS, type MobDef } from '../entities/catalog';
 import { texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
-import { buildMobObject, mobDeps, pickTexture, type TexturePick } from '../render/entityMesh';
+import { buildMobObject, mobDeps, pickTexture, type MobAnimator, type TexturePick } from '../render/entityMesh';
+import { mobLayers, type MobOptions } from '../entities/equipment';
+import { MOTIONS, type Motion } from '../entities/motion';
+import { MobLookPanel } from './MobLookPanel';
 import { mobThumbnail } from '../render/thumbnails';
 import { useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
@@ -122,24 +125,31 @@ export function MobsView() {
 function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; onClose: () => void }) {
   const names = useApp((s) => s.names);
   const soundEvents = useApp((s) => s.soundEvents);
-  useApp((s) => s.revision);
+  const revision = useApp((s) => s.revision);
   const t = useT();
   const links = useSoundLinks();
   const sounds = useMemo(() => eventsLinkedTo(soundEvents, links, `minecraft:${mob.entity}`), [soundEvents, links, mob.entity]);
   const [uvFor, setUvFor] = useState<number | undefined>(0);
   const [pick, setPick] = useState<TexturePick>();
-  useEffect(() => setPick(undefined), [mob.id]);
+  const [options, setOptions] = useState<MobOptions>({});
+  const [motion, setMotion] = useState<Motion>('still');
+  useEffect(() => {
+    setPick(undefined);
+    setOptions({});
+  }, [mob.id]);
+  const layers = useMemo(() => mobLayers(store, mob, options), [store, mob, options, revision]);
+  const animate = (obj: { userData: { animate?: MobAnimator } }, seconds: number) => obj.userData.animate?.(seconds * 20, motion);
   const onPick = (hits: Parameters<typeof pickTexture>[0]) => {
     const p = pickTexture(hits);
     setPick(p);
     if (p) setUvFor(p.layer);
   };
-  const depsKey = mobDeps(mob)
+  const depsKey = mobDeps(mob, store, options)
     .map((d) => store.rev(d))
     .join('.');
 
   const downloadRender = async () => {
-    const url = await mobThumbnail(store, mob, 512);
+    const url = await mobThumbnail(store, mob, 512, options);
     downloadBlob(await (await fetch(url)).blob(), `${mob.id}.png`);
   };
 
@@ -159,9 +169,27 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
       </div>
       <div className="px-3">
         <div className="h-80">
-          <ObjectViewer fit buildKey={`${mob.id}|${depsKey}`} build={() => buildMobObject(store, mob)} onPick={onPick} marker={pick?.point} />
+          <ObjectViewer
+            fit
+            buildKey={`${mob.id}|${depsKey}|${JSON.stringify(options)}`}
+            build={() => buildMobObject(store, mob, options)}
+            onPick={onPick}
+            marker={motion === 'still' ? pick?.point : undefined}
+            animate={animate}
+          />
         </div>
-        <div className="mt-2 flex items-center">
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {MOTIONS.map((m) => (
+            <button
+              key={m}
+              onClick={() => setMotion(m)}
+              className={`rounded px-2 py-0.5 text-[11px] ${motion === m ? 'bg-emerald-700' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+            >
+              {t(`mobs.motion.${m}`)}
+            </button>
+          ))}
+        </div>
+        <div className="mt-1 flex items-center">
           <span className="text-[11px] text-neutral-500">{t('mobs.staticPose')} {t('mobs.pickHint')}</span>
           <span className="ml-auto">
             <Btn onClick={() => void downloadRender()} title={t('mobs.renderTitle')}>
@@ -171,10 +199,12 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
         </div>
       </div>
 
+      <MobLookPanel store={store} mob={mob} value={options} onChange={setOptions} />
+
       <section className="border-t border-neutral-800 p-3">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('mobs.textures')}</h3>
         <div className="flex flex-col gap-3">
-          {mob.layers.map((layer, i) => {
+          {layers.map((layer, i) => {
             const path = texturePath(layer.texture);
             const src = store.source(path);
             return (
