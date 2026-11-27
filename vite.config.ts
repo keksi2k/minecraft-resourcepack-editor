@@ -37,5 +37,6 @@ export default defineConfig({
   },
   server: { proxy: mcresProxy },
   preview: { proxy: mcresProxy },
-  test: { environment: 'node' },
+  // e2e/ holds the Playwright tests, which run in a browser instead
+  test: { environment: 'node', include: ['src/**/*.test.ts'] },
 });

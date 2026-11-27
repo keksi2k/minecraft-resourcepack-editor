@@ -27,6 +27,12 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 - **Sounds**: alle ~2000 Sound-Events durchsuchen und abspielen, einzelne Dateien ersetzen, **eigene Sounds zu Events hinzufügen** (z. B. weitere Schrittgeräusche), **Lautstärke und Tonhöhe pro Variante** einstellen oder die Vanilla-Varianten komplett ersetzen. Jedes Event zeigt, welche **Blöcke, Items und Mobs** es abspielen (Bruchstein und Andesit klingen nach `block.stone`), und lässt sich über deren Namen finden; Item- und Mob-Details listen ihre Sounds.
 - **Bearbeiten ohne Risiko**: Jede Datei zeigt, ob sie aus Vanilla, dem Pack oder einer eigenen Änderung stammt. Änderungen lassen sich einzeln verwerfen oder auf Vanilla zurücksetzen. Deine Arbeit wird **automatisch im Browser gespeichert**; nach einem Neuladen oder Absturz machst du dort weiter, wo du aufgehört hast.
 - **✨ Funny**: alle passenden Texturen und Sounds durchmischen (das Schwert sieht aus wie eine Karotte, die Kuh klingt wie ein Ghast) oder jede Textur knallbunt machen (Zufallsfarben, Regenbogen, Neon, invertiert). Der **Sound-Randomizer** gibt jedem Sound eine zufällige Tonhöhe (höher, tiefer oder beides, eine Stimme pro Event oder jede Variante anders) und versteckt Überraschungen aus anderen Events dazwischen. Texturen tauschen nur mit passenden (gleiche Art und Größe, Mobs nur mit gleich gebauten, optional Chaos-Modus); Sounds werden in der sounds.json umgeleitet, ohne Audiodateien zu kopieren. Deine eigenen Änderungen bleiben unberührt, ein Seed macht Ergebnisse wiederholbar, und ein Klick entfernt alles wieder.
+- **Szenen**: Sieh dein Pack dort, wo Spieler es sehen. Der **Titelbildschirm** dreht dein Panorama hinter Logo, Splash-Text und Buttons (Ziehen zum Umsehen; ein 360°-Bild wird mit einem Klick zu den sechs Panorama-Bildern). Das **HUD** zeigt Hotbar, Herzen, Hunger, Rüstung und Erfahrung, und **Inventar, Truhe, Werkbank und Ofen** werden aus deinen GUI-Texturen gezeichnet, mit Items deiner Wahl. **Biomfarben** zeigen Gras, Laub, Laubstreu und Wasser jedes Bioms aus deinen Colormaps. Die **Schrift**-Vorschau zeigt beliebigen Text in deinen Bitmap-Schriften, und du kannst **eigene Zeichen** (Emojis, Symbole) auf privaten Unicode-Zeichen anlegen. **Partikel** spielen ihre Sprites ab, **Gemälde** hängen in ihrer Größe an der Wand, und im **Block-Sandkasten** setzt du Blöcke nebeneinander, um zu sehen, wie sich deine Texturen kacheln, mit zufälligen Varianten und Biomfarben.
+- **Eigene 3D-Modelle**: Importiere ein Blockbench-Projekt (.bbmodel) oder ein Java-Modell mit seinen Texturen und nutze es für ein Item: als Ersatz, beim Umbenennen im Amboss oder für einen `custom_model_data`-Text (den `/give`-Befehl bekommst du dazu).
+- **Versionen (Overlays)**: ein Pack für mehrere Minecraft-Versionen. Lege Overlay-Ordner mit ihren Format-Bereichen an und kopiere Dateien hinein; der Editor zeigt und bearbeitet, was die geladene Version bekommt.
+- **Packs vergleichen**: Lade ein zweites Pack und sieh, was es hat und deins nicht (Texturen nebeneinander, Sounds zum Anhören), und übernimm Dateien, Ordner oder alles in einem Schritt, der sich rückgängig machen lässt.
+- **Alles finden mit Strg+K** (Items, Pflanzen, Mobs, Texturen, Sounds, Tabs, Aktionen), und **jede Änderung rückgängig machen und wiederholen** mit Strg+Z / Strg+Y.
+- **Offline nutzbar und als App installierbar**: Nach dem ersten Besuch öffnet sich der Editor auch ohne Netz (die Vanilla-Dateien liegen im Browser).
 - **Export** als neues Pack-ZIP mit Originaldateien und Änderungen. Vor dem Export listet eine **Prüfung** auf, was Minecraft ablehnen oder ignorieren würde: kaputtes JSON, ungültige Dateinamen, Animationen mit unpassenden Frames, fehlende Texturen, Modelle und Sounds, falsch große Texturen, Dateien in alten oder falschen Ordnern und ein unpassendes Pack-Format. Ohne Pack startest du mit „Neues Pack erstellen“ auf Vanilla-Basis. Ein Klick auf das Pack-Bild oben links lädt ein eigenes **Pack-Bild** hoch (jedes Bild, quadratisch zugeschnitten) oder bearbeitet es.
 - **Mehrsprachig**: Oberfläche auf Deutsch und Englisch, umschaltbar oben rechts. Item- und Mob-Namen kommen aus Minecrafts eigenen Sprachdateien (z. B. „Diamantschwert“). Weitere Sprachen lassen sich leicht ergänzen (siehe [Sprachen](#sprachen)).
 - **Privat**: Dein Pack verlässt den Rechner nicht. Die Vanilla-Dateien kommen direkt von Mojangs Servern und werden pro Version im Browser gespeichert. Um dich auf neue Versionen hinzuweisen, fragt der Editor höchstens alle 12 Stunden bei GitHub nach dem neuesten Release; dabei wird nichts über dich oder dein Pack gesendet.
@@ -121,12 +127,14 @@ Auch die Doku lässt sich übersetzen: `README.<code>.md` und `docs/INSTALLATION
 ```sh
 npm run dev       # Dev-Server mit Hot Reload
 npm test          # Unit-Tests (Vitest)
+npm run test:e2e  # End-to-End-Tests in Chromium (Playwright; einmalig: npx playwright install chromium,
+                  # oder ein installiertes Google Chrome mit PW_CHANNEL=chrome)
 npm run build     # Typecheck + Produktions-Build nach dist/
 npm run serve     # dist/ inkl. Sound-Proxy ausliefern (Port 8080)
 npm run package   # Release-ZIP nach release/
 ```
 
-Jeder Push prüft Typen, Tests und Build auf Node 20 und 22 (siehe [`.github/workflows/ci.yml`](.github/workflows/ci.yml)) und lässt den Resolver-Test gegen die echte client.jar laufen. Einmal pro Woche läuft derselbe Test gegen die neueste Minecraft-Version, damit Spiel-Updates, die etwas kaputtmachen, früh auffallen.
+Jeder Push prüft Typen, Tests und Build auf Node 20, 22 und 26 (siehe [`.github/workflows/ci.yml`](.github/workflows/ci.yml)), lässt die End-to-End-Tests in Chromium und den Resolver-Test gegen die echte client.jar laufen. Einmal pro Woche läuft derselbe Test gegen die neueste Minecraft-Version, damit Spiel-Updates, die etwas kaputtmachen, früh auffallen.
 
 Den Resolver gegen eine echte client.jar prüfen:
 
@@ -143,6 +151,7 @@ MC_JAR=/pfad/zur/client.jar npx vitest run vanilla
 - Block-Sounds kommen direkt aus dem Spiel; bei Items und Mobs ordnet der Editor nach dem Sound-Namen zu (`entity.wolf_angry.*` → Wolf). Sounds, die ein Mob oder Item unter einem ganz anderen Namen spielt, fehlen deshalb.
 - Das Mikrofon funktioniert nur über `localhost`/`127.0.0.1` oder https. Öffnest du den Editor von einem anderen Gerät im LAN (`--host 0.0.0.0`), blockiert der Browser die Aufnahme.
 - Beim Bearbeiten eines flachen Items (Schwert, Apfel …) ändern sich die Farben live in 3D, die Seiten des Items folgen neu gemalten oder radierten Pixeln aber erst nach dem Speichern.
+- HUD und Inventare nutzen das Vanilla-Layout; ein Pack kann GUI-Elemente nicht verschieben, nur ihr Aussehen ändern. Zeichen aus TrueType- oder Unifont-Quellen zeichnet die Schrift-Vorschau ersatzweise.
 - Bedrock Edition wird nicht unterstützt.
 
 ## Rechtliches

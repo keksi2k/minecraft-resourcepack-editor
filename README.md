@@ -27,6 +27,12 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 - **Sounds**: search and play all ~2000 sound events, replace individual files, **add your own sounds to events** (e.g. more footstep variants), set **volume and pitch per variant**, or replace the vanilla variants entirely. Every event shows which **blocks, items and mobs** play it (cobblestone and andesite sound like `block.stone`), and you can search by their names; item and mob details list their sounds.
 - **Safe editing**: every file shows whether it comes from vanilla, the pack or your own change. Changes can be discarded one by one or reset to vanilla. Your work is **saved automatically** in the browser; after a reload or crash you can continue where you left off.
 - **✨ Funny**: shuffle all matching textures and sounds (the sword looks like a carrot, the cow sounds like a ghast) or make every texture as colourful as possible (random colours, rainbow, neon, inverted). The **sound randomizer** gives every sound a random pitch (higher, lower or both, one voice per event or a new one per variant) and hides surprise variants from other events in between. Textures only swap with ones that fit (same kind and size, mobs only with mobs built the same way, optional chaos mode); sounds are redirected in sounds.json without copying audio. Your own edits are left alone, a seed makes results repeatable, and one click removes it all again.
+- **Scenes**: see your pack where players see it. The **title screen** turns your panorama behind the logo, splash text and buttons (drag to look around; a 360° image becomes the six panorama images in one click). The **HUD** shows hotbar, hearts, hunger, armour and experience, and the **inventory, chest, crafting table and furnace** screens are drawn from your GUI textures with items you pick. **Biome colours** show grass, leaves, leaf litter and water of every biome from your colormaps. The **font** preview renders any text with your bitmap fonts, and you can add **glyphs of your own** (emoji, icons) on private use characters. **Particles** play their sprites, **paintings** hang at their size, and the **block sandbox** lets you place blocks side by side to see how your textures tile, random variants and biome colours included.
+- **Own 3D models**: import a Blockbench project (.bbmodel) or a Java model with its textures, and use it for an item: replace it, show it when the item is renamed, or show it for a `custom_model_data` string (you get the `/give` command).
+- **Versions (overlays)**: one pack for several Minecraft versions. Declare overlay folders with their format ranges and copy files into them; the editor shows and edits what the loaded version gets.
+- **Compare packs**: load a second pack to see what it has that yours doesn't (textures side by side, sounds to play) and take files, folders or everything over in one undoable step.
+- **Find anything with Ctrl+K** (items, plants, mobs, textures, sounds, tabs, actions), and **undo and redo** every change with Ctrl+Z / Ctrl+Y.
+- **Works offline and installs as an app**: after the first visit the editor opens without a network (vanilla files are cached in the browser).
 - **Export** as a new pack ZIP with the original files plus your changes. Before exporting, a **check** lists what Minecraft would reject or ignore: broken JSON, invalid file names, animations whose frames don't fit, missing textures, models and sounds, wrongly sized textures, files in old or wrong folders and a pack format that doesn't match. Without a pack, “Create new pack” starts from vanilla. Click the pack icon at the top left to upload your own **pack icon** (any image, cropped to a square) or edit it.
 - **Multilingual**: the interface is available in English and German (switch at the top right). Item and mob names come from Minecraft's own language files. More languages are easy to add (see [Languages](#languages)).
 - **Private**: your pack never leaves your computer. Vanilla files come straight from Mojang's servers and are cached in the browser per version. To tell you about new versions, the editor asks GitHub for the latest release at most every 12 hours; nothing about you or your pack is sent.
@@ -121,12 +127,14 @@ The docs can be translated too: add `README.<code>.md` and `docs/INSTALLATION.<c
 ```sh
 npm run dev       # dev server with hot reload
 npm test          # unit tests (Vitest)
+npm run test:e2e  # end-to-end tests in Chromium (Playwright; once: npx playwright install chromium,
+                  # or use an installed Google Chrome with PW_CHANNEL=chrome)
 npm run build     # type check + production build to dist/
 npm run serve     # serve dist/ including the sound proxy (port 8080)
 npm run package   # release ZIP to release/
 ```
 
-Every push runs type check, tests and build on Node 20 and 22 (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)), plus the resolver test against the real client.jar. Once a week the same test runs against the newest Minecraft release, so breaking game updates show up early.
+Every push runs type check, tests and build on Node 20, 22 and 26 (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)), the end-to-end tests in Chromium, and the resolver test against the real client.jar. Once a week the same test runs against the newest Minecraft release, so breaking game updates show up early.
 
 Check the resolver against a real client.jar:
 
@@ -143,6 +151,7 @@ MC_JAR=/path/to/client.jar npx vitest run vanilla
 - Block sounds come straight from the game; for items and mobs the editor matches sound names (`entity.wolf_angry.*` → wolf), so sounds a mob or item plays under an unrelated name are not linked.
 - The microphone only works on `localhost`/`127.0.0.1` or over https. If you open the editor from another device on the LAN (`--host 0.0.0.0`), the browser blocks recording.
 - While editing a flat item (sword, apple …), colours update live in 3D, but the item's sides only follow newly painted or erased pixels after saving.
+- The HUD and container screens use the vanilla layout; a pack can't move GUI elements, only change how they look. Characters from TrueType or unifont providers are drawn with a stand-in in the font preview.
 - Bedrock Edition is not supported.
 
 ## Legal

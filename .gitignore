@@ -6,3 +6,5 @@ logs
 *.log
 release
 .mc
+test-results
+playwright-report
