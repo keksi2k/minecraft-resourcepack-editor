@@ -6,8 +6,9 @@ import { newPackMeta } from '../pack/exportPack';
 import { COLOR_CODES, componentToLegacy, FORMAT_CODES, parseFormatted, setLangEntry, splashLines } from '../texts/formatting';
 import { useApp } from '../state/appStore';
 import { Btn, SourceBadge } from './common';
+import { OverlaysEditor } from './OverlaysEditor';
 
-type Section = 'description' | 'splashes' | 'lang';
+type Section = 'description' | 'splashes' | 'lang' | 'overlays';
 const SPLASHES = 'assets/minecraft/texts/splashes.txt';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -20,7 +21,7 @@ export function TextsView() {
   return (
     <div className="flex h-full">
       <nav className="w-52 shrink-0 overflow-y-auto border-r border-neutral-800 p-2 text-sm">
-        {(['description', 'splashes', 'lang'] as const).map((s) => (
+        {(['description', 'splashes', 'lang', 'overlays'] as const).map((s) => (
           <button key={s} onClick={() => setSection(s)} className={`block w-full rounded px-2 py-1 text-left ${section === s ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}>
             {t(`texts.sections.${s}`)}
           </button>
@@ -30,6 +31,7 @@ export function TextsView() {
         {section === 'description' && <DescriptionEditor />}
         {section === 'splashes' && <SplashEditor />}
         {section === 'lang' && <LangEditor />}
+        {section === 'overlays' && <OverlaysEditor />}
       </section>
     </div>
   );

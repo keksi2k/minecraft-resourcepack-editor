@@ -25,6 +25,7 @@ import { ensureVorbis } from '../sounds/audioEdit';
 import { useEditor } from './editorStore';
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
+import { activeOverlays } from '../pack/overlays';
 
 export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'scenes' | 'texts' | 'progress' | 'funny';
 
@@ -151,6 +152,7 @@ export const useApp = create<AppState>((set, get) => ({
       const vanilla = await loadVanillaAssets(version, (status, progress) => set({ status, progress }));
       set({ status: t('load.statusAnalyzing'), progress: undefined });
       const store = new AssetStore(vanilla.files, pack?.files ?? new Map());
+      store.setOverlays(activeOverlays(parsePackMeta(store.get('pack.mcmeta'))?.raw, vanilla.packFormat));
       const icon = store.get('pack.png');
       set({
         phase: 'ready',
@@ -250,12 +252,14 @@ export const useApp = create<AppState>((set, get) => ({
 
   setFile(path, data) {
     const store = get().store!;
-    store.setEdit(path, data);
+    // a file an active overlay provides is changed where the game reads it: in the overlay
+    store.setEdit(store.writePath(path), data);
     afterEdit(path);
   },
 
   resetFile(path) {
-    get().store!.clearEdit(path);
+    const store = get().store!;
+    store.clearEdit(store.editPath(path) ?? path);
     afterEdit(path);
   },
 
@@ -364,6 +368,7 @@ export const useApp = create<AppState>((set, get) => ({
   applyBatch(changes) {
     const store = get().store;
     if (!store || !changes.size) return;
+    changes = new Map([...changes].map(([p, d]) => [store.writePath(p), d]));
     const before: FileStates = [...changes.keys()].map((p) => [p, store.edits.has(p) ? store.edits.get(p)! : undefined]);
     for (const [path, data] of changes) store.setEdit(path, data);
     set({ lastBatch: { before, count: changes.size } });
@@ -419,8 +424,20 @@ function afterEdit(path: string) {
   useApp.setState(patch);
   if (/^assets\/minecraft\/lang\//.test(path)) void useApp.getState().loadGameNames();
   if (path === 'pack.png') refreshIcon();
-  if (path === 'pack.mcmeta') useApp.setState({ packMeta: parsePackMeta(store.get(path)) });
+  if (path === 'pack.mcmeta') {
+    useApp.setState({ packMeta: parsePackMeta(store.get(path)) });
+    syncOverlays();
+  }
   persistEdits();
+}
+
+/** Applies the overlays pack.mcmeta declares for the loaded game version. */
+function syncOverlays() {
+  const { store, gameFormat, revision, names } = useApp.getState();
+  if (!store) return;
+  const before = store.overlays.join('/');
+  store.setOverlays(activeOverlays(parsePackMeta(store.get('pack.mcmeta'))?.raw, gameFormat));
+  if (store.overlays.join('/') !== before) useApp.setState({ revision: revision + 1, items: listItems(store, names), plants: listPlants(store, names) });
 }
 
 /** Shows the current pack.png (after it was uploaded, edited, removed or restored). */
@@ -450,6 +467,7 @@ function refreshDerived() {
     soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)),
     packMeta: parsePackMeta(store.get('pack.mcmeta')),
   });
+  syncOverlays();
   refreshIcon();
 }
 

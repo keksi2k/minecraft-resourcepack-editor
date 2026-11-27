@@ -67,13 +67,62 @@ export class AssetStore {
   private readonly revs = new Map<string, number>();
   private jsonCache = new Map<string, unknown>();
   private changeCount = 0;
+  private active: string[] = [];
 
   constructor(
     readonly vanilla: Map<string, Uint8Array>,
     readonly pack: Map<string, Uint8Array>,
   ) {}
 
+  /** Overlay folders the game applies (lowest priority first); their files cover the pack's own. */
+  get overlays(): readonly string[] {
+    return this.active;
+  }
+
+  setOverlays(dirs: string[]): void {
+    if (dirs.join('/') === this.active.join('/')) return;
+    const before = this.active;
+    this.active = [...dirs];
+    // every path an old or new overlay covers may show something else now
+    for (const dir of new Set([...before, ...dirs])) {
+      for (const map of [this.pack, this.edits]) for (const p of map.keys()) if (p.startsWith(`${dir}/`)) this.bump(p.slice(dir.length + 1));
+    }
+    this.jsonCache.clear();
+    this.changeCount++;
+  }
+
+  /** The overlay path that provides `path`, if an active overlay covers it (and no root edit does). */
+  private overlaid(path: string): string | undefined {
+    if (this.edits.has(path)) return undefined;
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      const p = `${this.active[i]}/${path}`;
+      if (this.edits.has(p)) {
+        if (this.edits.get(p)) return p;
+        continue;
+      }
+      if (this.pack.has(p)) return p;
+    }
+    return undefined;
+  }
+
+  /** Where an edit of `path` goes: into the overlay the game reads it from, else the path itself. */
+  writePath(path: string): string {
+    return this.overlaid(path) ?? path;
+  }
+
+  /** The path holding the user's edit of `path` (in an overlay or not), if there is one. */
+  editPath(path: string): string | undefined {
+    if (this.edits.has(path)) return path;
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      const p = `${this.active[i]}/${path}`;
+      if (this.edits.has(p)) return p;
+    }
+    return undefined;
+  }
+
   get(path: string): Uint8Array | undefined {
+    const o = this.overlaid(path);
+    if (o) return this.edits.get(o) ?? this.pack.get(o);
     if (this.edits.has(path)) return this.edits.get(path) ?? this.vanilla.get(path);
     return this.pack.get(path) ?? this.vanilla.get(path);
   }
@@ -83,6 +132,8 @@ export class AssetStore {
   }
 
   source(path: string): Source | undefined {
+    const o = this.overlaid(path);
+    if (o) return this.edits.has(o) ? 'edited' : 'pack';
     if (this.edits.has(path)) return this.edits.get(path) ? 'edited' : this.vanilla.has(path) ? 'vanilla' : undefined;
     if (this.pack.has(path)) return 'pack';
     if (this.vanilla.has(path)) return 'vanilla';
@@ -120,6 +171,16 @@ export class AssetStore {
     for (const map of [this.vanilla, this.pack, this.edits]) {
       for (const p of map.keys()) if (p.startsWith(prefix) && this.has(p)) out.add(p);
     }
+    // files only an overlay has show at the path the game sees them at
+    for (const dir of this.active) {
+      for (const map of [this.pack, this.edits]) {
+        for (const p of map.keys()) {
+          if (!p.startsWith(`${dir}/`)) continue;
+          const inner = p.slice(dir.length + 1);
+          if (inner.startsWith(prefix) && this.has(inner)) out.add(inner);
+        }
+      }
+    }
     return [...out].sort();
   }
 
@@ -142,7 +203,7 @@ export class AssetStore {
   /** True if removing the pack/edited file would reveal a vanilla file. */
   canRevertToVanilla(path: string): boolean {
     const src = this.source(path);
-    return (src === 'pack' || src === 'edited') && this.vanilla.has(path);
+    return (src === 'pack' || src === 'edited') && this.vanilla.has(path) && !this.overlaid(path);
   }
 
   get editCount(): number {
@@ -174,8 +235,14 @@ export class AssetStore {
   }
 
   private touch(path: string) {
-    this.revs.set(path, this.rev(path) + 1);
+    this.bump(path);
+    // a file in an active overlay changes what the game sees at its inner path
+    for (const dir of this.active) if (path.startsWith(`${dir}/`)) this.bump(path.slice(dir.length + 1));
     this.changeCount++;
+  }
+
+  private bump(path: string) {
+    this.revs.set(path, this.rev(path) + 1);
     this.jsonCache.delete(path);
   }
 }

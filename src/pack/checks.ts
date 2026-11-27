@@ -3,6 +3,7 @@ import { isAtlasTexture } from '../models/atlasMembership';
 import { texturePermutation } from '../models/atlasPermutations';
 import { allItemModels } from '../models/itemDefinition';
 import { modelPath, normalizeRL, texturePath } from '../models/resourceLocation';
+import { readOverlays, splitOverlayPath, VALID_DIRECTORY } from './overlays';
 
 /**
  * Checks a pack before export for things Minecraft would reject or silently ignore: broken JSON,
@@ -28,7 +29,9 @@ export type IssueCode =
   | 'missingTexture'
   | 'missingModel'
   | 'missingSound'
-  | 'iconNotSquare';
+  | 'iconNotSquare'
+  | 'badOverlayDir'
+  | 'emptyOverlay';
 
 export interface Issue {
   level: IssueLevel;
@@ -54,6 +57,8 @@ export const LEVEL: Record<IssueCode, IssueLevel> = {
   missingModel: 'warning',
   missingSound: 'warning',
   iconNotSquare: 'warning',
+  badOverlayDir: 'error',
+  emptyOverlay: 'info',
 };
 
 
@@ -117,20 +122,30 @@ export function checkPack(store: AssetStore, files: Map<string, Uint8Array>, opt
   const iconSize = icon && pngSize(icon);
   if (iconSize && iconSize[0] !== iconSize[1]) add('iconNotSquare', 'pack.png', { w: iconSize[0], h: iconSize[1] });
 
+  // overlays: folders beside assets/ for some game versions
+  const overlays = readOverlays(parsed('pack.mcmeta'));
+  const dirs = overlays.map((o) => o.directory);
+  for (const o of overlays) {
+    if (!VALID_DIRECTORY.test(o.directory)) add('badOverlayDir', 'pack.mcmeta', { dir: o.directory });
+    else if (![...files.keys()].some((p) => p.startsWith(`${o.directory}/`))) add('emptyOverlay', 'pack.mcmeta', { dir: o.directory });
+  }
+
   for (const [path, bytes] of files) {
     if (ROOT_FILES.has(path)) {
       if (path === 'pack.mcmeta' && parsed(path) === undefined) add('badJson', path);
       continue;
     }
-    if (!path.startsWith('assets/')) {
+    // a file in an overlay is checked like the file it stands for
+    const inner = splitOverlayPath(path, dirs)?.inner ?? path;
+    if (!inner.startsWith('assets/')) {
       add('outsideAssets', path);
       continue;
     }
-    if (!VALID_PATH.test(path)) {
+    if (!VALID_PATH.test(inner)) {
       add('badPath', path);
       continue;
     }
-    const m = /^assets\/([^/]+)\/([^/]+)\/(.*)$/.exec(path);
+    const m = /^assets\/([^/]+)\/([^/]+)\/(.*)$/.exec(inner);
     const [, , kind, rest] = m ?? [];
     if (/\.(json|mcmeta)$/.test(path) && parsed(path) === undefined) {
       add('badJson', path);
