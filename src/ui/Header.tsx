@@ -7,11 +7,12 @@ import { makePackIcon, PACK_ICON } from '../pack/packIcon';
 import { useEditor } from '../state/editorStore';
 import { checkPack, type Issue } from '../pack/checks';
 import { ExportCheck } from './ExportCheck';
+import { COMMAND_EVENT, type HeaderCommand } from './CommandPalette';
 
 const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'scenes', 'texts', 'progress', 'funny'];
 
-export function Header() {
-  const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision, objects } = useApp();
+export function Header({ onSearch }: { onSearch: () => void }) {
+  const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision, objects, undo, redo, undoCount, redoCount } = useApp();
   const t = useT();
   const [exporting, setExporting] = useState(false);
   const [issues, setIssues] = useState<Issue[]>();
@@ -39,10 +40,19 @@ export function Header() {
     else void doExport();
   };
 
+  // export and check can be asked for from the command palette
+  const checkRef = useRef(check);
+  checkRef.current = check;
+  useEffect(() => {
+    const h = (e: Event) => checkRef.current((e as CustomEvent<HeaderCommand>).detail === 'check');
+    window.addEventListener(COMMAND_EVENT, h);
+    return () => window.removeEventListener(COMMAND_EVENT, h);
+  }, []);
+
   return (
     <header className="flex items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-4 py-2">
       <PackIconButton />
-      <div className="min-w-0">
+      <div className="min-w-0 shrink">
         <div className="truncate font-semibold">{packName}</div>
         <div className="truncate text-xs text-neutral-400">
           Vanilla {version?.id}
@@ -51,20 +61,31 @@ export function Header() {
           {formatMismatch && <span className="text-amber-400"> · {t('header.formatMismatch')}</span>}
         </div>
       </div>
-      <nav className="ml-6 flex gap-1">
+      <nav className="ml-2 flex gap-0.5 xl:ml-6 xl:gap-1">
         {TABS.map((id) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`rounded px-3 py-1.5 text-sm ${tab === id ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}
+            className={`whitespace-nowrap rounded px-2 py-1.5 text-sm xl:px-3 ${tab === id ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}
           >
             {t(`header.tabs.${id}`)}
           </button>
         ))}
       </nav>
       <div className="ml-auto flex items-center gap-2">
+        <button onClick={onSearch} title={t('palette.open')} className="flex items-center gap-2 rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-700">
+          🔍 <kbd className="hidden whitespace-nowrap rounded bg-neutral-900 px-1 font-mono text-[10px] 2xl:inline">Ctrl K</kbd>
+        </button>
+        <span className="flex">
+          <button onClick={undo} disabled={!undoCount} title={t('palette.undoTitle', { count: undoCount })} className="rounded-l bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700 disabled:opacity-30">
+            ↶
+          </button>
+          <button onClick={redo} disabled={!redoCount} title={t('palette.redoTitle', { count: redoCount })} className="rounded-r border-l border-neutral-900 bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700 disabled:opacity-30">
+            ↷
+          </button>
+        </span>
         {edits > 0 && (
-          <span className="text-xs text-amber-400" title={t('header.autosaved')}>
+          <span className="whitespace-nowrap text-xs text-amber-400" title={t('header.autosaved')}>
             ✓ {t('header.edits', { count: edits })}
           </span>
         )}

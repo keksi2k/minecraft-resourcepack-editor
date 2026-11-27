@@ -68,6 +68,8 @@ export class AssetStore {
   private jsonCache = new Map<string, unknown>();
   private changeCount = 0;
   private active: string[] = [];
+  /** Told about every edit: the path, its edit before (`undefined` = none) and after. */
+  onEdit?: (path: string, before: Uint8Array | null | undefined, after: Uint8Array | null | undefined) => void;
 
   constructor(
     readonly vanilla: Map<string, Uint8Array>,
@@ -185,6 +187,7 @@ export class AssetStore {
   }
 
   setEdit(path: string, data: Uint8Array | null): void {
+    this.onEdit?.(path, this.edits.has(path) ? this.edits.get(path)! : undefined, data);
     this.edits.set(path, data);
     this.touch(path);
   }
@@ -196,6 +199,7 @@ export class AssetStore {
   }
 
   clearEdit(path: string): void {
+    if (this.edits.has(path)) this.onEdit?.(path, this.edits.get(path)!, undefined);
     this.edits.delete(path);
     this.touch(path);
   }

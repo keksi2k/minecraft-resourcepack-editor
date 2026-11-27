@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { CommandPalette, useGlobalShortcuts } from './CommandPalette';
 import { useApp } from '../state/appStore';
 import { Header } from './Header';
 import { FunnyView } from './FunnyView';
@@ -18,6 +19,8 @@ export function App() {
   useEffect(() => {
     void loadManifest();
   }, [loadManifest]);
+  const [palette, setPalette] = useState(false);
+  useGlobalShortcuts(useCallback(() => setPalette(useApp.getState().phase === 'ready'), []));
 
   if (phase !== 'ready')
     return (
@@ -29,7 +32,8 @@ export function App() {
   return (
     <div className="flex h-screen flex-col">
       <UpdateBanner />
-      <Header />
+      <Header onSearch={() => setPalette(true)} />
+      {palette && <CommandPalette onClose={() => setPalette(false)} />}
       <main className="min-h-0 flex-1">
         {tab === 'items' && <ItemsView />}
         {tab === 'plants' && <PlantsView />}

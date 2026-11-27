@@ -73,6 +73,11 @@ interface AppState {
   textureFocus?: { path: string; n: number };
   /** The last batch change, so it can be undone in one go. */
   lastBatch?: { before: FileStates; count: number };
+  /** Steps that can be undone and redone (each the files one action changed). */
+  undoCount: number;
+  redoCount: number;
+  /** A sound event to show in the sounds tab (bumped `n` re-triggers the same one). */
+  soundFocus?: { id: string; n: number };
 
   loadManifest(): Promise<void>;
   open(pack: LoadedPack | null, versionId: string, restoredEdits?: [string, Uint8Array | null][]): Promise<void>;
@@ -108,6 +113,11 @@ interface AppState {
   /** Writes many files at once and remembers how they were, for `undoBatch`. */
   applyBatch(changes: Map<string, Uint8Array | null>): void;
   undoBatch(): void;
+  /** Takes back the last change to the pack's files (any tab), or does it again. */
+  undo(): void;
+  redo(): void;
+  /** Opens the sounds tab with this event shown. */
+  focusSound(id: string): void;
   select(id: string | undefined): void;
   selectPlant(id: string | undefined): void;
   selectMob(id: string | undefined): void;
@@ -133,6 +143,8 @@ export const useApp = create<AppState>((set, get) => ({
   soundEvents: [],
   soundsLoading: false,
   tab: 'items',
+  undoCount: 0,
+  redoCount: 0,
 
   async loadManifest() {
     void loadSessionMeta().then((resumable) => set({ resumable }));
@@ -179,7 +191,9 @@ export const useApp = create<AppState>((set, get) => ({
       if (restoredEdits) {
         for (const [path, data] of restoredEdits) store.setEdit(path, data);
         refreshDerived();
-      } else {
+      }
+      startHistory(store);
+      if (!restoredEdits) {
         void startSession(sessionMeta(), pack?.source).catch((e) => console.warn('Could not save session', e));
       }
       void get().loadSounds();
@@ -385,6 +399,27 @@ export const useApp = create<AppState>((set, get) => ({
     persistEdits();
   },
 
+  undo() {
+    const step = history.undo.pop();
+    if (!step) return;
+    replay(step, 'before');
+    history.redo.push(step);
+    syncHistory();
+  },
+
+  redo() {
+    const step = history.redo.pop();
+    if (!step) return;
+    replay(step, 'after');
+    history.undo.push(step);
+    syncHistory();
+  },
+
+  focusSound(id) {
+    get().setTab('sounds');
+    if (get().tab === 'sounds') set({ soundFocus: { id, n: (get().soundFocus?.n ?? 0) + 1 } });
+  },
+
   select: (selectedItem) => set({ selectedItem }),
   selectPlant: (selectedPlant) => set({ selectedPlant }),
   selectMob: (selectedMob) => set({ selectedMob }),
@@ -394,9 +429,64 @@ export const useApp = create<AppState>((set, get) => ({
     if (icon) URL.revokeObjectURL(icon);
     void clearSession();
     useEditor.getState().close();
-    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined, lastBatch: undefined, textureFocus: undefined });
+    history.undo = [];
+    history.redo = [];
+    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined, lastBatch: undefined, textureFocus: undefined, undoCount: 0, redoCount: 0 });
   },
 }));
+
+/* undo / redo ------------------------------------------------------------------------------- */
+
+type Change = [path: string, before: Uint8Array | null | undefined, after: Uint8Array | null | undefined];
+const HISTORY_LIMIT = 100;
+const history: { undo: Change[][]; redo: Change[][]; open?: Change[]; replaying: boolean } = { undo: [], redo: [], replaying: false };
+
+/** Records every edit of the store; edits made in one go (one click) become one step. */
+function startHistory(store: AssetStore) {
+  history.undo = [];
+  history.redo = [];
+  history.open = undefined;
+  store.onEdit = (path, before, after) => {
+    if (history.replaying) return;
+    if (!history.open) {
+      const step: Change[] = [];
+      history.open = step;
+      queueMicrotask(() => {
+        history.open = undefined;
+        if (!step.length) return;
+        history.undo.push(step);
+        if (history.undo.length > HISTORY_LIMIT) history.undo.shift();
+        history.redo = [];
+        syncHistory();
+      });
+    }
+    history.open.push([path, before, after]);
+  };
+}
+
+function replay(step: Change[], side: 'before' | 'after') {
+  const store = useApp.getState().store;
+  if (!store) return;
+  history.replaying = true;
+  try {
+    const list = side === 'before' ? [...step].reverse() : step;
+    for (const [path, before, after] of list) {
+      const v = side === 'before' ? before : after;
+      if (v === undefined) store.clearEdit(path);
+      else store.setEdit(path, v);
+    }
+  } finally {
+    history.replaying = false;
+  }
+  // a batch or the funny changes can't be undone on their own after this
+  useApp.setState({ lastBatch: undefined });
+  refreshDerived();
+  persistEdits();
+}
+
+function syncHistory() {
+  useApp.setState({ undoCount: history.undo.length, redoCount: history.redo.length });
+}
 
 /** Vanilla files already taken from the asset index, per store. */
 const fetchedObjects = new WeakMap<AssetStore, Set<string>>();

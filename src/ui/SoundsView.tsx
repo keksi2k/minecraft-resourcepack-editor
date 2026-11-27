@@ -281,7 +281,7 @@ export function SoundEventRow({ event, compact, links }: { event: SoundEvent; co
 }
 
 export function SoundsView() {
-  const { soundEvents, soundsError, soundsLoading, addLocalAssetsFolder, loadSounds, items, names } = useApp();
+  const { soundEvents, soundsError, soundsLoading, addLocalAssetsFolder, loadSounds, items, names, soundFocus } = useApp();
   const t = useT();
   const links = useSoundLinks();
   const [query, setQuery] = useState('');
@@ -291,6 +291,10 @@ export function SoundsView() {
   const [base, setBase] = useState(getResourcesBase());
   const q = useDeferredValue(query.trim().toLowerCase());
   const editing = useEditing('sounds');
+  // the command palette shows one event
+  useEffect(() => {
+    if (soundFocus) setQuery(soundFocus.id);
+  }, [soundFocus]);
 
   // what an event can be found by: its id, its file names and the names of what plays it
   const searchText = useMemo(

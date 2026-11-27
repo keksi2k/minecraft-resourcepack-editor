@@ -136,7 +136,7 @@ export function Btn({ children, onClick, title, disabled, tone = 'default' }: {
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className={`rounded px-2 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed ${tones[tone]}`}
+      className={`whitespace-nowrap rounded px-2 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed ${tones[tone]}`}
     >
       {children}
     </button>
