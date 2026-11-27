@@ -86,7 +86,7 @@ function ColormapView({
       <div className="text-xs font-semibold">{label}</div>
       <div
         className="checker relative h-48 w-48 rounded"
-        onMouseMove={(e) => {
+        onPointerMove={(e) => {
           if (!map) return;
           const r = e.currentTarget.getBoundingClientRect();
           const x = Math.min(map.width - 1, Math.floor(((e.clientX - r.left) / r.width) * map.width));
@@ -94,7 +94,7 @@ function ColormapView({
           const i = (y * map.width + x) * 4;
           setAt({ x, y, color: (map.data[i] << 16) | (map.data[i + 1] << 8) | map.data[i + 2] });
         }}
-        onMouseLeave={() => setAt(undefined)}
+        onPointerLeave={() => setAt(undefined)}
       >
         {url ? (
           <img src={url} alt="" className="pixelated h-full w-full" draggable={false} />
@@ -108,8 +108,8 @@ function ColormapView({
           return (
             <span
               key={b.id}
-              onMouseEnter={() => onHover(b.id)}
-              onMouseLeave={() => onHover(undefined)}
+              onPointerEnter={() => onHover(b.id)}
+              onPointerLeave={() => onHover(undefined)}
               className={`absolute -ml-1 -mt-1 h-2 w-2 rounded-full ring-1 ${hovered === b.id ? 'z-10 scale-150 bg-white ring-black' : 'bg-black/60 ring-white/80'}`}
               style={{ left: `${((x + 0.5) / 256) * 100}%`, top: `${((y + 0.5) / 256) * 100}%` }}
             />
@@ -147,8 +147,8 @@ function BiomeCard({
   const urls = useMemo(() => TILES.map((tile, i) => tinted(tiles[i], colors[tile.key])), [tiles, colors]);
   return (
     <div
-      onMouseEnter={() => onHover(biome.id)}
-      onMouseLeave={() => onHover(undefined)}
+      onPointerEnter={() => onHover(biome.id)}
+      onPointerLeave={() => onHover(undefined)}
       className={`flex flex-col gap-1.5 rounded p-2 ring-1 ${hovered ? 'bg-neutral-700 ring-emerald-500' : 'bg-neutral-800 ring-transparent'}`}
     >
       <div className="truncate text-xs font-semibold" title={biome.id}>

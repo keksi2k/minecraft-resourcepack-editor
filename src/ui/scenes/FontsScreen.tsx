@@ -34,13 +34,13 @@ function GlyphSheet({ font, provider, onPick }: { font: Font; provider: BitmapPr
       <div
         className="checker relative cursor-pointer"
         style={{ width: sheet.width * zoom, height: sheet.height * zoom }}
-        onMouseMove={(e) => {
+        onPointerMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           const c = Math.floor(((e.clientX - r.left) / r.width) * cols);
           const row = Math.floor(((e.clientY - r.top) / r.height) * rows.length);
           setHover(rows[row]?.[c]);
         }}
-        onMouseLeave={() => setHover(undefined)}
+        onPointerLeave={() => setHover(undefined)}
         onClick={() => hover && onPick(String.fromCodePoint(hover))}
       >
         <img src={url} alt="" className="pixelated h-full w-full" draggable={false} />

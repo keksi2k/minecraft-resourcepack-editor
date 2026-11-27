@@ -74,7 +74,7 @@ export function Header({ onSearch }: { onSearch: () => void }) {
           {t('upgrade.button')}
         </button>
       )}
-      <nav className="ml-2 flex gap-0.5 xl:ml-6 xl:gap-1">
+      <nav className="no-scrollbar ml-2 flex min-w-0 shrink gap-0.5 overflow-x-auto xl:ml-6 xl:gap-1">
         {TABS.map((id) => (
           <button
             key={id}
@@ -169,9 +169,9 @@ function PackIconButton() {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => box.current?.contains(e.target as Node) || setOpen(false);
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
+    const close = (e: PointerEvent) => box.current?.contains(e.target as Node) || setOpen(false);
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
   }, [open]);
 
   const upload = async () => {

@@ -31,6 +31,7 @@ import {
   type Clip,
 } from '../sounds/audioEdit';
 import { inspectOgg } from '../sounds/editSounds';
+import { PinchTracker } from './gestures';
 import { stopSound } from '../sounds/player';
 import { startRecording, type Recording } from '../sounds/recorder';
 import { useApp } from '../state/appStore';
@@ -311,18 +312,21 @@ export function SoundEditor({ path, bytes, onSave, onDone }: {
     return Math.round(v0 + x * (v1 - v0));
   };
 
-  const onWheel = (e: React.WheelEvent) => {
+  /** Zooms the waveform around a point on screen; `f` > 1 shows more of the sound. */
+  const zoomAt = (clientX: number, f: number) => {
     if (!clip) return;
     const rect = canvas.current!.getBoundingClientRect();
     const [v0, v1] = viewRange;
     const n = clipLength(clip);
-    const at = v0 + ((e.clientX - rect.left) / rect.width) * (v1 - v0);
-    const f = e.deltaY > 0 ? 1.25 : 0.8;
+    const at = v0 + ((clientX - rect.left) / rect.width) * (v1 - v0);
     const span = Math.max(64, Math.min(n, (v1 - v0) * f));
     let a = at - (at - v0) * (span / (v1 - v0));
     a = Math.max(0, Math.min(n - span, a));
     setViewRange([Math.round(a), Math.round(a + span)]);
   };
+  const onWheel = (e: React.WheelEvent) => zoomAt(e.clientX, e.deltaY > 0 ? 1.25 : 0.8);
+  // two fingers on the waveform zoom it instead of selecting
+  const pinch = useRef(new PinchTracker());
 
   const close = () => {
     if (!dirty.current || confirm(t('editor.unsaved'))) {
@@ -509,16 +513,30 @@ export function SoundEditor({ path, bytes, onSave, onDone }: {
             style={{ height: HEIGHT }}
             onPointerDown={(e) => {
               if (!clip) return;
+              if (e.pointerType === 'touch' && pinch.current.down(e.pointerId, e.clientX, e.clientY)) {
+                drag.current = null;
+                (e.target as Element).setPointerCapture(e.pointerId);
+                return;
+              }
               const s = sampleAt(e);
               drag.current = s;
               setSel({ a: s, b: s });
               (e.target as Element).setPointerCapture(e.pointerId);
             }}
             onPointerMove={(e) => {
+              const step = e.pointerType === 'touch' ? pinch.current.move(e.pointerId, e.clientX, e.clientY) : undefined;
+              if (step) return step.scale !== 1 && zoomAt(step.x, 1 / step.scale);
               if (drag.current === null) return;
               setSel({ a: drag.current, b: sampleAt(e) });
             }}
-            onPointerUp={() => (drag.current = null)}
+            onPointerUp={(e) => {
+              pinch.current.up(e.pointerId);
+              drag.current = null;
+            }}
+            onPointerCancel={(e) => {
+              pinch.current.up(e.pointerId);
+              drag.current = null;
+            }}
             onWheel={onWheel}
           />
         </div>

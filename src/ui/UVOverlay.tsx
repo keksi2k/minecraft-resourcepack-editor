@@ -63,8 +63,8 @@ export function UVOverlay({ store, path, modelKey, pick }: { store: AssetStore; 
                 stroke={color(r.part)}
                 strokeOpacity={active ? 1 : 0.15}
                 strokeWidth={Math.max(w, h) / 400}
-                onMouseEnter={() => setHover(topPart(r.part))}
-                onMouseLeave={() => setHover(undefined)}
+                onPointerEnter={() => setHover(topPart(r.part))}
+                onPointerLeave={() => setHover(undefined)}
               >
                 <title>{r.part}</title>
               </rect>
@@ -77,8 +77,8 @@ export function UVOverlay({ store, path, modelKey, pick }: { store: AssetStore; 
         {parts.map((p) => (
           <span
             key={p}
-            onMouseEnter={() => setHover(p)}
-            onMouseLeave={() => setHover(undefined)}
+            onPointerEnter={() => setHover(p)}
+            onPointerLeave={() => setHover(undefined)}
             className={`cursor-default rounded px-1.5 py-0.5 text-[10px] ${hover === p ? 'bg-neutral-600' : 'bg-neutral-800'}`}
           >
             <span className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: color(p) }} />

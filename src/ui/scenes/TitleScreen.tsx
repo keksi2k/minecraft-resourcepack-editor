@@ -197,7 +197,7 @@ export function TitleScreen({ store }: { store: AssetStore }) {
       main={
         <div
           ref={ref}
-          className="absolute inset-0 cursor-grab overflow-hidden bg-black active:cursor-grabbing"
+          className="absolute inset-0 cursor-grab touch-none overflow-hidden bg-black active:cursor-grabbing"
           title={t('scenes.title.dragHint')}
           onPointerDown={(e) => {
             drag.current = [e.clientX, e.clientY];

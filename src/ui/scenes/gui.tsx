@@ -111,11 +111,11 @@ export function GuiCanvas({
       ref={ref}
       className={className}
       style={{ width: width * scale, height: height * scale, imageRendering: 'pixelated' }}
-      onMouseMove={(e) => {
+      onPointerMove={(e) => {
         mouse.current = at(e);
         if (!animate) setRedraw((n) => n + 1);
       }}
-      onMouseLeave={() => {
+      onPointerLeave={() => {
         mouse.current = undefined;
         if (!animate) setRedraw((n) => n + 1);
       }}

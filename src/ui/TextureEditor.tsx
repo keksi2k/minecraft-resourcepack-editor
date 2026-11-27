@@ -20,6 +20,7 @@ import {
   type RGBA,
 } from '../render/pixelEdit';
 import { decodeImage, encodePng } from '../render/png';
+import { isPenEraser, PinchTracker } from './gestures';
 import { previewTexture } from '../render/textures';
 import { useApp } from '../state/appStore';
 import { useEditor } from '../state/editorStore';
@@ -351,12 +352,36 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const line = (p: Pixels, a: [number, number], b: [number, number], c: RGBA) =>
     scoped((q) => drawLine(q, a[0], a[1] - (single ? region.y0 : 0), b[0], b[1] - (single ? region.y0 : 0), c, size))(p);
 
+  // touch: two fingers zoom and pan; once a pen was used, a resting hand doesn't draw
+  const pinch = useRef(new PinchTracker());
+  const gesture = useRef<{ zoom: number } | null>(null);
+  const penSeen = useRef(false);
+  /** Takes back the stroke just begun (a second finger came down: it was a gesture after all). */
+  const cancelStroke = () => {
+    const prev = undo.current.pop();
+    stroke.current = null;
+    if (!img || !prev) return;
+    origin.current = prev.origin;
+    img.data.set(prev.data);
+    commit();
+  };
+
   const onDown = (e: React.PointerEvent) => {
     if (!img || hsl.some((v) => v !== 0)) return;
     e.preventDefault();
+    if (e.pointerType === 'pen') penSeen.current = true;
+    if (e.pointerType === 'touch') {
+      (e.target as Element).setPointerCapture(e.pointerId);
+      if (pinch.current.down(e.pointerId, e.clientX, e.clientY)) {
+        if (stroke.current) cancelStroke();
+        gesture.current ??= { zoom };
+        return;
+      }
+      if (penSeen.current) return;
+    }
     const p = pixelAt(e);
     if (!inside(p)) return;
-    const active: Tool = e.altKey ? 'picker' : e.button === 2 ? 'eraser' : tool;
+    const active: Tool = e.altKey ? 'picker' : e.button === 2 || isPenEraser(e) ? 'eraser' : tool;
     if (active === 'picker') {
       useColor(getPixel(img, ...p));
       // Alt+click keeps the current tool, so only the picker tool itself hands over to the pencil
@@ -384,6 +409,15 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
 
   const onMove = (e: React.PointerEvent) => {
     if (!img) return;
+    if (e.pointerType === 'touch') {
+      const step = pinch.current.move(e.pointerId, e.clientX, e.clientY);
+      if (step && gesture.current) {
+        gesture.current.zoom = Math.max(1, Math.min(48, gesture.current.zoom * step.scale));
+        setZoom(Math.round(gesture.current.zoom));
+        area.current?.scrollBy(-step.dx, -step.dy);
+      }
+      if (gesture.current || (penSeen.current && !stroke.current)) return;
+    }
     const p = pixelAt(e);
     setHover(inside(p) ? p : undefined);
     const s = stroke.current;
@@ -394,7 +428,11 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     commit();
   };
 
-  const onUp = () => {
+  const onUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') {
+      pinch.current.up(e.pointerId);
+      if (!pinch.current.count) gesture.current = null;
+    }
     if (stroke.current) setPaletteRev((r) => r + 1);
     stroke.current = null;
   };
