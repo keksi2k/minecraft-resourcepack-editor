@@ -58,7 +58,7 @@ export function Formatted({ text, className = '' }: { text: string; className?: 
 }
 
 /** Buttons that insert § colour and format codes at the cursor of a text field. */
-function CodeBar({ target, onInsert }: { target: React.RefObject<HTMLInputElement | HTMLTextAreaElement>; onInsert: (next: string) => void }) {
+export function CodeBar({ target, onInsert }: { target: React.RefObject<HTMLInputElement | HTMLTextAreaElement>; onInsert: (next: string) => void }) {
   const t = useT();
   const insert = (code: string) => {
     const el = target.current;

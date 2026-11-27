@@ -198,3 +198,43 @@ export function layoutText(font: Font, text: string): { runs: TextRun[]; width: 
 }
 
 export const textWidth = (font: Font, text: string) => layoutText(font, text).width;
+
+/** Private use characters (U+E000 …) are free for a pack's own glyphs. */
+export const PRIVATE_USE_START = 0xe000;
+
+/** The first private use character no provider of the font has yet. */
+export function nextFreeChar(providers: FontProvider[]): string {
+  const used = new Set<number>();
+  for (const p of providers) {
+    if (p.type === 'bitmap') p.chars.forEach((row) => rowCodePoints(row).forEach((cp) => used.add(cp)));
+    else Object.keys(p.advances).forEach((c) => used.add(c.codePointAt(0)!));
+  }
+  let cp = PRIVATE_USE_START;
+  while (used.has(cp)) cp++;
+  return String.fromCodePoint(cp);
+}
+
+export interface GlyphSpec {
+  /** Resource location of the glyph image (`minecraft:font/custom/heart.png`). */
+  file: string;
+  char: string;
+  height: number;
+  ascent: number;
+}
+
+/** The pack's font file with one more single-glyph bitmap provider. */
+export function addGlyph(json: any, g: GlyphSpec): any {
+  const providers = Array.isArray(json?.providers) ? json.providers : [];
+  return { ...(json ?? {}), providers: [...providers, { type: 'bitmap', file: g.file, ascent: g.ascent, height: g.height, chars: [g.char] }] };
+}
+
+/** The pack's font file without the bitmap provider that draws `char` alone. */
+export function removeGlyph(json: any, char: string): any {
+  const providers = Array.isArray(json?.providers) ? json.providers : [];
+  return {
+    ...json,
+    providers: providers.filter((p: any) => !(p?.type?.replace?.(/^minecraft:/, '') === 'bitmap' && Array.isArray(p.chars) && p.chars.length === 1 && p.chars[0] === char)),
+  };
+}
+
+export const codePointLabel = (cp: number) => `U+${cp.toString(16).toUpperCase().padStart(4, '0')}`;

@@ -5,8 +5,12 @@ import { useEditing } from '../../state/editorStore';
 import { EditorPanel } from '../EditorPanel';
 import { TitleScreen } from './TitleScreen';
 import { HudScreen } from './HudScreen';
+import { BiomesScreen } from './BiomesScreen';
+import { FontsScreen } from './FontsScreen';
+import { ParticlesScreen } from './ParticlesScreen';
+import { PaintingsScreen } from './PaintingsScreen';
 
-export const SCENES = ['title', 'hud'] as const;
+export const SCENES = ['title', 'hud', 'biomes', 'fonts', 'particles', 'paintings'] as const;
 export type Scene = (typeof SCENES)[number];
 
 /** Previews of what the pack changes outside items and mobs: menus, HUD, biomes, fonts … */
@@ -27,6 +31,10 @@ export function ScenesView() {
       <div className="min-w-0 flex-1">
         {scene === 'title' && <TitleScreen store={store} />}
         {scene === 'hud' && <HudScreen store={store} />}
+        {scene === 'biomes' && <BiomesScreen store={store} />}
+        {scene === 'fonts' && <FontsScreen store={store} />}
+        {scene === 'particles' && <ParticlesScreen store={store} />}
+        {scene === 'paintings' && <PaintingsScreen store={store} />}
       </div>
     </div>
   );

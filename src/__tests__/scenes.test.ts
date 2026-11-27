@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AssetStore } from '../assets/AssetStore';
 import { biomeColors, colormapSpot, darkForestGrass, parseBiome, sampleColormap, SWAMP_GRASS } from '../scenes/colormap';
-import { buildFont, fontProviders, glyphWidth, layoutText } from '../scenes/font';
+import { addGlyph, buildFont, codePointLabel, fontProviders, glyphWidth, layoutText, nextFreeChar, removeGlyph } from '../scenes/font';
 import { containerSlots, CONTAINERS } from '../scenes/hud';
 import { directionAngles, equirectToFaces, faceDirection, faceSizeFor, PANORAMA_FACES } from '../scenes/panorama';
 import type { Pixels } from '../render/pixelEdit';
@@ -134,5 +134,17 @@ describe('container screens', () => {
     expect(slots).toHaveLength(27 + 36);
     expect(slots[27]).toEqual([8, 85]);
     expect(slots[slots.length - 1]).toEqual([8 + 8 * 18, 143]);
+  });
+});
+
+describe('own glyphs', () => {
+  it('adds and removes single-glyph providers on the next free private use character', () => {
+    const own = addGlyph(undefined, { file: 'minecraft:font/custom/a.png', char: '', height: 8, ascent: 7 });
+    expect(own.providers).toHaveLength(1);
+    const providers = [{ type: 'bitmap' as const, file: '', ascent: 7, height: 8, chars: [''], from: 'pack' as const, defPath: '' }];
+    expect(nextFreeChar(providers)).toBe('');
+    const both = addGlyph(own, { file: 'minecraft:font/custom/b.png', char: '', height: 9, ascent: 8 });
+    expect(removeGlyph(both, '').providers.map((p: any) => p.chars[0])).toEqual(['']);
+    expect(codePointLabel(0xe001)).toBe('U+E001');
   });
 });

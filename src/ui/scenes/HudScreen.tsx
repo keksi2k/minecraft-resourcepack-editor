@@ -172,13 +172,16 @@ export function HudScreen({ store }: { store: AssetStore }) {
         return mm && mm[3] === slot ? [[slot, `${mm[1]}:${mm[2] === 'golden' ? 'gold' : mm[2]}`]] : [];
       }),
     );
-    void mobThumbnail(store, mob, 200, { armor: worn }).then(async (url) => {
-      if (!url || !alive) return;
-      const img = new Image();
-      img.src = url;
-      await img.decode().catch(() => undefined);
-      if (alive) setPlayer(img);
-    }, (e) => console.warn('Could not draw the player', e));
+    void mobThumbnail(store, mob, 200, { armor: worn }).then(
+      async (url) => {
+        if (!url || !alive) return;
+        const img = new Image();
+        img.src = url;
+        await img.decode().catch(() => undefined);
+        if (alive) setPlayer(img);
+      },
+      (e) => console.warn('Could not draw the player', e),
+    );
     return () => {
       alive = false;
     };
