@@ -473,7 +473,7 @@ const de: Translation = {
     },
   },
   scenes: {
-    nav: { title: 'Titelbildschirm', hud: 'HUD & Inventare', biomes: 'Biomfarben', fonts: 'Schrift', particles: 'Partikel', paintings: 'Gemälde' },
+    nav: { title: 'Titelbildschirm', hud: 'HUD & Inventare', biomes: 'Biomfarben', fonts: 'Schrift', particles: 'Partikel', paintings: 'Gemälde', sandbox: 'Block-Sandkasten' },
     title: {
       title: 'Titelbildschirm',
       hint: 'Das sich drehende Panorama hinter dem Hauptmenü, mit Logo, Splash-Text und Buttons, gezeichnet aus deinem Pack. Klick ins Menü für einen anderen Splash-Text.',
@@ -557,6 +557,20 @@ const de: Translation = {
       back: 'Rückseite aller Gemälde',
       misfit: 'gestreckt',
       misfitHint: 'Dieses Bild hat nicht die Form des Gemäldes ({w}:{h}); das Spiel streckt es passend.',
+    },
+    sandbox: {
+      title: 'Block-Sandkasten',
+      hint: 'Setze Blöcke nebeneinander, um zu sehen, wie deine Texturen zusammen wirken und ob sie sich kacheln. Blöcke mit zufälligen Varianten wählen pro Stelle eine, wie in einer Welt. Deine Szene bleibt in diesem Browser gespeichert.',
+      controls: 'Klick: setzen · Umschalt+Klick oder Rechtsklick: entfernen · Ziehen: drehen · Mausrad: zoomen',
+      place: '⬛ Setzen',
+      remove: '✕ Entfernen',
+      floor: 'Boden 8×8',
+      wall: 'Wand dazu',
+      clear: 'Leeren',
+      biome: 'Biomfarben',
+      blocks: 'Blöcke',
+      search: 'Blöcke suchen …',
+      variants: { one: 'Eine zufällige Variante.', other: 'Dieser Block hat {count} zufällige Varianten; jede Stelle wählt eine nach Gewicht.' },
     },
   },
   progress: {

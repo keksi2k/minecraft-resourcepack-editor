@@ -17,7 +17,7 @@ const TILES = [
 ] as const;
 
 /** Decodes the files at `paths` (undefined where missing), again when one of them changes. */
-function useDecoded(store: AssetStore, paths: readonly string[]): (Pixels | undefined)[] | undefined {
+export function useDecoded(store: AssetStore, paths: readonly string[]): (Pixels | undefined)[] | undefined {
   const revision = useApp((s) => s.revision);
   void revision;
   const key = paths.map((p) => `${p}@${store.rev(p)}`).join('|');

@@ -104,7 +104,7 @@ function plantTints(id: string, props: Props): number[] {
 }
 
 /** Places a variant like the game does: rotated around the block's centre, `up` blocks higher. */
-function placement({ x = 0, y = 0 }: Variant, up: number): TransformationJson[] {
+export function placement({ x = 0, y = 0 }: Variant, up: number): TransformationJson[] {
   const deg = Math.PI / 180;
   const out: TransformationJson[] = [];
   if (up) out.push({ translation: [0, up, 0] });

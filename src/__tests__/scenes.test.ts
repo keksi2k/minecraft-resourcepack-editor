@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { blockParts, blockTint, cellKey, DEFAULT_TINTS, floor, parseCells, pickVariant, positionSeed, serializeCells, usualVariantKey } from '../scenes/sandbox';
 import { AssetStore } from '../assets/AssetStore';
 import { biomeColors, colormapSpot, darkForestGrass, parseBiome, sampleColormap, SWAMP_GRASS } from '../scenes/colormap';
 import { addGlyph, buildFont, codePointLabel, fontProviders, glyphWidth, layoutText, nextFreeChar, removeGlyph } from '../scenes/font';
@@ -146,5 +147,34 @@ describe('own glyphs', () => {
     const both = addGlyph(own, { file: 'minecraft:font/custom/b.png', char: '', height: 9, ascent: 8 });
     expect(removeGlyph(both, '').providers.map((p: any) => p.chars[0])).toEqual(['']);
     expect(codePointLabel(0xe001)).toBe('U+E001');
+  });
+});
+
+describe('block sandbox', () => {
+  it('picks the usual state of a block', () => {
+    expect(usualVariantKey(['', 'x=1'])).toBe('');
+    expect(usualVariantKey(['axis=x', 'axis=y', 'axis=z'])).toBe('axis=y');
+    expect(usualVariantKey(['facing=east,lit=true', 'facing=north,lit=false'])).toBe('facing=north,lit=false');
+  });
+
+  it('keeps the parts that always apply to a multipart block', () => {
+    const parts = blockParts({ multipart: [{ apply: { model: 'post' } }, { when: { north: 'true' }, apply: { model: 'side' } }] });
+    expect(parts.map((p) => p[0].model)).toEqual(['post']);
+  });
+
+  it('picks random variants by weight, the same for a position every time', () => {
+    const variants = [{ model: 'a', weight: 3 }, { model: 'b' }];
+    expect([0, 1, 2, 3].map((s) => pickVariant(variants, s))).toEqual([0, 0, 0, 1]);
+    expect(positionSeed(4, 0, -7)).toBe(positionSeed(4, 0, -7));
+    const seen = new Set(Array.from({ length: 64 }, (_, i) => pickVariant([{ model: 'a' }, { model: 'b' }, { model: 'c' }, { model: 'd' }], positionSeed(i % 8, 0, i >> 3))));
+    expect(seen.size).toBe(4);
+  });
+
+  it('saves and reads a scene', () => {
+    const cells = floor('minecraft:stone', 2);
+    cells.set(cellKey(0, 1, 0), 'minecraft:oak_log');
+    expect(parseCells(serializeCells(cells))).toEqual(cells);
+    expect(blockTint('minecraft:spruce_leaves', DEFAULT_TINTS)).toBe(0x619961);
+    expect(blockTint('minecraft:stone', DEFAULT_TINTS)).toBeUndefined();
   });
 });

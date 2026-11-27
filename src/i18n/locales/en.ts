@@ -474,7 +474,7 @@ const en = {
     },
   },
   scenes: {
-    nav: { title: 'Title screen', hud: 'HUD & inventories', biomes: 'Biome colours', fonts: 'Font', particles: 'Particles', paintings: 'Paintings' },
+    nav: { title: 'Title screen', hud: 'HUD & inventories', biomes: 'Biome colours', fonts: 'Font', particles: 'Particles', paintings: 'Paintings', sandbox: 'Block sandbox' },
     title: {
       title: 'Title screen',
       hint: 'The turning panorama behind the main menu, with the logo, a splash text and the buttons, drawn from your pack. Click the menu for another splash text.',
@@ -558,6 +558,20 @@ const en = {
       back: 'Back of all paintings',
       misfit: 'stretched',
       misfitHint: 'This image doesn’t have the painting’s shape ({w}:{h}); the game stretches it to fit.',
+    },
+    sandbox: {
+      title: 'Block sandbox',
+      hint: 'Place blocks next to each other to see how your textures look together and whether they tile. Blocks with random variants pick one per spot, like in a world. Your scene is kept in this browser.',
+      controls: 'Click: place · Shift+click or right-click: remove · drag: turn · scroll: zoom',
+      place: '⬛ Place',
+      remove: '✕ Remove',
+      floor: 'Floor 8×8',
+      wall: 'Add a wall',
+      clear: 'Clear',
+      biome: 'Biome colours',
+      blocks: 'Blocks',
+      search: 'Search blocks …',
+      variants: { one: 'One random variant.', other: 'This block has {count} random variants; each spot picks one by weight.' },
     },
   },
   progress: {
