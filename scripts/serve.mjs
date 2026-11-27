@@ -37,6 +37,7 @@ const TYPES = {
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  '.webmanifest': 'application/manifest+json',
 };
 
 const HASH_PATH = /^\/mcres\/([0-9a-f]{2})\/([0-9a-f]{40})$/;
