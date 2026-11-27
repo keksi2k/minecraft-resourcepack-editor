@@ -5,12 +5,31 @@ import { fetchVersionJson } from '../mojang/versions';
 import { newSince, share, STYLE_THRESHOLD, textureProgress, type CategoryProgress } from '../pack/progress';
 import { useApp } from '../state/appStore';
 import { Btn } from './common';
+import { ComparePanel } from './ComparePanel';
 import { TextureThumb } from './TexturesView';
 
 const SHOWN = 120;
 
-/** How much of vanilla the pack replaces, per category, and what's still missing. */
+/** Progress of the pack, and a comparison with another pack. */
 export function ProgressView() {
+  const t = useT();
+  const [section, setSection] = useState<'progress' | 'compare'>('progress');
+  return (
+    <div className="flex h-full">
+      <nav className="w-52 shrink-0 overflow-y-auto border-r border-neutral-800 p-2 text-sm">
+        {(['progress', 'compare'] as const).map((s) => (
+          <button key={s} onClick={() => setSection(s)} className={`block w-full rounded px-2 py-1 text-left ${section === s ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}>
+            {t(`progress.sections.${s}`)}
+          </button>
+        ))}
+      </nav>
+      <div className="min-w-0 flex-1">{section === 'progress' ? <PackProgress /> : <div className="h-full overflow-y-auto p-4 text-sm"><ComparePanel /></div>}</div>
+    </div>
+  );
+}
+
+/** How much of vanilla the pack replaces, per category, and what's still missing. */
+function PackProgress() {
   const t = useT();
   const { store, revision, manifest, version } = useApp();
   const progress = useMemo(() => (store ? textureProgress(store) : []), [store, revision]);
