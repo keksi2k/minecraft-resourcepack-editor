@@ -18,6 +18,7 @@ import { TextureThumb } from './TexturesView';
 import { texturePermutation } from '../models/atlasPermutations';
 import { BlockVariantsSection, CustomNamesSection } from './ItemExtras';
 import { CustomModelSection } from './CustomModelSection';
+import { CitSection } from './CitSection';
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -162,6 +163,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
 
       <CustomNamesSection store={store} item={item} />
       <CustomModelSection store={store} item={item} />
+      <CitSection store={store} item={item} />
       <BlockVariantsSection store={store} item={item} />
 
       <Section title={t('items.models')}>

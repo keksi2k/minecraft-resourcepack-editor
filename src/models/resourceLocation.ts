@@ -18,9 +18,16 @@ export const modelPath = (id: string) => {
   return `assets/${ns}/models/${path}.json`;
 };
 
+/**
+ * Pseudo namespace for images outside `textures/` (OptiFine's CTM and CIT tiles): `__file:` and the
+ * full path of the PNG.
+ */
+export const FILE_NS = '__file';
+export const fileTextureId = (path: string) => `${FILE_NS}:${path}`;
+
 export const texturePath = (id: string) => {
   const { ns, path } = parseRL(id);
-  return `assets/${ns}/textures/${path}.png`;
+  return ns === FILE_NS ? path : `assets/${ns}/textures/${path}.png`;
 };
 
 export const itemDefinitionPath = (id: string) => {

@@ -1,7 +1,8 @@
 import type { AssetStore } from '../assets/AssetStore';
 import { FOLIAGE, GRASS } from '../models/itemDefinition';
 import type { ResolvedItemModel } from '../models/items';
-import { resolveModel } from '../models/modelResolver';
+import { resolveFaceTexture, resolveModel, type FaceDir } from '../models/modelResolver';
+import { ctmTile, emissiveOf, ruleFor, SHOWN_METHODS, type CtmRule, type CtmWorld } from '../optifine/optifine';
 import { placement } from '../models/plants';
 import { normalizeRL, parseRL } from '../models/resourceLocation';
 
@@ -198,4 +199,75 @@ export function parseCells(text: string): Cells {
     if (m) cells.set(cellKey(+m[1], +m[2], +m[3]), m[4]);
   }
   return cells;
+}
+
+/* OptiFine: connected textures and emissive overlays ------------------------------------------- */
+
+/**
+ * The block's models with each face's texture swapped for the CTM tile its neighbours call for.
+ * Rotated variants keep their textures (their model faces don't point where they are drawn).
+ * `key` names the chosen tiles, so blocks that look the same can share one built object.
+ */
+export function ctmModels(
+  models: ResolvedItemModel[],
+  parts: BlockVariant[][],
+  choice: number[],
+  rules: CtmRule[],
+  world: CtmWorld,
+  pos: [number, number, number],
+  block: string,
+): { models: ResolvedItemModel[]; key: string } {
+  if (!rules.length) return { models, key: '' };
+  const keys: string[] = [];
+  const out = models.map((m, i) => {
+    const v = parts[i]?.[choice[i] ?? 0];
+    if (!v || v.x || v.y || m.model.kind !== 'elements') return m;
+    const textures = { ...m.model.textures };
+    let n = 0;
+    const elements = m.model.elements.map((el) => {
+      const faces = { ...el.faces };
+      for (const dir of Object.keys(faces) as FaceDir[]) {
+        const face = faces[dir];
+        const tex = face && resolveFaceTexture(m.model.textures, face.texture);
+        const rule = tex ? ruleFor(rules, block, tex, dir) : undefined;
+        const tile = rule && SHOWN_METHODS.has(rule.method) ? ctmTile(rule, world, pos, dir, block, tex!) : undefined;
+        if (!tile) continue;
+        const name = `ctm_${n++}`;
+        textures[name] = tile;
+        faces[dir] = { ...face!, texture: `#${name}` };
+        keys.push(`${dir}:${tile}`);
+      }
+      return { ...el, faces };
+    });
+    return n ? { ...m, model: { ...m.model, textures, elements } } : m;
+  });
+  return { models: out, key: keys.join(',') };
+}
+
+/** Only the faces that have an emissive overlay, showing that overlay; undefined if there are none. */
+export function emissiveModels(store: AssetStore, models: ResolvedItemModel[], suffix: string | undefined): ResolvedItemModel[] | undefined {
+  if (!suffix) return undefined;
+  let any = false;
+  const out = models.map((m) => {
+    if (m.model.kind !== 'elements') return { ...m, model: { ...m.model, elements: [] } };
+    const textures = { ...m.model.textures };
+    let n = 0;
+    const elements = m.model.elements
+      .map((el) => {
+        const faces: typeof el.faces = {};
+        for (const [dir, face] of Object.entries(el.faces) as [FaceDir, NonNullable<(typeof el.faces)[FaceDir]>][]) {
+          const tex = face && resolveFaceTexture(m.model.textures, face.texture);
+          const glow = tex && emissiveOf(store, tex, suffix);
+          if (!glow) continue;
+          const name = `glow_${n++}`;
+          textures[name] = glow;
+          faces[dir] = { ...face, texture: `#${name}`, tintindex: undefined };
+        }
+        return { ...el, faces };
+      })
+      .filter((el) => Object.keys(el.faces).length);
+    if (elements.length) any = true;
+    return { ...m, model: { ...m.model, textures, elements } };
+  });
+  return any ? out : undefined;
 }

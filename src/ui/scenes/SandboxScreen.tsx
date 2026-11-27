@@ -14,7 +14,9 @@ import {
   blockParts,
   blockStatePath,
   cellKey,
+  ctmModels,
   DEFAULT_TINTS,
+  emissiveModels,
   floor,
   listBlocks,
   parseCell,
@@ -26,6 +28,8 @@ import {
   type Tints,
 } from '../../scenes/sandbox';
 import { useApp } from '../../state/appStore';
+import { emissiveSuffix, loadCtmRules, ruleFor, SHOWN_METHODS, type CtmRule, type CtmWorld } from '../../optifine/optifine';
+import { resolveFaceTexture } from '../../models/modelResolver';
 import { Btn } from '../common';
 import { Section, TextureRow } from '../ItemDetail';
 import { ItemThumb } from '../ItemsView';
@@ -59,6 +63,14 @@ class BlockCache {
   }
 }
 
+/** What the blocks need to know about OptiFine features. */
+interface OptiFine {
+  rules: CtmRule[];
+  world: CtmWorld;
+  suffix?: string;
+  night: boolean;
+}
+
 function Block({
   cache,
   store,
@@ -66,6 +78,7 @@ function Block({
   block,
   tints,
   revision,
+  optifine,
   onPick,
   onHover,
 }: {
@@ -75,6 +88,7 @@ function Block({
   block: string;
   tints: Tints;
   revision: number;
+  optifine: OptiFine;
   onPick: (cell: string, normal: THREE.Vector3, e: ThreeEvent<MouseEvent>) => void;
   onHover: (cell: string | undefined) => void;
 }) {
@@ -82,16 +96,46 @@ function Block({
   const parts = useMemo(() => blockParts(store.json(blockStatePath(block))), [store, block, revision]);
   const seed = positionSeed(x, y, z);
   const choice = parts.map((v) => pickVariant(v, seed));
-  const key = `${block}|${choice.join('.')}|${tints.grass}.${tints.foliage}.${tints.water}|${revision}`;
+  // connected textures depend on the neighbours, so the tiles are part of what makes blocks alike
+  const { models, key: tiles } = ctmModels(blockModels(store, block, parts, choice, tints), parts, choice, optifine.rules, optifine.world, [x, y, z], block);
+  const glow = emissiveModels(store, models, optifine.suffix);
+  const key = `${block}|${choice.join('.')}|${tints.grass}.${tints.foliage}.${tints.water}|${revision}|${tiles}|${glow ? 'g' : ''}`;
   const [obj, setObj] = useState<THREE.Object3D>();
   useEffect(() => {
     let alive = true;
-    void cache.get(key, () => buildItemObject(store, blockModels(store, block, parts, choice, tints), 'none')).then((o) => alive && setObj(o.clone(true)));
+    const build = async () => {
+      const o = await buildItemObject(store, models, 'none');
+      if (glow) {
+        // emissive overlays: drawn on top, never darkened
+        const g = await buildItemObject(store, glow, 'none');
+        g.traverse((m) => {
+          if (m instanceof THREE.Mesh) {
+            const mat = m.material as THREE.MeshBasicMaterial;
+            mat.userData.glow = true;
+            mat.polygonOffset = true;
+            mat.polygonOffsetFactor = -1;
+            mat.polygonOffsetUnits = -4;
+          }
+        });
+        o.add(g);
+      }
+      return o;
+    };
+    void cache.get(key, build).then((o) => alive && setObj(o.clone(true)));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cache, key]);
+  // night: everything dark except emissive overlays (materials are shared, so this is cheap)
+  useEffect(() => {
+    obj?.traverse((m) => {
+      if (m instanceof THREE.Mesh) {
+        const mat = m.material as THREE.MeshBasicMaterial;
+        mat.color.setScalar(optifine.night && !mat.userData.glow ? 0.18 : 1);
+      }
+    });
+  }, [obj, optifine.night]);
   if (!obj) return null;
   return (
     <primitive
@@ -127,6 +171,8 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
   const [query, setQuery] = useState('');
   const [hover, setHover] = useState<string>();
   const [biome, setBiome] = useState('minecraft:plains');
+  const [useCtm, setUseCtm] = useState(true);
+  const [night, setNight] = useState(false);
   const cache = useMemo(() => new BlockCache(), [store]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => cache.dispose(), [cache]);
 
@@ -167,6 +213,22 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
     return { grass: c.grass, foliage: c.foliage, water: c.water };
   }, [biomes, biome, maps]);
 
+  // OptiFine / Continuity: connected textures and emissive overlays
+  const ctmRules = useMemo(() => loadCtmRules(store), [store, revision]);
+  const suffix = useMemo(() => emissiveSuffix(store), [store, revision]);
+  const texturesOf = useMemo(() => {
+    const memo = new Map<string, Set<string>>();
+    return (b: string) => {
+      let set = memo.get(b);
+      if (!set) memo.set(b, (set = new Set(blockParts(store.json(blockStatePath(b))).flatMap((vs) => vs.flatMap((v) => modelTextures(resolveModel(store, v.model)))))));
+      return set;
+    };
+  }, [store, revision]);
+  const optifine: OptiFine = useMemo(
+    () => ({ rules: useCtm ? ctmRules : [], world: { blockAt: (p) => cells.get(cellKey(...p)), texturesOf }, suffix, night }),
+    [useCtm, ctmRules, cells, texturesOf, suffix, night],
+  );
+
   // a file change (an edit, a new random variant) rebuilds the blocks
   const [rebuild, setRebuild] = useState(revision);
   useEffect(() => {
@@ -193,15 +255,30 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
   const variantCount = selectedParts.reduce((n, p) => Math.max(n, p.length), 0);
   const textures = useMemo(() => [...new Set(selectedParts.flatMap((variants) => variants.flatMap((v) => modelTextures(resolveModel(store, v.model)))))], [store, selectedParts]);
   const hoverPos = hover ? parseCell(hover) : undefined;
+  // CTM rules for the selected block's faces
+  const blockRules = useMemo(() => {
+    const out = new Set<CtmRule>();
+    for (const variants of selectedParts)
+      for (const v of variants) {
+        const m = resolveModel(store, v.model);
+        for (const el of m.elements)
+          for (const [dir, face] of Object.entries(el.faces)) {
+            const tex = face && resolveFaceTexture(m.textures, face.texture);
+            const r = tex && ruleFor(ctmRules, block, tex, dir as Parameters<typeof ruleFor>[3]);
+            if (r) out.add(r);
+          }
+      }
+    return [...out];
+  }, [selectedParts, ctmRules, block, store]);
 
   return (
     <SceneLayout
       main={
         <div className="absolute inset-0" onContextMenu={(e) => e.preventDefault()}>
           <Canvas camera={{ position: [9, 8, 11], fov: 45, near: 0.05, far: 300 }} onCreated={({ gl }) => (gl.outputColorSpace = THREE.SRGBColorSpace)}>
-            <color attach="background" args={['#79a6ff']} />
+            <color attach="background" args={[night ? '#0b1024' : '#79a6ff']} />
             {[...cells].map(([cell, b]) => (
-              <Block key={cell} cache={cache} store={store} cell={cell} block={b} tints={tints} revision={rebuild} onPick={pick} onHover={setHover} />
+              <Block key={cell} cache={cache} store={store} cell={cell} block={b} tints={tints} revision={rebuild} optifine={optifine} onPick={pick} onHover={setHover} />
             ))}
             <mesh
               rotation={[-Math.PI / 2, 0, 0]}
@@ -273,6 +350,24 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
               </select>
             </label>
           </div>
+          {(ctmRules.length > 0 || suffix) && (
+            <div className="border-t border-neutral-800 p-3 text-xs">
+              <div className="font-semibold">{t('optifine.title')}</div>
+              <p className="mb-2 text-neutral-400">{t('optifine.sandboxHint', { rules: ctmRules.length, suffix: suffix ?? '–' })}</p>
+              <div className="flex flex-wrap gap-3">
+                {ctmRules.length > 0 && (
+                  <label className="flex items-center gap-1">
+                    <input type="checkbox" checked={useCtm} onChange={(e) => setUseCtm(e.target.checked)} />
+                    {t('optifine.ctm')}
+                  </label>
+                )}
+                <label className="flex items-center gap-1" title={t('optifine.nightTitle')}>
+                  <input type="checkbox" checked={night} onChange={(e) => setNight(e.target.checked)} />
+                  {t('optifine.night')}
+                </label>
+              </div>
+            </div>
+          )}
           <Section title={t('scenes.sandbox.blocks')}>
             <input
               value={query}
@@ -302,6 +397,13 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
           </Section>
           <Section title={nameOf(block)}>
             {variantCount > 1 && <p className="mb-2 text-xs text-neutral-400">{t('scenes.sandbox.variants', { count: variantCount })}</p>}
+            {blockRules.map((r) => (
+              <div key={r.file} className="mb-2 rounded bg-neutral-950 px-2 py-1 text-[11px]">
+                <span className="text-emerald-300">CTM {r.method}</span>
+                {!SHOWN_METHODS.has(r.method) && <span className="text-amber-300"> · {t('optifine.notShown')}</span>}
+                <div className="break-all font-mono text-neutral-500">{r.file.replace(/^assets\/[^/]+\//, '')}</div>
+              </div>
+            ))}
             <div className="flex flex-col gap-3">
               {textures.map((id) => (
                 <TextureRow key={id} store={store} id={id} />

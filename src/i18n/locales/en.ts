@@ -690,6 +690,22 @@ const en = {
     undoInfo: { one: 'Last batch: {count} file', other: 'Last batch: {count} files' },
     undo: '↶ Undo batch',
   },
+  optifine: {
+    title: 'OptiFine / Continuity',
+    sandboxHint: 'The pack has {rules} connected-texture rules (CTM) and emissive suffix {suffix}. Minecraft itself ignores them; OptiFine, Continuity and similar mods read them.',
+    ctm: 'Connected textures',
+    night: 'Night',
+    nightTitle: 'Darkens the blocks so emissive textures (glowing parts) stand out',
+    notShown: 'this method isn’t drawn here',
+    cit: {
+      title: { one: 'OptiFine CIT ({count} rule)', other: 'OptiFine CIT ({count} rules)' },
+      hint: 'Custom item textures for OptiFine or CIT Resewn. The game itself ignores them.',
+      noTexture: 'The texture of this rule is missing.',
+      convert: 'Use for the name “{name}” without mods',
+      convertTitle: 'Adds the texture as a name rule of the item definition (1.21.5+), so renaming the item in an anvil shows it without OptiFine',
+      converted: 'works without mods for “{name}”',
+    },
+  },
   folder: {
     open: '📁 Open folder …',
     openHint: 'Work on an unzipped pack folder: changes are saved straight into it, and files you save in other programs show up here right away.',

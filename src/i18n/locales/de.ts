@@ -689,6 +689,22 @@ const de: Translation = {
     undoInfo: { one: 'Letzte Sammeländerung: {count} Datei', other: 'Letzte Sammeländerung: {count} Dateien' },
     undo: '↶ Sammeländerung rückgängig',
   },
+  optifine: {
+    title: 'OptiFine / Continuity',
+    sandboxHint: 'Das Pack hat {rules} Regeln für verbundene Texturen (CTM) und das Emissive-Suffix {suffix}. Minecraft selbst ignoriert sie; OptiFine, Continuity und ähnliche Mods lesen sie.',
+    ctm: 'Verbundene Texturen',
+    night: 'Nacht',
+    nightTitle: 'Dunkelt die Blöcke ab, damit leuchtende Texturen (Emissive) hervortreten',
+    notShown: 'diese Methode wird hier nicht gezeichnet',
+    cit: {
+      title: { one: 'OptiFine-CIT ({count} Regel)', other: 'OptiFine-CIT ({count} Regeln)' },
+      hint: 'Eigene Item-Texturen für OptiFine oder CIT Resewn. Das Spiel selbst ignoriert sie.',
+      noTexture: 'Die Textur dieser Regel fehlt.',
+      convert: 'Für den Namen „{name}“ ohne Mods nutzen',
+      convertTitle: 'Fügt die Textur als Namensregel der Item-Definition hinzu (1.21.5+), damit sie beim Umbenennen im Amboss auch ohne OptiFine erscheint',
+      converted: 'funktioniert ohne Mods für „{name}“',
+    },
+  },
   folder: {
     open: '📁 Ordner öffnen …',
     openHint: 'An einem entpackten Pack-Ordner arbeiten: Änderungen landen direkt darin, und Dateien, die du in anderen Programmen speicherst, erscheinen hier sofort.',
