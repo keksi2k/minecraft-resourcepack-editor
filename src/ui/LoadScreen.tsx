@@ -21,6 +21,14 @@ export function LoadScreen() {
     [manifest, snapshots],
   );
   const selected = versionId || (manifest ? suggestVersion(pack?.meta?.format, manifest) : '');
+  // a pack for an older version can be opened with the newest one and upgraded right away
+  const latest = manifest?.latest.release;
+  const oldPack = !!pack && pack.meta?.format !== undefined && !!manifest && suggestVersion(pack.meta.format, manifest) !== latest;
+  const openAndUpgrade = async () => {
+    if (!latest) return;
+    await open(pack, latest);
+    if (useApp.getState().phase === 'ready') useApp.getState().setUpgradeOpen(true);
+  };
 
   const accept = async (file: File | undefined) => {
     if (!file) return;
@@ -137,6 +145,14 @@ export function LoadScreen() {
       </div>
       {pack?.meta?.format !== undefined && !versionId && (
         <div className="-mt-4 text-xs text-neutral-500">{t('load.suggested', { format: pack.meta.format })}</div>
+      )}
+      {oldPack && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/70 bg-amber-950/40 p-3 text-xs">
+          <span className="min-w-0 flex-1 text-amber-200">{t('upgrade.loadHint', { version: suggestVersion(pack!.meta!.format, manifest!), latest: latest! })}</span>
+          <Btn tone="primary" onClick={() => void openAndUpgrade()}>
+            {t('upgrade.loadButton', { latest: latest! })}
+          </Btn>
+        </div>
       )}
 
       <div className="flex gap-3">

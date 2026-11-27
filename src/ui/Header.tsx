@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { exportPackZip, downloadBlob } from '../pack/exportPack';
 import { useT } from '../i18n';
 import { useApp, type Tab } from '../state/appStore';
@@ -9,10 +9,12 @@ import { checkPack, type Issue } from '../pack/checks';
 import { ExportCheck } from './ExportCheck';
 import { COMMAND_EVENT, type HeaderCommand } from './CommandPalette';
 
+const UpgradePanel = lazy(() => import('./UpgradePanel').then((m) => ({ default: m.UpgradePanel })));
+
 const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'scenes', 'texts', 'progress', 'funny'];
 
 export function Header({ onSearch }: { onSearch: () => void }) {
-  const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision, objects, undo, redo, undoCount, redoCount } = useApp();
+  const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision, objects, undo, redo, undoCount, redoCount, upgradeOpen, setUpgradeOpen } = useApp();
   const t = useT();
   const [exporting, setExporting] = useState(false);
   const [issues, setIssues] = useState<Issue[]>();
@@ -20,6 +22,7 @@ export function Header({ onSearch }: { onSearch: () => void }) {
   void revision; // re-render on edits so the counter stays current
 
   const formatMismatch = packMeta?.format !== undefined && gameFormat !== undefined && packMeta.format !== gameFormat;
+  const older = formatMismatch && packMeta!.format! < gameFormat!;
 
   const doExport = async () => {
     if (!store) return;
@@ -44,7 +47,11 @@ export function Header({ onSearch }: { onSearch: () => void }) {
   const checkRef = useRef(check);
   checkRef.current = check;
   useEffect(() => {
-    const h = (e: Event) => checkRef.current((e as CustomEvent<HeaderCommand>).detail === 'check');
+    const h = (e: Event) => {
+      const c = (e as CustomEvent<HeaderCommand>).detail;
+      if (c === 'upgrade') useApp.getState().setUpgradeOpen(true);
+      else checkRef.current(c === 'check');
+    };
     window.addEventListener(COMMAND_EVENT, h);
     return () => window.removeEventListener(COMMAND_EVENT, h);
   }, []);
@@ -61,6 +68,11 @@ export function Header({ onSearch }: { onSearch: () => void }) {
           {formatMismatch && <span className="text-amber-400"> · {t('header.formatMismatch')}</span>}
         </div>
       </div>
+      {older && (
+        <button onClick={() => setUpgradeOpen(true)} title={t('upgrade.buttonTitle')} className="shrink-0 whitespace-nowrap rounded bg-amber-800 px-2 py-1 text-xs hover:bg-amber-700">
+          {t('upgrade.button')}
+        </button>
+      )}
       <nav className="ml-2 flex gap-0.5 xl:ml-6 xl:gap-1">
         {TABS.map((id) => (
           <button
@@ -102,7 +114,23 @@ export function Header({ onSearch }: { onSearch: () => void }) {
           {t('header.close')}
         </Btn>
       </div>
-      {issues && <ExportCheck issues={issues} exporting={exporting} onExport={() => void doExport()} onClose={() => setIssues(undefined)} />}
+      {issues && (
+        <ExportCheck
+          issues={issues}
+          exporting={exporting}
+          onExport={() => void doExport()}
+          onClose={() => setIssues(undefined)}
+          onUpgrade={() => {
+            setIssues(undefined);
+            setUpgradeOpen(true);
+          }}
+        />
+      )}
+      {upgradeOpen && (
+        <Suspense fallback={null}>
+          <UpgradePanel onClose={() => setUpgradeOpen(false)} />
+        </Suspense>
+      )}
     </header>
   );
 }

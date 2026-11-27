@@ -78,6 +78,9 @@ interface AppState {
   redoCount: number;
   /** A sound event to show in the sounds tab (bumped `n` re-triggers the same one). */
   soundFocus?: { id: string; n: number };
+  /** The pack upgrade dialog is open. */
+  upgradeOpen: boolean;
+  setUpgradeOpen(open: boolean): void;
 
   loadManifest(): Promise<void>;
   open(pack: LoadedPack | null, versionId: string, restoredEdits?: [string, Uint8Array | null][]): Promise<void>;
@@ -145,6 +148,8 @@ export const useApp = create<AppState>((set, get) => ({
   tab: 'items',
   undoCount: 0,
   redoCount: 0,
+  upgradeOpen: false,
+  setUpgradeOpen: (upgradeOpen) => set({ upgradeOpen }),
 
   async loadManifest() {
     void loadSessionMeta().then((resumable) => set({ resumable }));
@@ -432,7 +437,7 @@ export const useApp = create<AppState>((set, get) => ({
     useEditor.getState().close();
     history.undo = [];
     history.redo = [];
-    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined, lastBatch: undefined, textureFocus: undefined, undoCount: 0, redoCount: 0 });
+    set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined, lastBatch: undefined, textureFocus: undefined, undoCount: 0, redoCount: 0, upgradeOpen: false });
   },
 }));
 

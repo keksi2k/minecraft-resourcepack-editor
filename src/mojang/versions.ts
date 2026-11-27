@@ -56,6 +56,10 @@ const FORMAT_TO_RELEASE: [number, string][] = [
   [63, '1.21.6'],
   [64, '1.21.8'],
   [69, '1.21.10'],
+  [75, '1.21.11'],
+  [84, '26.1.2'],
+  [88, '26.2'],
+  [97, '26.3'],
 ];
 
 /** Suggests a game version for a pack format; unknown/newer formats map to the latest release. */

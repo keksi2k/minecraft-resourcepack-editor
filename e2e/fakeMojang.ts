@@ -67,6 +67,9 @@ async function clientJar(): Promise<Buffer> {
   zip.file(`${a}items/apple.json`, json({ model: { type: 'minecraft:model', model: 'item/apple' } }));
   zip.file(`${a}textures/item/apple.png`, png(16, [220, 30, 30]));
   zip.file(`${a}texts/splashes.txt`, 'Tested!\n');
+  // what the pack upgrade test's old pack turns into
+  zip.file(`${a}textures/block/white_wool.png`, png(16, [240, 240, 240]));
+  zip.file(`${a}textures/gui/sprites/widget/button.png`, png(16, [100, 100, 100]));
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
@@ -85,6 +88,15 @@ export async function fakeMojang(page: Page) {
   await page.route(`${BASE}/v1/packages/e2e/index.json`, (r) => r.fulfill({ contentType: 'application/json', body: json({ objects: {} }) }));
   await page.route(JAR, (r) => r.fulfill({ contentType: 'application/java-archive', body: bytes }));
   await page.route('https://api.github.com/**', (r) => r.fulfill({ status: 404, body: '' }));
+}
+
+/** A pack for Minecraft 1.12 (format 3): textures in the old folders, the old combined widgets.png. */
+export async function oldPack(): Promise<Buffer> {
+  const zip = new JSZip();
+  zip.file('pack.mcmeta', json({ pack: { pack_format: 3, description: 'Old pack' } }));
+  zip.file('assets/minecraft/textures/blocks/wool_colored_white.png', png(16, [200, 30, 30]));
+  zip.file('assets/minecraft/textures/gui/widgets.png', png(256, [30, 30, 200]));
+  return zip.generateAsync({ type: 'nodebuffer' });
 }
 
 /** A resource pack ZIP replacing the stone texture. */

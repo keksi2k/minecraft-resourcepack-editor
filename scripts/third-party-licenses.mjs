@@ -122,6 +122,8 @@ export function thirdPartyNotice(appName, root = '.') {
   const parts = [
     `${appName} includes the following third-party software.\nEach is used under the licence reproduced below.`,
   ];
+  // data, not a package: the pack upgrader's slicing steps come from Mojang's slicer
+  parts.push(`${rule}\nMojang slicer (MIT), data in src/pack/upgrade/slices.json\nhttps://github.com/Mojang/slicer\n${rule}\n\n${MIT('Microsoft Corporation. All rights reserved.')}`);
   for (const p of list) {
     parts.push(`${rule}\n${p.name} ${p.version} (${p.license})${p.homepage ? `\n${p.homepage}` : ''}\n${rule}\n\n${p.text ?? fallbackText(p)}`);
     for (const e of EMBEDDED[p.name] ?? []) {

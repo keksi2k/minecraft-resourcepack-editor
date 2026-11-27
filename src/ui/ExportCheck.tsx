@@ -13,12 +13,26 @@ const STYLE: Record<IssueLevel, string> = {
 const ICON: Record<IssueLevel, string> = { error: '⛔', warning: '⚠', info: 'ℹ' };
 
 /** The results of the pre-export check, with a way to export anyway. */
-export function ExportCheck({ issues, exporting, onExport, onClose }: { issues: Issue[]; exporting: boolean; onExport: () => void; onClose: () => void }) {
+export function ExportCheck({
+  issues,
+  exporting,
+  onExport,
+  onClose,
+  onUpgrade,
+}: {
+  issues: Issue[];
+  exporting: boolean;
+  onExport: () => void;
+  onClose: () => void;
+  onUpgrade?: () => void;
+}) {
   const t = useT();
   const focusTexture = useApp((s) => s.focusTexture);
   const [showInfo, setShowInfo] = useState(false);
   const count = (l: IssueLevel) => issues.filter((i) => i.level === l).length;
   const problems = count('error') + count('warning');
+  // a pack for an older version: most of these go away when it is upgraded
+  const old = issues.some((i) => i.code === 'legacyFolder' || (i.code === 'formatMismatch' && Number(String(i.vars?.format).split(/[–,]/)[0]) < Number(i.vars?.game)));
 
   const open = (path: string) => {
     const png = path.endsWith('.png.mcmeta') ? path.slice(0, -'.mcmeta'.length) : path;
@@ -71,6 +85,11 @@ export function ExportCheck({ issues, exporting, onExport, onClose }: { issues: 
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-neutral-800 p-3">
           <span className="mr-auto text-[11px] text-neutral-500">{t('check.hint')}</span>
+          {old && onUpgrade && (
+            <Btn onClick={onUpgrade} title={t('upgrade.buttonTitle')}>
+              {t('upgrade.button')}
+            </Btn>
+          )}
           <Btn onClick={onClose}>{t('editor.cancel')}</Btn>
           <Btn tone={count('error') ? 'danger' : 'primary'} onClick={onExport} disabled={exporting}>
             {exporting ? t('header.exporting') : problems ? t('check.exportAnyway') : t('header.export')}

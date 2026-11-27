@@ -7,7 +7,7 @@ import { mobName } from './MobsView';
 
 /** Commands the header carries out (export, check), asked for from elsewhere. */
 export const COMMAND_EVENT = 'rpe:command';
-export type HeaderCommand = 'export' | 'check';
+export type HeaderCommand = 'export' | 'check' | 'upgrade';
 export const runHeaderCommand = (c: HeaderCommand) => window.dispatchEvent(new CustomEvent(COMMAND_EVENT, { detail: c }));
 
 const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'scenes', 'texts', 'progress', 'funny'];
@@ -53,6 +53,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const actions: Entry[] = [
       { key: 'a:export', label: t('palette.export'), group: 'actions', run: () => runHeaderCommand('export') },
       { key: 'a:check', label: t('palette.check'), group: 'actions', run: () => runHeaderCommand('check') },
+      { key: 'a:upgrade', label: t('palette.upgrade'), group: 'actions', run: () => runHeaderCommand('upgrade') },
       ...(undoCount ? [{ key: 'a:undo', label: t('palette.undo'), detail: 'Ctrl+Z', group: 'actions' as const, run: () => useApp.getState().undo() }] : []),
       ...(redoCount ? [{ key: 'a:redo', label: t('palette.redo'), detail: 'Ctrl+Y', group: 'actions' as const, run: () => useApp.getState().redo() }] : []),
       ...(Object.keys(LOCALES) as Locale[]).map((l) => ({ key: `a:lang:${l}`, label: `${t('app.language')}: ${LOCALES[l].name}`, group: 'actions' as const, run: () => setLocale(l) })),

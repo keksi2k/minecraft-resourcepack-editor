@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import JSZip from 'jszip';
-import { fakeMojang, samplePack } from './fakeMojang';
+import { fakeMojang, oldPack, samplePack } from './fakeMojang';
 
 test.beforeEach(async ({ page }) => {
   await fakeMojang(page);
@@ -61,6 +61,32 @@ test('draws the title screen and the font preview', async ({ page }) => {
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.getByRole('button', { name: 'Font', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Glyph sheets' }).or(page.getByText('Glyph sheets'))).toBeVisible();
+});
+
+test('upgrades a pack made for an old version', async ({ page }) => {
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'old.zip', mimeType: 'application/zip', buffer: await oldPack() });
+  await page.getByRole('button', { name: 'Open pack' }).click();
+  await page.getByRole('button', { name: '⬆ Upgrade pack' }).click();
+  await expect(page.getByText('Move renamed textures')).toBeVisible();
+  const apply = page.getByRole('button', { name: /^Upgrade \(\d+ files\)$/ });
+  await expect(apply).toBeEnabled();
+  await apply.click();
+  await expect(page.getByText(/^Done: \d+ files changed\.$/)).toBeVisible();
+  // the dialog's own button (the header has a "Close" too)
+  await page.getByRole('button', { name: 'Close' }).last().click();
+  // the button goes once the pack declares the game's format
+  await expect(page.getByRole('button', { name: '⬆ Upgrade pack' })).toBeHidden();
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export pack' }).click();
+  // the fake game's 16×16 button differs in size from the real sprite, so the check has something to say
+  await page.getByRole('button', { name: 'Export anyway' }).click();
+  const zip = await JSZip.loadAsync(await (await download).createReadStream().then(streamToBuffer));
+  const names = Object.keys(zip.files);
+  expect(names).toEqual(expect.arrayContaining(['assets/minecraft/textures/block/white_wool.png', 'assets/minecraft/textures/gui/sprites/widget/button.png', 'assets/minecraft/textures/gui/sprites/widget/button.png.mcmeta']));
+  expect(names).not.toContain('assets/minecraft/textures/blocks/wool_colored_white.png');
+  expect(names).not.toContain('assets/minecraft/textures/gui/widgets.png');
+  expect(JSON.parse(await zip.file('pack.mcmeta')!.async('string')).pack.pack_format).toBe(97);
 });
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
