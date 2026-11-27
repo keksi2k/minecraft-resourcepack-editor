@@ -26,8 +26,19 @@ import { useEditor } from './editorStore';
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
 import { activeOverlays } from '../pack/overlays';
+import { PackFolder } from '../pack/folder';
 
 export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'scenes' | 'texts' | 'progress' | 'funny';
+
+export interface FolderState {
+  name: string;
+  status: 'saved' | 'saving' | 'error' | 'reloaded' | 'denied';
+  /** When the last write or reload finished. */
+  at?: number;
+  /** Files reloaded from disk by the last reload. */
+  reloaded?: number;
+  error?: string;
+}
 
 /** Files as they were before a batch change (`undefined` = not edited), for undoing it. */
 export type FileStates = [string, Uint8Array | null | undefined][];
@@ -78,6 +89,12 @@ interface AppState {
   redoCount: number;
   /** A sound event to show in the sounds tab (bumped `n` re-triggers the same one). */
   soundFocus?: { id: string; n: number };
+  /** The pack folder on disk the editor writes to, if the pack was opened from one. */
+  folder?: FolderState;
+  /** Reads what other programs changed in the pack folder. */
+  reloadFolder(): Promise<void>;
+  /** Asks the browser again for permission to write to the folder (after a reload), then writes. */
+  allowFolder(): Promise<void>;
   /** The pack upgrade dialog is open. */
   upgradeOpen: boolean;
   setUpgradeOpen(open: boolean): void;
@@ -198,8 +215,10 @@ export const useApp = create<AppState>((set, get) => ({
         refreshDerived();
       }
       startHistory(store);
+      attachFolder(pack?.folder);
       if (!restoredEdits) {
-        void startSession(sessionMeta(), pack?.source).catch((e) => console.warn('Could not save session', e));
+        const f = pack?.folder;
+        void startSession(sessionMeta(), pack?.source, f && { handle: f.handle, root: f.root }).catch((e) => console.warn('Could not save session', e));
       }
       void get().loadSounds();
     } catch (e) {
@@ -258,9 +277,25 @@ export const useApp = create<AppState>((set, get) => ({
   async resume() {
     const saved = await loadSession();
     if (!saved) return set({ resumable: undefined });
-    const pack = saved.zip ? await loadPackZip(saved.zip, saved.meta.packName) : null;
+    let pack: LoadedPack | null = null;
+    let edits = saved.edits;
+    if (saved.meta.folder && saved.folder) {
+      // the folder holds the pack and everything written before the reload; the browser asks first
+      const { handle, root } = saved.folder;
+      try {
+        if ((await handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted' && (await handle.requestPermission?.({ mode: 'readwrite' })) !== 'granted') {
+          throw new Error(t('folder.denied', { name: saved.meta.packName }));
+        }
+        const { folder, files } = await PackFolder.open(handle, root);
+        pack = PackFolder.toPack(folder, files);
+        // only what didn't reach the disk any more
+        edits = edits.filter(([p, d]) => (d ? !sameBytes(files.get(p), d) : files.has(p)));
+      } catch (e) {
+        return set({ error: (e as Error).message });
+      }
+    } else if (saved.zip) pack = await loadPackZip(saved.zip, saved.meta.packName);
     if (pack) pack.name = saved.meta.packName;
-    await get().open(pack, saved.meta.versionId, saved.edits);
+    await get().open(pack, saved.meta.versionId, edits);
     if (saved.funny && get().store) set({ funny: saved.funny });
   },
 
@@ -430,7 +465,37 @@ export const useApp = create<AppState>((set, get) => ({
   selectPlant: (selectedPlant) => set({ selectedPlant }),
   selectMob: (selectedMob) => set({ selectedMob }),
 
+  async reloadFolder() {
+    const { store } = get();
+    const folder = activeFolder;
+    if (!store || !folder) return;
+    try {
+      const { changed, removed } = await folder.scan();
+      if (get().store !== store) return;
+      for (const [path, bytes] of changed) store.setPackFile(path, bytes);
+      for (const path of removed) store.setPackFile(path, undefined);
+      const n = changed.size + removed.length;
+      if (n) {
+        refreshDerived();
+        persistEdits();
+        if ([...changed.keys(), ...removed].some((p) => /^assets\/minecraft\/lang\//.test(p))) void get().loadGameNames();
+      }
+      const before = get().folder;
+      set({ folder: n || before?.status !== 'error' ? { name: folder.name, status: n ? 'reloaded' : 'saved', at: Date.now(), reloaded: n } : before });
+    } catch (e) {
+      set({ folder: { name: folder.name, status: 'error', error: (e as Error).message } });
+    }
+  },
+
+  async allowFolder() {
+    const folder = activeFolder;
+    if (!folder) return;
+    if (await folder.permitted(true)) await writeFolder();
+    else set({ folder: { name: folder.name, status: 'denied' } });
+  },
+
   close() {
+    attachFolder(undefined);
     const icon = get().packIcon;
     if (icon) URL.revokeObjectURL(icon);
     void clearSession();
@@ -503,13 +568,74 @@ function writeJson(path: string, json: unknown) {
 
 function sessionMeta(): SessionMeta {
   const s = useApp.getState();
-  return { versionId: s.version!.id, packName: s.packName, packMeta: s.packMeta, editCount: s.store?.editCount ?? 0, savedAt: Date.now() };
+  return { versionId: s.version!.id, packName: s.packName, packMeta: s.packMeta, editCount: s.store?.editCount ?? 0, savedAt: Date.now(), folder: !!activeFolder || undefined };
 }
 
 const persistEdits = debounce(() => {
   const { store, phase } = useApp.getState();
   if (store && phase === 'ready') void saveEdits(sessionMeta(), store.edits).catch((e) => console.warn('Could not save edits', e));
+  if (activeFolder) void writeFolder();
 }, 400);
+
+/* pack folder ------------------------------------------------------------------------------- */
+
+/** The folder the open pack came from; every change is written there. */
+let activeFolder: PackFolder | undefined;
+let stopWatching: (() => void) | undefined;
+
+const sameBytes = (a: Uint8Array | undefined, b: Uint8Array) => !!a && a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** Chromium 129+ tells about changes in a folder; elsewhere the folder is read again on focus. */
+type FolderObserver = { observe(handle: unknown, opts: { recursive: boolean }): Promise<void>; disconnect(): void };
+const Observer = (globalThis as { FileSystemObserver?: new (cb: () => void) => FolderObserver }).FileSystemObserver;
+
+function attachFolder(folder: PackFolder | undefined) {
+  stopWatching?.();
+  stopWatching = undefined;
+  activeFolder = folder;
+  useApp.setState({ folder: folder && { name: folder.name, status: 'saved', at: Date.now() } });
+  if (!folder) return;
+  // coming back from another program (Aseprite, Blockbench …): read what it saved
+  const reload = debounce(() => void useApp.getState().reloadFolder(), 150);
+  const onVisible = () => document.visibilityState === 'visible' && reload();
+  window.addEventListener('focus', reload);
+  document.addEventListener('visibilitychange', onVisible);
+  let observer: FolderObserver | undefined;
+  try {
+    if (Observer) {
+      observer = new Observer(reload);
+      void observer.observe(folder.handle, { recursive: true }).catch(() => undefined);
+    }
+  } catch {
+    observer = undefined;
+  }
+  stopWatching = () => {
+    window.removeEventListener('focus', reload);
+    document.removeEventListener('visibilitychange', onVisible);
+    observer?.disconnect();
+  };
+}
+
+/** Writes the pack (its files plus the edits) to the folder. */
+async function writeFolder() {
+  const { store } = useApp.getState();
+  const folder = activeFolder;
+  if (!store || !folder) return;
+  const files = new Map(store.pack);
+  for (const [path, data] of store.edits) {
+    if (data) files.set(path, data);
+    else files.delete(path);
+  }
+  useApp.setState({ folder: { name: folder.name, status: 'saving' } });
+  try {
+    await folder.write(files);
+    if (activeFolder === folder) useApp.setState({ folder: { name: folder.name, status: 'saved', at: Date.now() } });
+  } catch (e) {
+    if (activeFolder !== folder) return;
+    const name = (e as DOMException)?.name;
+    useApp.setState({ folder: { name: folder.name, status: name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'error', error: (e as Error).message } });
+  }
+}
 
 function afterEdit(path: string) {
   const { store, vanillaSounds, revision } = useApp.getState();

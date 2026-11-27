@@ -198,6 +198,17 @@ export class AssetStore {
     this.touch(path);
   }
 
+  /**
+   * A pack file changed outside the editor (in the pack folder on disk): the new content (or
+   * `undefined` when it was deleted) becomes the pack's, replacing an edit of it. Not an edit itself.
+   */
+  setPackFile(path: string, data: Uint8Array | undefined): void {
+    if (data) this.pack.set(path, data);
+    else this.pack.delete(path);
+    this.edits.delete(path);
+    this.touch(path);
+  }
+
   clearEdit(path: string): void {
     if (this.edits.has(path)) this.onEdit?.(path, this.edits.get(path)!, undefined);
     this.edits.delete(path);

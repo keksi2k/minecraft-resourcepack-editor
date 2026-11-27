@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { APP_VERSION } from '../update/updateCheck';
 import { suggestVersion } from '../mojang/versions';
 import { loadPackZip, type LoadedPack } from '../pack/loadPack';
+import { folderSupported, pickPackFolder } from '../pack/folder';
 import { useLocale, useT } from '../i18n';
 import { useApp } from '../state/appStore';
 import { Btn, LanguageSelect } from './common';
@@ -38,6 +39,19 @@ export function LoadScreen() {
       if (!p.files.has('pack.mcmeta') && ![...p.files.keys()].some((k) => k.startsWith('assets/'))) {
         throw new Error(t('load.notAPack'));
       }
+      setPack(p);
+      setVersionId('');
+    } catch (e) {
+      setPackError((e as Error).message);
+    }
+  };
+
+  const openFolder = async () => {
+    setPackError(undefined);
+    try {
+      const p = await pickPackFolder();
+      if (!p) return;
+      if (!p.files.has('pack.mcmeta') && ![...p.files.keys()].some((k) => k.startsWith('assets/'))) throw new Error(t('load.notAPack'));
       setPack(p);
       setVersionId('');
     } catch (e) {
@@ -108,7 +122,10 @@ export function LoadScreen() {
         <input type="file" accept=".zip" className="hidden" onChange={(e) => void accept(e.target.files?.[0])} />
         {pack ? (
           <>
-            <div className="text-lg font-semibold">{pack.name}</div>
+            <div className="text-lg font-semibold">
+              {pack.folder && '📁 '}
+              {pack.name}
+            </div>
             <div className="text-sm text-neutral-400">{pack.meta?.description || t('load.noDescription')}</div>
             <div className="text-xs text-neutral-500">
               {t('load.fileInfo', { count: pack.files.size, format: pack.meta?.format ?? '?' })}
@@ -121,6 +138,16 @@ export function LoadScreen() {
           </>
         )}
       </label>
+      <div className="-mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
+        {folderSupported() ? (
+          <>
+            <Btn onClick={() => void openFolder()}>{t('folder.open')}</Btn>
+            <span>{t('folder.openHint')}</span>
+          </>
+        ) : (
+          <span>{t('folder.unsupported')}</span>
+        )}
+      </div>
       {packError && <div className="rounded bg-red-950 p-3 text-sm text-red-200">{packError}</div>}
 
       <div className="flex flex-wrap items-center gap-3">

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import JSZip from 'jszip';
-import { fakeMojang, oldPack, samplePack } from './fakeMojang';
+import { fakeMojang, fakePackFolder, oldPack, samplePack } from './fakeMojang';
 
 test.beforeEach(async ({ page }) => {
   await fakeMojang(page);
@@ -87,6 +87,31 @@ test('upgrades a pack made for an old version', async ({ page }) => {
   expect(names).not.toContain('assets/minecraft/textures/blocks/wool_colored_white.png');
   expect(names).not.toContain('assets/minecraft/textures/gui/widgets.png');
   expect(JSON.parse(await zip.file('pack.mcmeta')!.async('string')).pack.pack_format).toBe(97);
+});
+
+test('works on a pack folder and picks up outside changes', async ({ page }) => {
+  await fakePackFolder(page, {
+    'pack.mcmeta': JSON.stringify({ pack: { pack_format: 97, description: 'Folder pack' } }),
+    'assets/minecraft/lang/en_us.json': JSON.stringify({ 'block.minecraft.stone': 'Rock' }),
+  });
+  await page.reload();
+  await page.getByRole('button', { name: '📁 Open folder …' }).click();
+  await expect(page.getByText('📁 FolderPack')).toBeVisible();
+  await page.getByRole('button', { name: 'Open pack' }).click();
+  await expect(page.getByText('· saved')).toBeVisible();
+
+  // a change in the editor lands in the folder
+  await page.getByRole('button', { name: 'Texts', exact: true }).click();
+  await page.locator('textarea').first().fill('Changed in the editor');
+  await page.getByRole('button', { name: '✓ Save' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__packFolder.read('pack.mcmeta'))).toContain('Changed in the editor');
+
+  // another program saves a file: it is read again when the window gets the focus back
+  await page.evaluate(() => (window as any).__packFolder.put('assets/minecraft/lang/en_us.json', JSON.stringify({ 'block.minecraft.stone': 'Boulder' })));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText('· 1 file reloaded')).toBeVisible();
+  await page.getByRole('button', { name: 'Items', exact: true }).click();
+  await expect(page.getByTitle(/minecraft:stone$/)).toContainText('Boulder');
 });
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {

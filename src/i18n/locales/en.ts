@@ -690,6 +690,17 @@ const en = {
     undoInfo: { one: 'Last batch: {count} file', other: 'Last batch: {count} files' },
     undo: '↶ Undo batch',
   },
+  folder: {
+    open: '📁 Open folder …',
+    openHint: 'Work on an unzipped pack folder: changes are saved straight into it, and files you save in other programs show up here right away.',
+    unsupported: 'Opening a pack folder directly needs Chrome or Edge; in this browser, open the pack as a ZIP.',
+    badgeTitle: 'Changes are written to the folder “{name}”; files changed by other programs are read again when you come back to this window.',
+    status: { saved: 'saved', saving: 'saving …', error: 'not saved', reloaded: 'reloaded', denied: 'no access' },
+    reloaded: { one: '{count} file reloaded', other: '{count} files reloaded' },
+    reload: 'Read the folder again (files changed by other programs)',
+    allow: 'Allow access',
+    denied: 'The browser didn’t allow access to the folder “{name}”.',
+  },
   upgrade: {
     button: '⬆ Upgrade pack',
     buttonTitle: 'Bring this pack, made for an older Minecraft version, up to date',

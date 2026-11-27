@@ -106,3 +106,86 @@ export async function samplePack(): Promise<Buffer> {
   zip.file('assets/minecraft/textures/block/stone.png', png(16, [40, 90, 200]));
   return zip.generateAsync({ type: 'nodebuffer' });
 }
+
+/**
+ * A pack folder in the page's memory behind `showDirectoryPicker`, for the folder mode test.
+ * `window.__packFolder` reads (`read(path)`) and writes (`put(path, text)`, like another program).
+ */
+export async function fakePackFolder(page: Page, files: Record<string, string>) {
+  await page.addInitScript((initial: Record<string, string>) => {
+    let clock = Date.now();
+    class MemFile {
+      kind = 'file';
+      modified = ++clock;
+      name: string;
+      data: Uint8Array;
+      constructor(name: string, data: Uint8Array) {
+        this.name = name;
+        this.data = data;
+      }
+      async getFile() {
+        const data = this.data;
+        return { size: data.length, lastModified: this.modified, arrayBuffer: async () => data.slice().buffer };
+      }
+      async createWritable() {
+        return {
+          write: async (d: Uint8Array) => {
+            this.data = new Uint8Array(d);
+          },
+          close: async () => {
+            this.modified = ++clock;
+          },
+        };
+      }
+    }
+    class MemDir {
+      kind = 'directory';
+      children = new Map<string, MemDir | MemFile>();
+      name: string;
+      constructor(name: string) {
+        this.name = name;
+      }
+      async *values() {
+        yield* this.children.values();
+      }
+      async getDirectoryHandle(name: string, o?: { create?: boolean }) {
+        let d = this.children.get(name);
+        if (!d && o?.create) this.children.set(name, (d = new MemDir(name)));
+        if (!(d instanceof MemDir)) throw new DOMException('not found', 'NotFoundError');
+        return d;
+      }
+      async getFileHandle(name: string, o?: { create?: boolean }) {
+        let f = this.children.get(name);
+        if (!f && o?.create) this.children.set(name, (f = new MemFile(name, new Uint8Array())));
+        if (!(f instanceof MemFile)) throw new DOMException('not found', 'NotFoundError');
+        return f;
+      }
+      async removeEntry(name: string) {
+        this.children.delete(name);
+      }
+      async queryPermission() {
+        return 'granted';
+      }
+      async requestPermission() {
+        return 'granted';
+      }
+      put(path: string, text: string) {
+        const parts = path.split('/');
+        let d: MemDir = this;
+        for (const p of parts.slice(0, -1)) {
+          if (!d.children.has(p)) d.children.set(p, new MemDir(p));
+          d = d.children.get(p) as MemDir;
+        }
+        d.children.set(parts[parts.length - 1], new MemFile(parts[parts.length - 1], new TextEncoder().encode(text)));
+      }
+      read(path: string) {
+        let n: MemDir | MemFile | undefined = this;
+        for (const p of path.split('/')) n = n instanceof MemDir ? n.children.get(p) : undefined;
+        return n instanceof MemFile ? new TextDecoder().decode(n.data) : undefined;
+      }
+    }
+    const root = new MemDir('FolderPack');
+    for (const [p, t] of Object.entries(initial)) root.put(p, t);
+    Object.assign(window, { __packFolder: root, showDirectoryPicker: async () => root });
+  }, files);
+}

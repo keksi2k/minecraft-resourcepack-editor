@@ -1,6 +1,7 @@
 import { del, get, set, setMany } from 'idb-keyval';
 import type { FunnyRecord } from '../funny/record';
 import type { PackMeta } from '../pack/loadPack';
+import type { DirHandleLike } from '../pack/folder';
 
 /**
  * The open pack and the user's edits, kept in IndexedDB so a reload or crash doesn't lose work.
@@ -13,23 +14,33 @@ export interface SessionMeta {
   packMeta?: PackMeta;
   editCount: number;
   savedAt: number;
+  /** The pack is a folder on disk (its handle is stored, not a ZIP). */
+  folder?: boolean;
 }
 
-const KEY = { meta: 'session:v1:meta', zip: 'session:v1:zip', edits: 'session:v1:edits', funny: 'session:v1:funny' };
+/** A pack folder as stored: the folder the user chose and the path down to the pack inside it. */
+export interface StoredFolder {
+  handle: DirHandleLike;
+  root: string[];
+}
+
+const KEY = { meta: 'session:v1:meta', zip: 'session:v1:zip', edits: 'session:v1:edits', funny: 'session:v1:funny', folder: 'session:v1:folder' };
 
 export interface StoredSession {
   meta: SessionMeta;
   zip?: Blob;
   edits: [string, Uint8Array | null][];
   funny?: FunnyRecord;
+  folder?: StoredFolder;
 }
 
-export async function startSession(meta: SessionMeta, zip: Blob | undefined): Promise<void> {
+export async function startSession(meta: SessionMeta, zip: Blob | undefined, folder?: StoredFolder): Promise<void> {
   await clearSession();
   await setMany([
     [KEY.meta, meta],
     [KEY.zip, zip ?? null],
     [KEY.edits, []],
+    ...(folder ? ([[KEY.folder, folder]] as [string, StoredFolder][]) : []),
   ]);
 }
 
@@ -52,12 +63,13 @@ export function loadSessionMeta(): Promise<SessionMeta | undefined> {
 export async function loadSession(): Promise<StoredSession | undefined> {
   const meta = await loadSessionMeta();
   if (!meta) return undefined;
-  const [zip, edits, funny] = await Promise.all([
+  const [zip, edits, funny, folder] = await Promise.all([
     get<Blob | null>(KEY.zip),
     get<[string, Uint8Array | null][]>(KEY.edits),
     get<FunnyRecord>(KEY.funny).catch(() => undefined),
+    get<StoredFolder>(KEY.folder).catch(() => undefined),
   ]);
-  return { meta, zip: zip ?? undefined, edits: edits ?? [], funny };
+  return { meta, zip: zip ?? undefined, edits: edits ?? [], funny, folder };
 }
 
 export async function clearSession(): Promise<void> {

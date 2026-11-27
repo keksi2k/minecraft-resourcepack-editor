@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { parseLenientJson } from '../assets/AssetStore';
+import type { PackFolder } from './folder';
 
 export interface PackMeta {
   description: string;
@@ -14,6 +15,8 @@ export interface LoadedPack {
   meta?: PackMeta;
   /** The original ZIP, kept for restoring the session after a reload. */
   source?: Blob;
+  /** The folder on disk the pack was opened from (changes are written back there). */
+  folder?: PackFolder;
 }
 
 /** Packs are often zipped with an enclosing folder; find the folder that holds pack.mcmeta / assets. */

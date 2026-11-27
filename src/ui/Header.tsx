@@ -68,6 +68,7 @@ export function Header({ onSearch }: { onSearch: () => void }) {
           {formatMismatch && <span className="text-amber-400"> · {t('header.formatMismatch')}</span>}
         </div>
       </div>
+      <FolderBadge />
       {older && (
         <button onClick={() => setUpgradeOpen(true)} title={t('upgrade.buttonTitle')} className="shrink-0 whitespace-nowrap rounded bg-amber-800 px-2 py-1 text-xs hover:bg-amber-700">
           {t('upgrade.button')}
@@ -132,6 +133,30 @@ export function Header({ onSearch }: { onSearch: () => void }) {
         </Suspense>
       )}
     </header>
+  );
+}
+
+/** Shown when the pack is a folder on disk: whether changes reached it, and a way to reload it. */
+function FolderBadge() {
+  const { folder, reloadFolder, allowFolder } = useApp();
+  const t = useT();
+  if (!folder) return null;
+  const tone = folder.status === 'error' || folder.status === 'denied' ? 'text-red-300' : folder.status === 'saving' ? 'text-neutral-400' : 'text-emerald-300';
+  const text =
+    folder.status === 'reloaded' ? t('folder.reloaded', { count: folder.reloaded ?? 0 }) : t(`folder.status.${folder.status}`);
+  return (
+    <div className="flex shrink-0 items-center gap-1 text-xs" title={folder.error ?? t('folder.badgeTitle', { name: folder.name })}>
+      <span className="flex items-center gap-1 whitespace-nowrap rounded bg-neutral-800 px-2 py-1">
+        📁 <span className="max-w-[8rem] truncate">{folder.name}</span> <span className={tone}>· {text}</span>
+      </span>
+      {folder.status === 'denied' ? (
+        <Btn tone="primary" onClick={() => void allowFolder()}>{t('folder.allow')}</Btn>
+      ) : (
+        <button onClick={() => void reloadFolder()} title={t('folder.reload')} className="rounded bg-neutral-800 px-2 py-1 hover:bg-neutral-700">
+          ⟳
+        </button>
+      )}
+    </div>
   );
 }
 

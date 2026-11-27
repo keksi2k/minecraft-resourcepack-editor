@@ -689,6 +689,17 @@ const de: Translation = {
     undoInfo: { one: 'Letzte Sammeländerung: {count} Datei', other: 'Letzte Sammeländerung: {count} Dateien' },
     undo: '↶ Sammeländerung rückgängig',
   },
+  folder: {
+    open: '📁 Ordner öffnen …',
+    openHint: 'An einem entpackten Pack-Ordner arbeiten: Änderungen landen direkt darin, und Dateien, die du in anderen Programmen speicherst, erscheinen hier sofort.',
+    unsupported: 'Einen Pack-Ordner direkt zu öffnen geht in Chrome oder Edge; in diesem Browser öffne das Pack als ZIP.',
+    badgeTitle: 'Änderungen werden in den Ordner „{name}“ geschrieben; Dateien, die andere Programme geändert haben, werden neu gelesen, wenn du zu diesem Fenster zurückkommst.',
+    status: { saved: 'gespeichert', saving: 'speichert …', error: 'nicht gespeichert', reloaded: 'neu geladen', denied: 'kein Zugriff' },
+    reloaded: { one: '{count} Datei neu geladen', other: '{count} Dateien neu geladen' },
+    reload: 'Ordner neu einlesen (von anderen Programmen geänderte Dateien)',
+    allow: 'Zugriff erlauben',
+    denied: 'Der Browser hat den Zugriff auf den Ordner „{name}“ nicht erlaubt.',
+  },
   upgrade: {
     button: '⬆ Pack aktualisieren',
     buttonTitle: 'Dieses Pack für eine ältere Minecraft-Version auf den aktuellen Stand bringen',
