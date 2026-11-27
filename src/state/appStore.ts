@@ -8,7 +8,7 @@ import { gameNames, listItems, type ItemEntry } from '../models/items';
 import { listPlants, type PlantEntry } from '../models/plants';
 import { loadPackZip, parsePackMeta, type LoadedPack, type PackMeta } from '../pack/loadPack';
 import { clearSession, debounce, loadSession, loadSessionMeta, saveEdits, saveFunny, startSession, type SessionMeta } from './session';
-import { computeFunny, type FunnySettings } from '../funny/funny';
+import type { FunnySettings } from '../funny/funny';
 import type { FunnyRecord } from '../funny/record';
 import {
   addSoundToEvent,
@@ -330,6 +330,7 @@ export const useApp = create<AppState>((set, get) => ({
     let result;
     try {
       const events = mergeSounds(get().vanillaSounds, packSoundFiles(store));
+      const { computeFunny } = await import('../funny/funny');
       result = await computeFunny(store, events, settings, onProgress);
     } catch (e) {
       refreshDerived();

@@ -22,6 +22,19 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_REPO__: JSON.stringify(pkg.repository.url.replace(/\.git$/, '')),
   },
+  build: {
+    // three.js and the mob models rarely change: their own files stay cached across releases
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('entityModels.json')) return 'entity-models';
+          if (/node_modules[\/](three|@react-three)[\/]/.test(id)) return 'three';
+          return undefined;
+        },
+      },
+    },
+  },
   server: { proxy: mcresProxy },
   preview: { proxy: mcresProxy },
   test: { environment: 'node' },

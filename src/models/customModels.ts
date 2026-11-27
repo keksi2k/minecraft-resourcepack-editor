@@ -203,4 +203,6 @@ export function writeCmdCases(def: Json | undefined, base: Json | undefined, cas
 }
 
 /** The command that gives an item with this custom_model_data string. */
-export const giveCommand = (itemId: string, value: string) => `/give @s ${itemId}[minecraft:custom_model_data={strings:[${JSON.stringify(value)}]}]`;
+// built in parts: Tailwind would read `[name:value]` in one piece as a CSS class
+const COMPONENT = ['minecraft', 'custom_model_data'].join(':');
+export const giveCommand = (itemId: string, value: string) => `/give @s ${itemId}[${COMPONENT}={strings:[${JSON.stringify(value)}]}]`;
