@@ -26,7 +26,7 @@ import { useEditor } from './editorStore';
 import { mergeSounds, type SoundEvent, type SoundFileRef } from '../sounds/soundsJson';
 import { soundPath } from '../models/resourceLocation';
 
-export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'texts' | 'progress' | 'funny';
+export type Tab = 'items' | 'plants' | 'mobs' | 'textures' | 'sounds' | 'scenes' | 'texts' | 'progress' | 'funny';
 
 /** Files as they were before a batch change (`undefined` = not edited), for undoing it. */
 export type FileStates = [string, Uint8Array | null | undefined][];
@@ -94,6 +94,11 @@ interface AppState {
   removeFunny(): void;
   addLocalAssetsFolder(files: FileList): number;
   loadSounds(): Promise<void>;
+  /**
+   * Fetches vanilla files that live in the asset index instead of the jar (path → index key) and
+   * adds them to the vanilla layer, so they can be shown and edited like any other file.
+   */
+  ensureVanillaObjects(files: [path: string, key: string][]): Promise<void>;
   /** (Re)loads item/mob names for the current UI language. */
   loadGameNames(): Promise<void>;
   setTab(tab: Tab): void;
@@ -197,6 +202,21 @@ export const useApp = create<AppState>((set, get) => ({
     }
     set({ objects, vanillaSounds, soundsError, soundsLoading: false, soundEvents: mergeSounds(vanillaSounds, packSoundFiles(store)) });
     void get().loadGameNames();
+  },
+
+  async ensureVanillaObjects(files) {
+    const { store, objects } = get();
+    if (!store || !objects) return;
+    // the jar may hold a placeholder (the panorama is 1×1 there); the game uses the asset index's file
+    const done = fetchedObjects.get(store) ?? new Set<string>();
+    fetchedObjects.set(store, done);
+    const missing = files.filter(([path, key]) => !done.has(path) && objects.has(key));
+    if (!missing.length) return;
+    missing.forEach(([path]) => done.add(path));
+    const fetched = await Promise.all(missing.map(([, key]) => objects.fetch(key).catch(() => undefined)));
+    if (get().store !== store) return;
+    missing.forEach(([path], i) => (fetched[i] ? store.addVanilla(path, fetched[i]!) : done.delete(path)));
+    set({ revision: get().revision + 1 });
   },
 
   async loadGameNames() {
@@ -372,6 +392,9 @@ export const useApp = create<AppState>((set, get) => ({
     set({ phase: 'start', store: undefined, items: [], plants: [], soundEvents: [], packIcon: undefined, selectedItem: undefined, selectedPlant: undefined, funny: undefined, lastBatch: undefined, textureFocus: undefined });
   },
 }));
+
+/** Vanilla files already taken from the asset index, per store. */
+const fetchedObjects = new WeakMap<AssetStore, Set<string>>();
 
 function writeJson(path: string, json: unknown) {
   useApp.getState().setFile(path, new TextEncoder().encode(JSON.stringify(json, null, 2)));

@@ -11,6 +11,7 @@ import { TexturesView } from './TexturesView';
 import { TextsView } from './TextsView';
 import { ProgressView } from './ProgressView';
 import { UpdateBanner } from './UpdateBanner';
+import { ScenesView } from './scenes/ScenesView';
 
 export function App() {
   const { phase, tab, loadManifest } = useApp();
@@ -35,6 +36,7 @@ export function App() {
         {tab === 'mobs' && <MobsView />}
         {tab === 'textures' && <TexturesView />}
         {tab === 'sounds' && <SoundsView />}
+        {tab === 'scenes' && <ScenesView />}
         {tab === 'texts' && <TextsView />}
         {tab === 'progress' && <ProgressView />}
         {tab === 'funny' && <FunnyView />}

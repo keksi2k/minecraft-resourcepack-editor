@@ -128,6 +128,12 @@ export class AssetStore {
     this.touch(path);
   }
 
+  /** Adds a vanilla file fetched later (from the asset index, e.g. the title panorama). */
+  addVanilla(path: string, data: Uint8Array): void {
+    this.vanilla.set(path, data);
+    this.touch(path);
+  }
+
   clearEdit(path: string): void {
     this.edits.delete(path);
     this.touch(path);

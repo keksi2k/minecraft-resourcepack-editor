@@ -8,7 +8,7 @@ import { useEditor } from '../state/editorStore';
 import { checkPack, type Issue } from '../pack/checks';
 import { ExportCheck } from './ExportCheck';
 
-const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'texts', 'progress', 'funny'];
+const TABS: Tab[] = ['items', 'plants', 'mobs', 'textures', 'sounds', 'scenes', 'texts', 'progress', 'funny'];
 
 export function Header() {
   const { packName, packMeta, version, gameFormat, tab, setTab, store, close, revision, objects } = useApp();
