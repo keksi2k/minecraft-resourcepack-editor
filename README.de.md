@@ -6,6 +6,22 @@
 
 Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft. Pack laden, alle Items und Mobs in 3D ansehen, Sounds anhören, Texturen und Sounds herunterladen, ersetzen oder **direkt im Browser bearbeiten**, eigene Sounds aufnehmen und das Pack wieder als ZIP exportieren.
 
+## Highlights
+
+| | |
+|---|---|
+| 🧊 **Alles in 3D** | Jedes Item, jeder Block, jede Pflanze und jeder Mob mit den Texturen deines Packs – animiert, von allen Seiten, in allen Varianten. |
+| 🎨 **Direkt im Browser malen** | Ein Pixel-Editor mit Ebenen, Auswahl, Lospec-Paletten und Farbersetzen im ganzen Pack. Das 3D-Modell folgt jedem Strich. |
+| 🧍 **Dein Spieler, voll ausgerüstet** | Jeder Skin, Rüstung, Elytren, ein Umhang und Items in beiden Händen, platziert wie im Spiel. |
+| 🧱 **Blockzustände und Modelle** | Multipart-Zäune und -Mauern mit anklickbaren Bedingungen bearbeiten und Quader-Modelle in einer 3D-Live-Ansicht formen. |
+| ✨ **Shader, live** | Post-Effekte bearbeiten und zusehen, wie sich die Creeper-, Spinnen- und Enderman-Sicht beim Tippen ändert. |
+| 🖼️ **Dein Pack, wo Spieler es sehen** | Titelbildschirm, HUD und Inventare, Tooltips, Karten, Schrift, Gemälde, Partikel und ein Block-Sandkasten mit Lichtstufen. |
+| 🔊 **Sounds** | Jeden Sound anhören, eigene aufnehmen, schneiden, verändern und ersetzen. |
+| 🛠️ **Pack-Werkzeuge** | Packs ab 1.8 in einem Schritt aktualisieren, mehrere Packs stapeln, verkleinern, auf Probleme prüfen, als ZIP exportieren. |
+| 🔒 **Privat von Grund auf** | Alles passiert in deinem Browser: kein Konto, kein Upload. |
+
+**Neu in 1.22:** Ebenen, Auswahl und Paletten im Textur-Editor, die Spieler-Vorschau, Blockzustand- und Modell-Editor, Shader live, Tooltips, Karten und der Verzauberungsglanz. [Zum Release →](https://github.com/keksi2k/minecraft-resourcepack-editor/releases/latest)
+
 ## Funktionen
 
 - **Alle Items** (~1650 in 26.3) mit Inventar-Render: Blöcke isometrisch, flache Items als Sprite, Färbungen (Laub, Gras, Tränke …) wie im Spiel. Truhen, Shulkerkisten, Banner, Schilde, Köpfe, Betten, verzierte Krüge, Aquisitoren, Dreizacke und Kupfergolem-Statuen werden ebenfalls mit ihren echten Modellen gezeichnet, und animierte Texturen (Wasser, Lava, Feuer, Portale …) laufen im Grid, im 3D-Viewer und in der Texturvorschau.

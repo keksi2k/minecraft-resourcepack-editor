@@ -6,6 +6,22 @@
 
 A browser-based editor for **Minecraft Java Edition resource packs**. Load a pack, view every item and mob in 3D, listen to sounds, download, replace or **edit textures and sounds right in the browser**, record your own sounds, and export the pack as a ZIP again.
 
+## Highlights
+
+| | |
+|---|---|
+| 🧊 **See everything in 3D** | Every item, block, plant and mob with your pack's textures – animated, from every angle, in all their variants. |
+| 🎨 **Paint right in the browser** | A pixel editor with layers, selections, Lospec palettes and colour replacing across the whole pack. The 3D model updates with every stroke. |
+| 🧍 **Your player, fully equipped** | Any skin, armour, elytra, a cape and items in both hands, placed like in the game. |
+| 🧱 **Block states and models** | Edit multipart fences and walls with clickable conditions, and shape cuboid models in a live 3D view. |
+| ✨ **Shaders, live** | Edit post effects and watch the creeper, spider and enderman views change as you type. |
+| 🖼️ **Your pack where players see it** | Title screen, HUD and inventories, tooltips, maps, fonts, paintings, particles and a block sandbox with light levels. |
+| 🔊 **Sounds** | Listen to every sound, record your own, cut, tune and replace them. |
+| 🛠️ **Pack tools** | Upgrade packs from 1.8 onwards in one step, stack several packs, shrink them, check them for problems, export a ZIP. |
+| 🔒 **Private by design** | Everything happens in your browser: no account, no upload. |
+
+**New in 1.22:** layers, selections and palettes in the texture editor, the player preview, block state and model editors, live shaders, tooltips, maps and the enchantment glint. [See the release →](https://github.com/keksi2k/minecraft-resourcepack-editor/releases/latest)
+
 ## Features
 
 - **Every item** (~1650 in 26.3) with an inventory-style render: blocks isometric, flat items as sprites, tints (leaves, grass, potions …) like in game. Chests, shulker boxes, banners, shields, heads, beds, decorated pots, conduits, tridents and copper golem statues are drawn with their real models too, and animated textures (water, lava, fire, portals …) play in the grid, the 3D viewer and the texture preview.
