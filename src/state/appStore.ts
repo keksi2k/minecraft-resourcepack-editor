@@ -212,7 +212,7 @@ export const useApp = create<AppState>((set, get) => ({
       });
       if (restoredEdits) {
         for (const [path, data] of restoredEdits) store.setEdit(path, data);
-        refreshDerived();
+        refreshDerived(restoredEdits.map(([p]) => p));
       }
       startHistory(store);
       attachFolder(pack?.folder);
@@ -427,7 +427,7 @@ export const useApp = create<AppState>((set, get) => ({
     const before: FileStates = [...changes.keys()].map((p) => [p, store.edits.has(p) ? store.edits.get(p)! : undefined]);
     for (const [path, data] of changes) store.setEdit(path, data);
     set({ lastBatch: { before, count: changes.size } });
-    refreshDerived();
+    refreshDerived(changes.keys());
     persistEdits();
   },
 
@@ -436,7 +436,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (!store || !lastBatch) return;
     restoreFiles(store, lastBatch.before);
     set({ lastBatch: undefined });
-    refreshDerived();
+    refreshDerived(lastBatch.before.map(([p]) => p));
     persistEdits();
   },
 
@@ -551,7 +551,7 @@ function replay(step: Change[], side: 'before' | 'after') {
   }
   // a batch or the funny changes can't be undone on their own after this
   useApp.setState({ lastBatch: undefined });
-  refreshDerived();
+  refreshDerived(step.map(([p]) => p));
   persistEdits();
 }
 
@@ -678,8 +678,9 @@ function restoreFiles(store: AssetStore, before: FileStates) {
   }
 }
 
-/** Recomputes everything derived from the store (after restoring a session). */
-function refreshDerived() {
+/** Recomputes everything derived from the store (after restoring a session or changing many files);
+ *  `paths` are the files that changed, so item names are read again when a language file is among them. */
+function refreshDerived(paths: Iterable<string> = []) {
   const { store, vanillaSounds, revision, names } = useApp.getState();
   if (!store) return;
   useApp.setState({
@@ -691,6 +692,7 @@ function refreshDerived() {
   });
   syncOverlays();
   refreshIcon();
+  if ([...paths].some((p) => /^assets\/minecraft\/lang\//.test(p))) void useApp.getState().loadGameNames();
 }
 
 // Item and mob names follow the UI language.
