@@ -3,6 +3,25 @@ import { useT } from '../i18n';
 import { drawAnimationFrame, parseAnimation, subscribeTicks } from '../render/animation';
 import { blankPixels, isIdentity, remapFrameOrder, splitFrames, stackFrames } from '../render/frames';
 import {
+  clearRect,
+  constrain,
+  copyRect,
+  drawRect,
+  flatten,
+  intersect,
+  mergeInto,
+  paste,
+  putRect,
+  rectBetween,
+  rectMask,
+  replaceColor,
+  restoreRect,
+  shapeBounds,
+  type PaintLayer,
+  type Rect,
+} from '../render/paintTools';
+import { snapToPalette } from '../render/palettes';
+import {
   adjustHsl,
   copyPixels,
   drawLine,
@@ -25,16 +44,29 @@ import { previewTexture } from '../render/textures';
 import { useApp } from '../state/appStore';
 import { useEditor } from '../state/editorStore';
 import { Btn } from './common';
+import { LayersPanel, type LayerActions } from './texture/LayersPanel';
+import { PalettePanel } from './texture/PalettePanel';
+import { ReplaceColorPanel } from './texture/ReplaceColorPanel';
+import { css, HexInput, sameColor, Section, Swatches } from './texture/parts';
 
-type Tool = 'pencil' | 'eraser' | 'fill' | 'picker';
+type Tool = 'pencil' | 'eraser' | 'fill' | 'picker' | 'line' | 'rect' | 'select' | 'move';
 const TOOLS: [Tool, string, string][] = [
   ['pencil', '✎', 'b'],
   ['eraser', '⌫', 'e'],
   ['fill', '🪣', 'g'],
   ['picker', '💧', 'i'],
+  ['line', '╱', 'l'],
+  ['rect', '▭', 'r'],
+  ['select', '⬚', 'm'],
+  ['move', '✥', 'v'],
 ];
+const BRUSH: Tool[] = ['pencil', 'eraser', 'line', 'rect'];
 const HISTORY = 100;
 const MAX_CANVAS = 12000;
+const CLEAR: RGBA = [0, 0, 0, 0];
+
+/** Copied pixels; kept while the editor is closed, so they can go into another texture. */
+let clipboard: Pixels | undefined;
 
 /** Paints pixels onto a 1:1 canvas, used as the source for scaled drawing. */
 function toCanvas(p: Pixels, into?: HTMLCanvasElement): HTMLCanvasElement {
@@ -45,25 +77,32 @@ function toCanvas(p: Pixels, into?: HTMLCanvasElement): HTMLCanvasElement {
   return c;
 }
 
-const sameColor = (a: RGBA, b: RGBA) => a.every((v, i) => v === b[i]);
-
-/** An undo step: the whole sheet (its height changes when frames are added or removed). */
+/** An undo step: every layer (the sheet's height changes when frames are added or removed). */
 interface Snapshot {
-  data: Uint8ClampedArray;
+  layers: (Omit<PaintLayer, 'px'> & { data: Uint8ClampedArray })[];
   height: number;
+  active: number;
   origin: number[];
 }
+
+/** A drag with the line, rectangle, selection or move tool. */
+type Drag =
+  | { kind: 'line' | 'rect'; start: [number, number]; base: Uint8ClampedArray; last: Rect; color: RGBA; clip?: Rect }
+  | { kind: 'select'; start: [number, number]; moved: boolean }
+  | { kind: 'move'; start: [number, number]; base: Uint8ClampedArray; piece: Pixels; from: Rect; last: Rect; clip: Rect; withSel: boolean };
 
 export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Uint8Array; onDone: () => void }) {
   const t = useT();
   const { store, setFile } = useApp();
-  const [img, setImg] = useState<Pixels>();
+  const [layers, setLayers] = useState<PaintLayer[]>([]);
+  const [active, setActive] = useState(0);
   const [error, setError] = useState<string>();
   const [tool, setTool] = useState<Tool>('pencil');
   const [color, setColor] = useState<RGBA>([255, 255, 255, 255]);
   const [recent, setRecent] = useState<RGBA[]>([]);
   const [size, setSize] = useState(1);
   const [fillAll, setFillAll] = useState(false);
+  const [filledRect, setFilledRect] = useState(false);
   const [tolerance, setTolerance] = useState(0);
   const [zoom, setZoom] = useState(16);
   const [grid, setGrid] = useState(true);
@@ -72,6 +111,9 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const [hover, setHover] = useState<[number, number]>();
   const [rev, setRev] = useState(0); // bumped on every change to redraw
   const [saving, setSaving] = useState(false);
+  /** The selection, relative to the shown area (the current frame, or the whole sheet). */
+  const [selRel, setSelRel] = useState<Rect>();
+  const [hasClip, setHasClip] = useState(!!clipboard);
   // animated textures: frame height, the frame being edited, and how frames are shown
   const [fh, setFh] = useState(1);
   const [cur, setCur] = useState(0);
@@ -83,8 +125,10 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const undo = useRef<Snapshot[]>([]);
   const redo = useRef<Snapshot[]>([]);
   const dirty = useRef(false);
-  const stroke = useRef<{ last: [number, number]; erase: boolean } | null>(null);
+  const stroke = useRef<{ last: [number, number]; erase: boolean; clip?: Rect } | null>(null);
+  const drag = useRef<Drag | null>(null);
   const lastPoint = useRef<[number, number]>();
+  const nextId = useRef(2);
   const view = useRef<HTMLCanvasElement>(null);
   const preview = useRef<HTMLCanvasElement>(null);
   const src = useRef<HTMLCanvasElement>();
@@ -92,6 +136,10 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const live = useRef<Awaited<ReturnType<typeof previewTexture>>>();
   const liveFrame = useRef(0);
   const metaAnim = store?.json<any>(`${path}.mcmeta`)?.animation;
+
+  const img: Pixels | undefined = layers[active]?.px;
+  const W = layers[0]?.px.width ?? 1;
+  const H = layers[0]?.px.height ?? 1;
 
   useEffect(() => {
     decodeImage(bytes).then(
@@ -101,7 +149,8 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
         const frameH = anim && anim.columns === 1 ? anim.fh : p.height;
         setFh(frameH);
         origin.current = Array.from({ length: Math.floor(p.height / frameH) }, (_, i) => i);
-        setImg(p);
+        setLayers([{ id: 1, name: t('editor.texture.layerN', { n: 1 }), px: p, visible: true, opacity: 100 }]);
+        setActive(0);
         // fit the frame (not the whole animation strip) into the editing area
         const box = area.current?.getBoundingClientRect();
         const fit = box ? Math.min((box.width - 48) / p.width, (box.height - 48) / frameH) : 560 / p.width;
@@ -114,13 +163,25 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     );
   }, [bytes]);
 
-  const frames = img ? Math.max(1, Math.floor(img.height / fh)) : 1;
+  const frames = layers.length ? Math.max(1, Math.floor(H / fh)) : 1;
   const animated = frames > 1;
   const single = animated && !sheetView;
-  const region = { y0: single ? cur * fh : 0, h: single ? fh : (img?.height ?? 1) };
+  const region = { y0: single ? cur * fh : 0, h: single ? fh : H };
+  const regionRect: Rect = { x: 0, y: region.y0, w: W, h: region.h };
+  /** The selection in sheet pixels, cut to what's shown. */
+  const sel = selRel ? intersect({ ...selRel, y: selRel.y + region.y0 }, regionRect) : undefined;
   useEffect(() => {
     if (cur >= frames) setCur(frames - 1);
   }, [cur, frames]);
+  // the whole sheet and a single frame don't share a selection
+  useEffect(() => setSelRel(undefined), [sheetView]);
+
+  /** The frame (sheet view: the frame under `y`) painting is kept inside, cut to the selection. */
+  const limitAt = (y: number): Rect | undefined => {
+    const frame = single ? regionRect : animated ? { x: 0, y: Math.floor(y / fh) * fh, w: W, h: fh } : undefined;
+    if (sel) return frame ? intersect(frame, sel) : sel;
+    return frame;
+  };
 
   /** Limits an operation to the frame being edited (in single-frame view). */
   const scoped = useCallback(
@@ -136,21 +197,36 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     [single, cur, fh],
   );
 
-  /** Pixels a colour adjustment touches: the current frame in single-frame view. */
-  const frameMask = useMemo(() => {
-    if (!img || !single) return undefined;
-    const m = new Uint8Array(img.width * img.height);
-    m.fill(1, cur * fh * img.width, (cur + 1) * fh * img.width);
-    return m;
-  }, [img, single, cur, fh]);
+  /** Runs a transform on the selection (if any) or on the frame. */
+  const within = (fn: (p: Pixels) => void | boolean) => (p: Pixels) => {
+    if (!sel) return scoped(fn)(p);
+    const piece = copyRect(p, sel);
+    if (fn(piece) === false) return false;
+    putRect(p, piece, sel.x, sel.y);
+  };
 
-  /** What's shown: the image, with an unapplied colour adjustment previewed on top. */
+  /** Pixels a colour change touches: the selection, or the current frame in single-frame view. */
+  const mask = useMemo(() => {
+    if (!layers.length) return undefined;
+    if (sel) return rectMask(W, H, sel);
+    if (!single) return undefined;
+    return rectMask(W, H, regionRect);
+  }, [layers.length, W, H, single, cur, fh, sel?.x, sel?.y, sel?.w, sel?.h]);
+
+  const adjusting = hsl.some((v) => v !== 0);
+  /** What all visible layers make together. */
+  const flat = useMemo(() => (layers.length ? flatten(layers, W, H) : undefined), [layers, rev, W, H]);
+  /** What's shown: the picture, with an unapplied colour adjustment previewed on the active layer. */
   const shown = useMemo(() => {
-    if (!img || hsl.every((v) => v === 0)) return img;
+    if (!img || !adjusting) return flat;
     const p = copyPixels(img);
-    adjustHsl(p, ...hsl, frameMask);
-    return p;
-  }, [img, rev, hsl, frameMask]);
+    adjustHsl(p, ...hsl, mask);
+    return flatten(
+      layers.map((l, i) => (i === active ? { ...l, px: p } : l)),
+      W,
+      H,
+    );
+  }, [flat, layers, rev, hsl, mask, active]);
 
   // live preview: the 3D views (and everything else using the decoded texture) follow every change
   useEffect(() => {
@@ -171,15 +247,15 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const touched = useRef(false);
   useEffect(() => {
     if (!shown) return;
-    if (shown !== img || rev) touched.current = true;
+    if (adjusting || rev) touched.current = true;
     if (!touched.current) return;
     cancelAnimationFrame(liveFrame.current);
     liveFrame.current = requestAnimationFrame(() => live.current?.apply(shown.data, shown.width, shown.height));
-  }, [shown, rev, img]);
+  }, [shown, rev, adjusting]);
 
   // recounted after each stroke, not on every pixel of it
   const [paletteRev, setPaletteRev] = useState(0);
-  const palette = useMemo(() => (img ? usedColors(img, 48) : []), [img, paletteRev]);
+  const palette = useMemo(() => (flat ? usedColors(flat, 48) : []), [flat, paletteRev]);
 
   // redraw the zoomed view: the current frame (with the previous one faintly below it), or the whole sheet
   useEffect(() => {
@@ -214,22 +290,36 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
       for (let f = 1; f < frames; f++) g.moveTo(0, f * fh * zoom), g.lineTo(w, f * fh * zoom);
       g.stroke();
     }
+    if (sel) {
+      // marching ants without the marching: black and white dashes, readable on any colour
+      const r = [sel.x * zoom + 0.5, (sel.y - region.y0) * zoom + 0.5, sel.w * zoom - 1, sel.h * zoom - 1] as const;
+      g.lineWidth = 1;
+      g.setLineDash([4, 4]);
+      g.strokeStyle = '#000';
+      g.strokeRect(...r);
+      g.lineDashOffset = 4;
+      g.strokeStyle = '#fff';
+      g.strokeRect(...r);
+      g.setLineDash([]);
+      g.lineDashOffset = 0;
+    }
     if (hover) {
       g.strokeStyle = 'rgba(255,255,255,0.8)';
       g.lineWidth = 1;
-      const off = tool === 'pencil' || tool === 'eraser' ? Math.floor((size - 1) / 2) : 0;
-      const s = tool === 'pencil' || tool === 'eraser' ? size : 1;
+      const brush = BRUSH.includes(tool);
+      const off = brush ? Math.floor((size - 1) / 2) : 0;
+      const s = brush ? size : 1;
       g.strokeRect((hover[0] - off) * zoom + 0.5, (hover[1] - region.y0 - off) * zoom + 0.5, s * zoom - 1, s * zoom - 1);
     }
-  }, [shown, rev, zoom, grid, hover, frames, fh, tool, size, single, onion, cur, region.y0, region.h, animated]);
+  }, [shown, rev, zoom, grid, hover, frames, fh, tool, size, single, onion, cur, region.y0, region.h, animated, sel?.x, sel?.y, sel?.w, sel?.h]);
 
   // the frame order as it will be saved, for playing the animation in the preview
   const playAnim = useMemo(() => {
-    if (!img || !animated || !metaAnim || typeof metaAnim !== 'object') return undefined;
+    if (!layers.length || !animated || !metaAnim || typeof metaAnim !== 'object') return undefined;
     const order = Array.isArray(metaAnim.frames) ? remapFrameOrder(metaAnim.frames, origin.current) : undefined;
-    return parseAnimation({ ...metaAnim, frames: order }, img.width, img.height);
+    return parseAnimation({ ...metaAnim, frames: order }, W, H);
     // origin changes together with rev
-  }, [img, animated, metaAnim, rev]);
+  }, [layers.length, W, H, animated, metaAnim, rev]);
 
   // small preview: the current frame at a readable size, optionally tiled 3×3 like a block surface; or the animation
   useEffect(() => {
@@ -263,77 +353,132 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
     dirty.current = true;
     useEditor.setState({ dirty: true });
     setRev((r) => r + 1);
-    if (!stroke.current) setPaletteRev((r) => r + 1);
+    if (!stroke.current && !drag.current) setPaletteRev((r) => r + 1);
   }, []);
 
-  const snapshot = (p: Pixels): Snapshot => ({ data: p.data.slice(), height: p.height, origin: [...origin.current] });
+  const snapshot = (): Snapshot => ({
+    layers: layers.map(({ px, ...meta }) => ({ ...meta, data: px.data.slice() })),
+    height: H,
+    active,
+    origin: [...origin.current],
+  });
   const remember = (s: Snapshot) => {
     undo.current.push(s);
     if (undo.current.length > HISTORY) undo.current.shift();
     redo.current = [];
   };
+  /** Brings back an undo step; names, visibility and opacity stay as they are now (they aren't undo steps). */
+  const restore = (s: Snapshot) => {
+    origin.current = s.origin;
+    setLayers(
+      s.layers.map(({ data, ...meta }) => {
+        const now = layers.find((l) => l.id === meta.id);
+        return { ...meta, ...(now && { name: now.name, visible: now.visible, opacity: now.opacity }), px: { width: W, height: s.height, data } };
+      }),
+    );
+    setActive(Math.min(s.active, s.layers.length - 1));
+  };
 
-  /** Saves the current state for undo, then lets `fn` change the image. */
+  /** Saves the current state for undo, then lets `fn` change the active layer. */
   const edit = useCallback(
     (fn: (p: Pixels) => void | boolean) => {
       if (!img) return;
-      const before = snapshot(img);
+      const before = snapshot();
       if (fn(img) === false) return;
       remember(before);
       commit();
     },
-    [img, commit],
+    [img, layers, active, commit],
   );
 
-  /** Replaces the frames (added, removed, moved); `from` is the old index of each new frame (-1 = new). */
-  const setFrames = (list: Pixels[], from: number[], select: number) => {
-    if (!img) return;
-    remember(snapshot(img));
-    origin.current = from.map((i) => (i < 0 ? -1 : origin.current[i]));
-    setImg(stackFrames(list, img.width, fh));
-    setCur(Math.max(0, Math.min(list.length - 1, select)));
+  /** Changes the layers themselves (added, removed, merged …) as one undo step. */
+  const changeLayers = (next: PaintLayer[], select: number) => {
+    remember(snapshot());
+    setLayers(next);
+    setActive(Math.max(0, Math.min(next.length - 1, select)));
     commit();
   };
-  const frameOps = img && {
+  const blankLayer = (name?: string): PaintLayer => {
+    const id = nextId.current++;
+    return { id, name: name ?? t('editor.texture.layerN', { n: id }), px: blankPixels(W, H), visible: true, opacity: 100 };
+  };
+  const layerActions: LayerActions = {
+    select: setActive,
     add: () => {
-      const list = splitFrames(img, fh);
-      const ids = list.map((_, i) => i);
-      list.splice(cur + 1, 0, blankPixels(img.width, fh));
-      ids.splice(cur + 1, 0, -1);
-      setFrames(list, ids, cur + 1);
+      const next = [...layers];
+      next.splice(active + 1, 0, blankLayer());
+      changeLayers(next, active + 1);
     },
     duplicate: () => {
-      const list = splitFrames(img, fh);
-      const ids = list.map((_, i) => i);
-      list.splice(cur + 1, 0, copyPixels(list[cur]));
-      ids.splice(cur + 1, 0, -1);
-      setFrames(list, ids, cur + 1);
+      const l = layers[active];
+      const next = [...layers];
+      next.splice(active + 1, 0, { ...l, id: nextId.current++, name: t('editor.texture.layerCopy', { name: l.name }), px: copyPixels(l.px) });
+      changeLayers(next, active + 1);
     },
     remove: () => {
-      const list = splitFrames(img, fh);
-      const ids = list.map((_, i) => i);
-      list.splice(cur, 1);
-      ids.splice(cur, 1);
-      setFrames(list, ids, cur);
+      if (layers.length <= 1) return;
+      changeLayers(
+        layers.filter((_, i) => i !== active),
+        active - 1,
+      );
     },
+    mergeDown: () => {
+      if (active <= 0) return;
+      const below = { ...layers[active - 1], px: copyPixels(layers[active - 1].px) };
+      const top = layers[active];
+      if (top.visible) mergeInto(below.px, top.px, top.opacity);
+      changeLayers(
+        layers.flatMap((l, i) => (i === active ? [] : i === active - 1 ? [below] : [l])),
+        active - 1,
+      );
+    },
+    move: (by) => {
+      const to = active + by;
+      if (to < 0 || to >= layers.length) return;
+      const next = [...layers];
+      [next[active], next[to]] = [next[to], next[active]];
+      changeLayers(next, to);
+    },
+    update: (i, change) => {
+      setLayers(layers.map((l, k) => (k === i ? { ...l, ...change } : l)));
+      // a different name doesn't change the picture
+      if ('visible' in change || 'opacity' in change) commit();
+    },
+  };
+
+  /** Rebuilds the frames of every layer (added, removed, moved); ids follow along to keep the frame order. */
+  const setFrames = (change: <T>(list: T[], fresh: (copyOf?: T) => T) => void, select: number) => {
+    if (!layers.length) return;
+    remember(snapshot());
+    const ids = Array.from({ length: frames }, (_, i) => i);
+    change(ids, () => -1);
+    origin.current = ids.map((i) => (i < 0 ? -1 : origin.current[i]));
+    setLayers(
+      layers.map((l) => {
+        const list = splitFrames(l.px, fh);
+        change(list, (copyOf) => (copyOf ? copyPixels(copyOf) : blankPixels(W, fh)));
+        return { ...l, px: stackFrames(list, W, fh) };
+      }),
+    );
+    setCur(Math.max(0, Math.min(ids.length - 1, select)));
+    commit();
+  };
+  const frameOps = {
+    add: () => setFrames((list, fresh) => void list.splice(cur + 1, 0, fresh()), cur + 1),
+    duplicate: () => setFrames((list, fresh) => void list.splice(cur + 1, 0, fresh(list[cur])), cur + 1),
+    remove: () => setFrames((list) => void list.splice(cur, 1), cur),
     move: (by: -1 | 1) => {
       const to = cur + by;
       if (to < 0 || to >= frames) return;
-      const list = splitFrames(img, fh);
-      const ids = list.map((_, i) => i);
-      [list[cur], list[to]] = [list[to], list[cur]];
-      [ids[cur], ids[to]] = [ids[to], ids[cur]];
-      setFrames(list, ids, to);
+      setFrames((list) => void ([list[cur], list[to]] = [list[to], list[cur]]), to);
     },
   };
 
   const step = (from: typeof undo, to: typeof undo) => {
     const prev = from.current.pop();
-    if (!img || !prev) return;
-    to.current.push(snapshot(img));
-    origin.current = prev.origin;
-    if (prev.height === img.height) img.data.set(prev.data);
-    else setImg({ width: img.width, height: prev.height, data: prev.data });
+    if (!layers.length || !prev) return;
+    to.current.push(snapshot());
+    restore(prev);
     commit();
   };
 
@@ -345,12 +490,34 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   /** Pixel under the pointer, in sheet coordinates. */
   const pixelAt = (e: React.PointerEvent): [number, number] => {
     const r = view.current!.getBoundingClientRect();
-    return [Math.floor(((e.clientX - r.left) / r.width) * img!.width), region.y0 + Math.floor(((e.clientY - r.top) / r.height) * region.h)];
+    return [Math.floor(((e.clientX - r.left) / r.width) * W), region.y0 + Math.floor(((e.clientY - r.top) / r.height) * region.h)];
   };
-  const inside = ([x, y]: [number, number]) => !!img && x >= 0 && x < img.width && y >= region.y0 && y < region.y0 + region.h;
-  /** Draws a line, kept inside the current frame in single-frame view. */
-  const line = (p: Pixels, a: [number, number], b: [number, number], c: RGBA) =>
-    scoped((q) => drawLine(q, a[0], a[1] - (single ? region.y0 : 0), b[0], b[1] - (single ? region.y0 : 0), c, size))(p);
+  const inside = ([x, y]: [number, number]) => !!img && x >= 0 && x < W && y >= region.y0 && y < region.y0 + region.h;
+  const clamp = ([x, y]: [number, number]): [number, number] => [Math.max(0, Math.min(W - 1, x)), Math.max(region.y0, Math.min(region.y0 + region.h - 1, y))];
+  /** Draws a pencil line, kept inside the current frame and the selection. */
+  const line = (p: Pixels, a: [number, number], b: [number, number], c: RGBA, clip: Rect | undefined) => drawLine(p, a[0], a[1], b[0], b[1], c, size, clip);
+
+  /** Lifts the selection (or the whole frame) off the active layer, to be moved. */
+  const lift = (start: [number, number]): Extract<Drag, { kind: 'move' }> | undefined => {
+    if (!img) return undefined;
+    const frame = single ? regionRect : animated && !sel ? { x: 0, y: Math.floor(start[1] / fh) * fh, w: W, h: fh } : { x: 0, y: 0, w: W, h: H };
+    const from = sel ?? frame;
+    remember(snapshot());
+    const piece = copyRect(img, from);
+    clearRect(img, from);
+    const base = img.data.slice();
+    paste(img, piece, from.x, from.y, frame);
+    return { kind: 'move', start, base, piece, from, last: from, clip: frame, withSel: !!sel };
+  };
+  const moveTo = (d: Extract<Drag, { kind: 'move' }>, dx: number, dy: number) => {
+    if (!img) return;
+    restoreRect(img, d.base, d.last);
+    const at = { ...d.from, x: d.from.x + dx, y: d.from.y + dy };
+    paste(img, d.piece, at.x, at.y, d.clip);
+    d.last = at;
+    if (d.withSel) setSelRel({ ...at, y: at.y - region.y0 });
+    commit();
+  };
 
   // touch: two fingers zoom and pan; once a pen was used, a resting hand doesn't draw
   const pinch = useRef(new PinchTracker());
@@ -358,53 +525,72 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   const penSeen = useRef(false);
   /** Takes back the stroke just begun (a second finger came down: it was a gesture after all). */
   const cancelStroke = () => {
-    const prev = undo.current.pop();
+    const wasEdit = stroke.current || (drag.current && drag.current.kind !== 'select');
     stroke.current = null;
-    if (!img || !prev) return;
-    origin.current = prev.origin;
-    img.data.set(prev.data);
+    drag.current = null;
+    const prev = wasEdit ? undo.current.pop() : undefined;
+    if (prev) restore(prev);
     commit();
   };
 
   const onDown = (e: React.PointerEvent) => {
-    if (!img || hsl.some((v) => v !== 0)) return;
+    if (!img || adjusting) return;
     e.preventDefault();
     if (e.pointerType === 'pen') penSeen.current = true;
     if (e.pointerType === 'touch') {
       (e.target as Element).setPointerCapture(e.pointerId);
       if (pinch.current.down(e.pointerId, e.clientX, e.clientY)) {
-        if (stroke.current) cancelStroke();
+        if (stroke.current || drag.current) cancelStroke();
         gesture.current ??= { zoom };
         return;
       }
       if (penSeen.current) return;
     }
     const p = pixelAt(e);
+    const erasing = e.button === 2 || isPenEraser(e);
+    const use: Tool = e.altKey ? 'picker' : erasing && (tool === 'line' || tool === 'rect') ? tool : erasing ? 'eraser' : tool;
+    if (use === 'select' || use === 'move') {
+      (e.target as Element).setPointerCapture(e.pointerId);
+      if (use === 'select') {
+        const s = clamp(p);
+        drag.current = { kind: 'select', start: s, moved: false };
+      } else drag.current = lift(p) ?? null;
+      return;
+    }
     if (!inside(p)) return;
-    const active: Tool = e.altKey ? 'picker' : e.button === 2 || isPenEraser(e) ? 'eraser' : tool;
-    if (active === 'picker') {
-      useColor(getPixel(img, ...p));
+    if (use === 'picker') {
+      useColor(getPixel(flat ?? img, ...p));
       // Alt+click keeps the current tool, so only the picker tool itself hands over to the pencil
       if (tool === 'picker') setTool('pencil');
       return;
     }
-    if (active === 'fill') {
-      if (single) edit(scoped((px) => floodFill(px, p[0], p[1] - region.y0, color, !fillAll, tolerance) > 0));
-      else {
-        const f = Math.floor(p[1] / fh) * fh;
-        edit((px) => floodFill(px, p[0], p[1], color, !fillAll, tolerance, { y0: f, y1: f + fh }) > 0);
-      }
+    const clip = limitAt(p[1]);
+    if (sel && !clip) return;
+    if (use === 'fill') {
+      const b = clip && { x0: clip.x, x1: clip.x + clip.w, y0: clip.y, y1: clip.y + clip.h };
+      // without a selection, "every pixel of that colour" means the whole sheet in sheet view
+      const bounds = fillAll && !sel && !single ? undefined : b;
+      edit((px) => floodFill(px, p[0], p[1], color, !fillAll, tolerance, bounds) > 0);
       useColor(color);
       return;
     }
-    const erase = active === 'eraser';
-    const c: RGBA = erase ? [0, 0, 0, 0] : color;
-    const from = e.shiftKey && lastPoint.current && inside(lastPoint.current) ? lastPoint.current : p;
-    edit((px) => line(px, from, p, c));
-    stroke.current = { last: p, erase };
-    lastPoint.current = p;
+    const c: RGBA = use === 'eraser' || erasing ? CLEAR : color;
     (e.target as Element).setPointerCapture(e.pointerId);
-    if (!erase) useColor(color);
+    if (use === 'line' || use === 'rect') {
+      remember(snapshot());
+      const base = img.data.slice();
+      const last = shapeBounds(p, p, size);
+      drag.current = { kind: use, start: p, base, last, color: c, clip };
+      if (use === 'line') line(img, p, p, c, clip);
+      else drawRect(img, p, p, c, filledRect, size, clip);
+      commit();
+    } else {
+      const from = e.shiftKey && lastPoint.current && inside(lastPoint.current) ? lastPoint.current : p;
+      edit((px) => line(px, from, p, c, clip));
+      stroke.current = { last: p, erase: c === CLEAR, clip };
+      lastPoint.current = p;
+    }
+    if (c !== CLEAR) useColor(color);
   };
 
   const onMove = (e: React.PointerEvent) => {
@@ -416,13 +602,32 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
         setZoom(Math.round(gesture.current.zoom));
         area.current?.scrollBy(-step.dx, -step.dy);
       }
-      if (gesture.current || (penSeen.current && !stroke.current)) return;
+      if (gesture.current || (penSeen.current && !stroke.current && !drag.current)) return;
     }
     const p = pixelAt(e);
     setHover(inside(p) ? p : undefined);
+    const d = drag.current;
+    if (d) {
+      if (d.kind === 'select') {
+        const end = clamp(p);
+        if (!d.moved && end[0] === d.start[0] && end[1] === d.start[1]) return;
+        d.moved = true;
+        const r = rectBetween(d.start, end, regionRect);
+        setSelRel(r && { ...r, y: r.y - region.y0 });
+      } else if (d.kind === 'move') moveTo(d, p[0] - d.start[0], p[1] - d.start[1]);
+      else {
+        const end = e.shiftKey ? constrain(d.start, p, d.kind === 'rect') : p;
+        restoreRect(img, d.base, d.last);
+        if (d.kind === 'line') line(img, d.start, end, d.color, d.clip);
+        else drawRect(img, d.start, end, d.color, filledRect, size, d.clip);
+        d.last = shapeBounds(d.start, end, size);
+        commit();
+      }
+      return;
+    }
     const s = stroke.current;
     if (!s || (p[0] === s.last[0] && p[1] === s.last[1])) return;
-    line(img, s.last, p, s.erase ? [0, 0, 0, 0] : color);
+    line(img, s.last, p, s.erase ? CLEAR : color, s.clip);
     s.last = p;
     lastPoint.current = p;
     commit();
@@ -433,8 +638,47 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
       pinch.current.up(e.pointerId);
       if (!pinch.current.count) gesture.current = null;
     }
-    if (stroke.current) setPaletteRev((r) => r + 1);
+    const d = drag.current;
+    // a click with the selection tool drops the selection
+    if (d?.kind === 'select' && !d.moved) setSelRel(undefined);
+    if (stroke.current || d) setPaletteRev((r) => r + 1);
     stroke.current = null;
+    drag.current = null;
+  };
+
+  // selection and clipboard
+  const selectAll = () => {
+    setSelRel({ x: 0, y: 0, w: W, h: region.h });
+    setTool('select');
+  };
+  const copy = () => {
+    if (!img) return;
+    clipboard = copyRect(img, sel ?? regionRect);
+    setHasClip(true);
+    // other programs get it too, where the browser allows that
+    void encodePng(clipboard)
+      .then((png) => navigator.clipboard?.write?.([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]))
+      .catch(() => undefined);
+  };
+  const deleteSel = () => sel && edit((p) => clearRect(p, sel));
+  /** Pastes an image into a new layer, at the selection (or the top left corner), ready to be moved. */
+  const pasteLayer = (piece: Pixels) => {
+    if (!layers.length) return;
+    const at = sel ?? regionRect;
+    const layer = blankLayer(t('editor.texture.pastedLayer'));
+    paste(layer.px, piece, at.x, at.y, regionRect);
+    const next = [...layers];
+    next.splice(active + 1, 0, layer);
+    changeLayers(next, active + 1);
+    const r = intersect({ x: at.x, y: at.y, w: piece.width, h: piece.height }, regionRect);
+    setSelRel(r && { ...r, y: r.y - region.y0 });
+    setTool('move');
+  };
+  const nudge = (dx: number, dy: number) => {
+    if (!sel) return;
+    const d = lift([sel.x, sel.y]);
+    if (d) moveTo(d, dx, dy);
+    setPaletteRev((r) => r + 1);
   };
 
   const close = () => {
@@ -442,10 +686,10 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   };
 
   const save = async () => {
-    if (!img) return;
+    if (!layers.length) return;
     setSaving(true);
     try {
-      const png = await encodePng(img);
+      const png = await encodePng(flatten(layers, W, H));
       dirty.current = false;
       useEditor.setState({ dirty: false });
       setFile(path, png);
@@ -466,33 +710,73 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
   // keyboard shortcuts
   const keys = useRef<(e: KeyboardEvent) => void>();
   keys.current = (e: KeyboardEvent) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
     const k = e.key.toLowerCase();
-    if ((e.ctrlKey || e.metaKey) && k === 'z') {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && k === 'z') {
       e.preventDefault();
       return e.shiftKey ? step(redo, undo) : step(undo, redo);
     }
-    if ((e.ctrlKey || e.metaKey) && k === 'y') {
+    if (mod && k === 'y') {
       e.preventDefault();
       return step(redo, undo);
     }
-    if ((e.ctrlKey || e.metaKey) && k === 's') {
+    if (mod && k === 's') {
       e.preventDefault();
       return void save();
     }
-    if (e.key === 'Escape') return close();
+    if (mod && k === 'a') {
+      e.preventDefault();
+      return selectAll();
+    }
+    if (mod && k === 'd') {
+      e.preventDefault();
+      return setSelRel(undefined);
+    }
+    if (mod && (k === 'c' || k === 'x')) {
+      e.preventDefault();
+      copy();
+      if (k === 'x') deleteSel();
+      return;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
+      e.preventDefault();
+      return deleteSel();
+    }
+    if (sel && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const by = e.shiftKey ? 4 : 1;
+      return nudge(e.key === 'ArrowLeft' ? -by : e.key === 'ArrowRight' ? by : 0, e.key === 'ArrowUp' ? -by : e.key === 'ArrowDown' ? by : 0);
+    }
+    if (e.key === 'Escape') return sel ? setSelRel(undefined) : close();
     if (animated && (k === ',' || k === '.')) return setCur((c) => (c + (k === ',' ? frames - 1 : 1)) % frames);
     const found = TOOLS.find(([, , key]) => key === k);
-    if (found && !e.ctrlKey && !e.metaKey) setTool(found[0]);
+    if (found && !mod) setTool(found[0]);
+  };
+  // pasting: an image from another program, else what was copied here
+  const onPaste = useRef<(e: ClipboardEvent) => void>();
+  onPaste.current = (e: ClipboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    e.preventDefault();
+    if (file) void decodeImage(file).then(pasteLayer, () => clipboard && pasteLayer(clipboard));
+    else if (clipboard) pasteLayer(clipboard);
   };
   useEffect(() => {
     const h = (e: KeyboardEvent) => keys.current?.(e);
+    const p = (e: ClipboardEvent) => onPaste.current?.(e);
     window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
+    window.addEventListener('paste', p);
+    return () => {
+      window.removeEventListener('keydown', h);
+      window.removeEventListener('paste', p);
+    };
   }, []);
 
-  const adjusting = hsl.some((v) => v !== 0);
-  const square = !!img && img.width === fh;
+  const square = !!img && (sel ? sel.w === sel.h : W === fh);
+  const scopeLabel = (whole: string, frame: string) => (sel ? t('editor.texture.inSelection', { what: whole }) : single ? frame : whole);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -501,8 +785,9 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
         <span className="min-w-0 truncate font-mono text-xs text-neutral-400">{path}</span>
         {img && (
           <span className="text-xs text-neutral-500">
-            {img.width}×{img.height}
+            {W}×{H}
             {animated && ` · ${t('editor.texture.frames', { count: frames })}`}
+            {layers.length > 1 && ` · ${t('editor.texture.layerCount', { count: layers.length })}`}
           </span>
         )}
         <div className="ml-auto flex gap-1">
@@ -529,17 +814,20 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
           {t('editor.texture.tile')}
         </label>
         <span className="text-neutral-500">{hover && t('editor.texture.position', { x: hover[0], y: hover[1] - region.y0 })}</span>
+        {sel && <span className="text-neutral-400">{t('editor.texture.selectionSize', { w: sel.w, h: sel.h })}</span>}
         {animated && sheetView && <span className="ml-auto text-[11px] text-neutral-500">{t('editor.texture.framesHint')}</span>}
       </div>
       {error && <div className="m-3 rounded bg-red-950 p-2 text-xs text-red-200">{t('editor.loadFailed', { error })}</div>}
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-r border-neutral-800 p-3 text-xs">
+        <aside className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-r border-neutral-800 p-3 text-xs">
           <div className="grid grid-cols-4 gap-1">
             {TOOLS.map(([id, icon, key]) => (
               <button
                 key={id}
                 onClick={() => setTool(id)}
                 title={`${t(`editor.texture.${id}`)} (${key.toUpperCase()})`}
+                aria-label={t(`editor.texture.${id}`)}
+                aria-pressed={tool === id}
                 className={`rounded py-1.5 text-base ${tool === id ? 'bg-emerald-700' : 'bg-neutral-800 hover:bg-neutral-700'}`}
               >
                 {icon}
@@ -547,11 +835,17 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
             ))}
           </div>
           <div className="text-neutral-300">{t(`editor.texture.${tool}`)}</div>
-          {(tool === 'pencil' || tool === 'eraser') && (
+          {BRUSH.includes(tool) && (
             <label className="flex items-center gap-2">
               {t('editor.texture.size')}
               <input type="range" min={1} max={8} value={size} onChange={(e) => setSize(Number(e.target.value))} className="flex-1" />
               <span className="w-4 text-right">{size}</span>
+            </label>
+          )}
+          {tool === 'rect' && (
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={filledRect} onChange={(e) => setFilledRect(e.target.checked)} />
+              {t('editor.texture.filled')}
             </label>
           )}
           {tool === 'fill' && (
@@ -567,16 +861,26 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
               </label>
             </>
           )}
+          {(tool === 'select' || tool === 'move' || sel) && (
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap gap-1">
+                <Btn onClick={selectAll}>{t('editor.texture.selectAll')}</Btn>
+                <Btn onClick={() => setSelRel(undefined)} disabled={!sel}>{t('editor.texture.deselect')}</Btn>
+                <Btn onClick={copy}>{t('editor.texture.copy')}</Btn>
+                <Btn onClick={() => clipboard && pasteLayer(clipboard)} disabled={!hasClip} title={t('editor.texture.pasteTitle')}>
+                  {t('editor.texture.paste')}
+                </Btn>
+                <Btn onClick={deleteSel} disabled={!sel}>{t('editor.texture.clear')}</Btn>
+              </div>
+              <p className="text-[11px] leading-snug text-neutral-500">{t('editor.texture.selectHint')}</p>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="checker h-9 w-9 shrink-0 overflow-hidden rounded ring-1 ring-neutral-600">
-              <div className="h-full w-full" style={{ background: `rgba(${color[0]},${color[1]},${color[2]},${color[3] / 255})` }} />
+              <div className="h-full w-full" style={{ background: css(color) }} />
             </div>
             <input type="color" value={toHex(color)} onChange={(e) => setColor(fromHex(e.target.value, color[3]))} className="h-9 w-12 cursor-pointer bg-transparent" />
-            <input
-              value={toHex(color)}
-              onChange={(e) => /^#[0-9a-f]{6}$/i.test(e.target.value) && setColor(fromHex(e.target.value, color[3]))}
-              className="w-full rounded bg-neutral-800 px-1 py-1 font-mono"
-            />
+            <HexInput color={color} onChange={setColor} label={t('editor.texture.hex')} />
           </div>
           <label className="flex items-center gap-2">
             {t('editor.texture.alpha')}
@@ -586,26 +890,37 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
           {recent.length > 0 && <Swatches label={t('editor.texture.recent')} colors={recent} current={color} onPick={setColor} />}
           <Swatches label={t('editor.texture.colors')} colors={palette} current={color} onPick={setColor} />
           <p className="text-[11px] leading-snug text-neutral-500">{t('editor.texture.toolHint')}</p>
-          <Section title={single ? t('editor.texture.transformFrame') : t('editor.texture.transform')}>
+          {layers.length > 0 && <LayersPanel layers={layers} active={active} actions={layerActions} />}
+          <PalettePanel current={color} onPick={setColor} busy={adjusting} onSnap={(colors) => edit((p) => snapToPalette(p, colors, mask) > 0)} />
+          <ReplaceColorPanel
+            path={path}
+            current={color}
+            onHere={(from, to, tol) => {
+              let n = 0;
+              edit((p) => (n = replaceColor(p, from, to, tol, mask)) > 0);
+              return n;
+            }}
+          />
+          <Section title={scopeLabel(t('editor.texture.transform'), t('editor.texture.transformFrame'))}>
             <div className="flex flex-wrap gap-1">
-              <Btn onClick={() => edit(scoped((p) => flip(p, 'h', fh)))}>{t('editor.texture.flipH')}</Btn>
-              <Btn onClick={() => edit(scoped((p) => flip(p, 'v', fh)))}>{t('editor.texture.flipV')}</Btn>
-              <Btn onClick={() => edit(scoped((p) => rotate(p, true, fh)))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
+              <Btn onClick={() => edit(within((p) => flip(p, 'h', sel ? p.height : fh)))}>{t('editor.texture.flipH')}</Btn>
+              <Btn onClick={() => edit(within((p) => flip(p, 'v', sel ? p.height : fh)))}>{t('editor.texture.flipV')}</Btn>
+              <Btn onClick={() => edit(within((p) => rotate(p, true, sel ? p.height : fh)))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
                 {t('editor.texture.rotateCw')}
               </Btn>
-              <Btn onClick={() => edit(scoped((p) => rotate(p, false, fh)))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
+              <Btn onClick={() => edit(within((p) => rotate(p, false, sel ? p.height : fh)))} disabled={!square} title={square ? undefined : t('editor.texture.rotateHint')}>
                 {t('editor.texture.rotateCcw')}
               </Btn>
             </div>
             <div className="text-neutral-400">{t('editor.texture.shift')}</div>
             <div className="flex gap-1">
-              <Btn onClick={() => edit(scoped((p) => shift(p, -1, 0, fh)))}>←</Btn>
-              <Btn onClick={() => edit(scoped((p) => shift(p, 1, 0, fh)))}>→</Btn>
-              <Btn onClick={() => edit(scoped((p) => shift(p, 0, -1, fh)))}>↑</Btn>
-              <Btn onClick={() => edit(scoped((p) => shift(p, 0, 1, fh)))}>↓</Btn>
+              <Btn onClick={() => edit(within((p) => shift(p, -1, 0, sel ? p.height : fh)))}>←</Btn>
+              <Btn onClick={() => edit(within((p) => shift(p, 1, 0, sel ? p.height : fh)))}>→</Btn>
+              <Btn onClick={() => edit(within((p) => shift(p, 0, -1, sel ? p.height : fh)))}>↑</Btn>
+              <Btn onClick={() => edit(within((p) => shift(p, 0, 1, sel ? p.height : fh)))}>↓</Btn>
             </div>
           </Section>
-          <Section title={single ? t('editor.texture.adjustFrame') : t('editor.texture.adjust')}>
+          <Section title={scopeLabel(t('editor.texture.adjust'), t('editor.texture.adjustFrame'))}>
             {(['hue', 'saturation', 'lightness'] as const).map((k, i) => (
               <label key={k} className="flex items-center gap-2">
                 <span className="w-16">{t(`editor.texture.${k}`)}</span>
@@ -629,7 +944,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
                 <Btn
                   tone="primary"
                   onClick={() => {
-                    edit((p) => adjustHsl(p, ...hsl, frameMask));
+                    edit((p) => adjustHsl(p, ...hsl, mask));
                     setHsl([0, 0, 0]);
                   }}
                 >
@@ -639,8 +954,8 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
               </div>
             )}
             <div className="flex gap-1">
-              <Btn onClick={() => edit(scoped(grayscale))} disabled={adjusting}>{t('editor.texture.grayscale')}</Btn>
-              <Btn onClick={() => edit(scoped(invert))} disabled={adjusting}>{t('editor.texture.invert')}</Btn>
+              <Btn onClick={() => edit(within(grayscale))} disabled={adjusting}>{t('editor.texture.grayscale')}</Btn>
+              <Btn onClick={() => edit(within(invert))} disabled={adjusting}>{t('editor.texture.invert')}</Btn>
             </div>
           </Section>
         </aside>
@@ -650,8 +965,9 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
             {img && (
               <canvas
                 ref={view}
-                className="checker mx-auto block cursor-crosshair touch-none shadow-lg"
-                style={{ width: img.width * zoom, height: region.h * zoom }}
+                aria-label={t('editor.texture.canvas')}
+                className={`checker mx-auto block touch-none shadow-lg ${tool === 'move' ? 'cursor-move' : 'cursor-crosshair'}`}
+                style={{ width: W * zoom, height: region.h * zoom }}
                 onPointerDown={onDown}
                 onPointerMove={onMove}
                 onPointerUp={onUp}
@@ -665,7 +981,7 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
               className="checker pixelated pointer-events-none absolute bottom-3 right-3 rounded shadow-lg ring-1 ring-neutral-700"
             />
           </div>
-          {img && animated && frameOps && (
+          {img && animated && (
             <div className="flex flex-col gap-1.5 border-t border-neutral-800 bg-neutral-950 px-3 py-2 text-xs">
               <div className="flex flex-wrap items-center gap-1">
                 <span className="mr-1 font-medium text-neutral-300">{t('editor.texture.frameOf', { n: cur + 1, count: frames })}</span>
@@ -685,9 +1001,8 @@ export function TextureEditor({ path, bytes, onDone }: { path: string; bytes: Ui
                 </label>
               </div>
               <div className="flex gap-1 overflow-x-auto pb-1">
-                {Array.from({ length: frames }, (_, i) => (
-                  <FrameThumb key={i} img={img} fh={fh} index={i} rev={rev} active={i === cur} onClick={() => setCur(i)} />
-                ))}
+                {flat &&
+                  Array.from({ length: frames }, (_, i) => <FrameThumb key={i} img={flat} fh={fh} index={i} rev={rev} active={i === cur} onClick={() => setCur(i)} />)}
               </div>
               <p className="text-[11px] text-neutral-500">{t('editor.texture.framesStripHint')}</p>
             </div>
@@ -717,35 +1032,5 @@ function FrameThumb({ img, fh, index, rev, active, onClick }: { img: Pixels; fh:
       <canvas ref={ref} className="checker pixelated block" style={{ width: img.width * scale, height: fh * scale }} />
       <span className="absolute bottom-0 right-0.5 font-mono text-[9px] text-neutral-300">{index + 1}</span>
     </button>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <details open className="border-t border-neutral-800 pt-2">
-      <summary className="mb-2 cursor-pointer select-none text-neutral-400">{title}</summary>
-      <div className="flex flex-col gap-2">{children}</div>
-    </details>
-  );
-}
-
-function Swatches({ label, colors, current, onPick }: { label: string; colors: RGBA[]; current: RGBA; onPick: (c: RGBA) => void }) {
-  if (!colors.length) return null;
-  return (
-    <div>
-      <div className="mb-1 text-neutral-400">{label}</div>
-      <div className="flex flex-wrap gap-0.5">
-        {colors.map((c) => (
-          <button
-            key={c.join()}
-            onClick={() => onPick(c)}
-            title={`${toHex(c)} · ${Math.round((c[3] / 255) * 100)}%`}
-            className={`checker h-5 w-5 overflow-hidden rounded-sm ${sameColor(c, current) ? 'ring-2 ring-emerald-400' : 'ring-1 ring-neutral-700'}`}
-          >
-            <span className="block h-full w-full" style={{ background: `rgba(${c[0]},${c[1]},${c[2]},${c[3] / 255})` }} />
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

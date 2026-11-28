@@ -24,8 +24,22 @@ export function setPixel(p: Pixels, x: number, y: number, c: RGBA): void {
   p.data.set(c, (y * p.width + x) * 4);
 }
 
+/** A rectangle painting stays inside (a frame, a selection). */
+export interface Clip {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Sets a pixel if it's inside the image and `clip`. */
+export function plot(p: Pixels, x: number, y: number, c: RGBA, clip?: Clip): void {
+  if (clip && (x < clip.x || y < clip.y || x >= clip.x + clip.w || y >= clip.y + clip.h)) return;
+  setPixel(p, x, y, c);
+}
+
 /** Draws a square brush of `size` px at every point of the line from (x0,y0) to (x1,y1). */
-export function drawLine(p: Pixels, x0: number, y0: number, x1: number, y1: number, c: RGBA, size = 1): void {
+export function drawLine(p: Pixels, x0: number, y0: number, x1: number, y1: number, c: RGBA, size = 1, clip?: Clip): void {
   const dx = Math.abs(x1 - x0);
   const dy = -Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1;
@@ -33,7 +47,7 @@ export function drawLine(p: Pixels, x0: number, y0: number, x1: number, y1: numb
   let err = dx + dy;
   const off = Math.floor((size - 1) / 2);
   for (;;) {
-    for (let by = 0; by < size; by++) for (let bx = 0; bx < size; bx++) setPixel(p, x0 - off + bx, y0 - off + by, c);
+    for (let by = 0; by < size; by++) for (let bx = 0; bx < size; bx++) plot(p, x0 - off + bx, y0 - off + by, c, clip);
     if (x0 === x1 && y0 === y1) break;
     const e2 = 2 * err;
     if (e2 >= dy) {
@@ -54,23 +68,37 @@ const close = (p: Pixels, i: number, c: RGBA, tol: number) =>
 
 /**
  * Bucket fill from (x, y). `contiguous` false recolours every matching pixel of the image.
- * `bounds` keeps a contiguous fill inside one frame of an animated texture.
+ * `bounds` keeps the fill inside one frame of an animated texture or a selection.
  */
-export function floodFill(p: Pixels, x: number, y: number, c: RGBA, contiguous = true, tolerance = 0, bounds?: { y0: number; y1: number }): number {
+export function floodFill(
+  p: Pixels,
+  x: number,
+  y: number,
+  c: RGBA,
+  contiguous = true,
+  tolerance = 0,
+  bounds?: { y0: number; y1: number; x0?: number; x1?: number },
+): number {
   if (x < 0 || y < 0 || x >= p.width || y >= p.height) return 0;
   const target = getPixel(p, x, y);
   if (target.every((v, k) => v === c[k])) return 0;
   let n = 0;
+  const y0 = bounds?.y0 ?? 0;
+  const y1 = bounds?.y1 ?? p.height;
+  const x0 = bounds?.x0 ?? 0;
+  const x1 = bounds?.x1 ?? p.width;
+  if (x < x0 || x >= x1 || y < y0 || y >= y1) return 0;
   if (!contiguous) {
-    for (let i = 0; i < p.data.length; i += 4)
-      if (close(p, i, target, tolerance)) {
-        p.data.set(c, i);
-        n++;
+    for (let yy = y0; yy < y1; yy++)
+      for (let xx = x0; xx < x1; xx++) {
+        const i = (yy * p.width + xx) * 4;
+        if (close(p, i, target, tolerance)) {
+          p.data.set(c, i);
+          n++;
+        }
       }
     return n;
   }
-  const y0 = bounds?.y0 ?? 0;
-  const y1 = bounds?.y1 ?? p.height;
   const seen = new Uint8Array(p.width * p.height);
   const stack = [y * p.width + x];
   while (stack.length) {
@@ -82,8 +110,8 @@ export function floodFill(p: Pixels, x: number, y: number, c: RGBA, contiguous =
     n++;
     const px = k % p.width;
     const py = (k - px) / p.width;
-    if (px > 0) stack.push(k - 1);
-    if (px < p.width - 1) stack.push(k + 1);
+    if (px > x0) stack.push(k - 1);
+    if (px < x1 - 1) stack.push(k + 1);
     if (py > y0) stack.push(k - p.width);
     if (py < y1 - 1) stack.push(k + p.width);
   }
