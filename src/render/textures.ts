@@ -125,7 +125,29 @@ async function decodeMix(store: AssetStore, layers: MixLayer[]): Promise<TexInfo
   return { canvas, width: w, height: h, pixels, translucent: hasTranslucency(pixels), frames: 1, missing: false };
 }
 
+/**
+ * Textures that aren't part of the pack, only shown in previews (a player skin or cape you load):
+ * `__custom:<name>`. A new picture gets a new id, so caches keyed by id stay right.
+ */
+export const CUSTOM_NS = '__custom';
+const custom = new Map<string, Uint8Array>();
+let customCount = 0;
+
+export function addCustomTexture(name: string, png: Uint8Array): string {
+  const id = `${CUSTOM_NS}:${name}_${++customCount}`;
+  custom.set(id, png);
+  return id;
+}
+
+export const isCustomTexture = (id: string) => id.startsWith(`${CUSTOM_NS}:`);
+
 export function loadTexture(store: AssetStore, textureId: string): Promise<TexInfo> {
+  if (isCustomTexture(textureId)) {
+    let p = cache.get(textureId);
+    const bytes = custom.get(textureId);
+    if (!p) cache.set(textureId, (p = bytes ? decode(bytes, undefined).catch(() => missingTexture()) : Promise.resolve(missingTexture())));
+    return p;
+  }
   const mix = parseMixTexture(textureId);
   if (mix) {
     // cached per id and the revisions of the textures it's made of

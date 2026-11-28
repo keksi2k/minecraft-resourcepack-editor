@@ -15,6 +15,8 @@ import { DYE } from '../entities/specials';
 import { useT } from '../i18n';
 import { parseRL } from '../models/resourceLocation';
 import { useApp } from '../state/appStore';
+import { isPlayer } from '../entities/player';
+import { PlayerLook } from './PlayerLook';
 
 /** Item names of armour pieces differ from the equipment ids (gold → golden, turtle_scute → turtle). */
 const ITEM_MATERIAL: Record<string, string> = { gold: 'golden', turtle_scute: 'turtle' };
@@ -68,11 +70,12 @@ export function MobLookPanel({ store, mob, value, onChange }: { store: AssetStor
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('mobs.look.title')}</h3>
       <div className="flex flex-col gap-2 text-xs">
         <p className="text-neutral-400">{t('mobs.look.intro')}</p>
+        {isPlayer(mob) && <PlayerLook store={store} mob={mob} value={value} onChange={onChange} row={row} select={select} />}
         {caps.armor.map((slot) => {
           const list = slot === 'leggings' ? materials.leggings : materials.humanoid;
           return row(
             t(`mobs.look.${slot}`),
-            <select value={value.armor?.[slot] ?? ''} onChange={(e) => set({ armor: { ...value.armor, [slot]: e.target.value || undefined } })} className={select}>
+            <select value={value.armor?.[slot] ?? ''} disabled={slot === 'chestplate' && !!value.elytra} onChange={(e) => set({ armor: { ...value.armor, [slot]: e.target.value || undefined } })} className={select}>
               <option value="">{t('mobs.look.none')}</option>
               {list.map((id) => (
                 <option key={id} value={id}>

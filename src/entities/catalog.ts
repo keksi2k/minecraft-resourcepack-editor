@@ -8,6 +8,10 @@ export interface MobLayer {
   emissive?: boolean;
   /** Colour the texture is multiplied with (tropical fish). */
   tint?: number;
+  /** Overrides for the root part's pose (pixels / radians), e.g. an elytra 2 px behind the body. */
+  rootPose?: Partial<Record<'x' | 'y' | 'z' | 'xRot' | 'yRot' | 'zRot', number>>;
+  /** Stretch the UVs when the picture's aspect ratio differs from the model's (64×32 capes on a 64×64 model). */
+  matchAspect?: boolean;
 }
 
 /** Variant labels are translated (i18n key `mobs.variant.<name>`). */

@@ -32,6 +32,7 @@ export type DisplayContext =
   | 'fixed'
   | 'head'
   | 'thirdperson_righthand'
+  | 'thirdperson_lefthand'
   | 'firstperson_righthand'
   | 'none';
 

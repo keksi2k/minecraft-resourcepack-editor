@@ -4,9 +4,11 @@ import type { MobDef } from '../entities/catalog';
 import models from '../entities/entityModels.json';
 import { mobLayers, type MobOptions } from '../entities/equipment';
 import { mergePoses, motionPose, type Motion } from '../entities/motion';
-import { resolveModel, type FaceDir } from '../models/modelResolver';
+import { resolveItemModels } from '../models/items';
+import { resolveModel, type DisplayTransform, type FaceDir } from '../models/modelResolver';
+import { CAPE_TILT, isPlayer, isSlim } from '../entities/player';
 import { texturePath } from '../models/resourceLocation';
-import { buildModelObject, MeshBatch, vertexColor } from './buildMesh';
+import { applyDisplay, buildModelObject, MeshBatch, vertexColor } from './buildMesh';
 import { loadTexture, type TexInfo } from './textures';
 import type { UVTemplate } from './uvTemplate';
 
@@ -96,6 +98,8 @@ export interface LayerSpec {
   part?: string;
   /** Overrides for the root part's pose, as a model's setupAnim would set them. */
   rootPose?: Partial<Record<(typeof POSE_FIELDS)[number], number>>;
+  /** Stretch the UVs when the picture's aspect ratio differs from the model's texture size. */
+  matchAspect?: boolean;
 }
 
 const POSE_FIELDS = ['x', 'y', 'z', 'xRot', 'yRot', 'zRot'] as const;
@@ -124,6 +128,8 @@ export async function buildLayerMesh(
   if (!model) return undefined;
   const tex = await loadTexture(store, layer.texture);
   const outerNormal = new THREE.Matrix3().getNormalMatrix(outer);
+  // a 64×32 cape on the 64×64 cape model: the same pixels, half as many rows
+  const vScale = layer.matchAspect && !tex.missing ? model.tex[1] / model.tex[0] / (tex.height / tex.width) : 1;
   const inPart = (name: string) => !layer.part || name === layer.part || name.startsWith(`${layer.part}/`);
   /** Geometry of the layer in a pose; the same parts in the same order every time. */
   const geometry = (pose: MobLook | undefined) => {
@@ -137,7 +143,7 @@ export async function buildLayerMesh(
       const order = [0, 3, 2, 1];
       batch.quad(
         order.map((i) => verts[i]),
-        order.map((i) => [uvs[i][0], 1 - uvs[i][1]] as [number, number]),
+        order.map((i) => [uvs[i][0], 1 - uvs[i][1] * vScale] as [number, number]),
         vertexColor(s, layer.tint ?? 0xffffff),
       );
     });
@@ -281,10 +287,68 @@ async function buildMushrooms(store: AssetStore, mob: MobDef, mainModel: string)
   return { group, follow: (pose: Record<string, [number, number, number]>) => headAt(pose.head) };
 }
 
+/** How an arm holding an item is raised: the game's ArmPose.ITEM at rest. */
+export const HOLD_ARM = -Math.PI / 10;
+
+/** A display transform for the left hand: the game mirrors the right hand's (or the left's own). */
+export function handDisplay(display: Partial<Record<string, DisplayTransform>>, left: boolean): DisplayTransform | undefined {
+  const t = left ? (display.thirdperson_lefthand ?? display.thirdperson_righthand) : display.thirdperson_righthand;
+  if (!t || !left) return t;
+  const [tx, ty, tz] = t.translation ?? [0, 0, 0];
+  const [rx, ry, rz] = t.rotation ?? [0, 0, 0];
+  return { ...t, translation: [-tx, ty, tz], rotation: [rx, -ry, -rz] };
+}
+
+/** Where an item sits on an arm, in layer space (blocks, model axes): ItemInHandLayer's steps. */
+export function handMatrix(arm: number[], extra: [number, number, number], left: boolean, slim: boolean): THREE.Matrix4 {
+  const [x, y, z, xr, yr, zr] = arm;
+  // slim arms are half a pixel narrower; the game moves the hand in by that much
+  const ax = slim ? x + (left ? -0.5 : 0.5) : x;
+  return move(ax / 16, y / 16, z / 16)
+    .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(xr + extra[0], yr + extra[1], zr + extra[2], 'ZYX')))
+    .multiply(new THREE.Matrix4().makeRotationX(deg(-90)))
+    .multiply(rotY(180))
+    .multiply(move((left ? -1 : 1) / 16, 2 / 16, -10 / 16));
+}
+
+/** Items in a player's hands, following the arms when they swing. */
+async function buildHeldItems(store: AssetStore, mainModel: string, hands: { left: boolean; item: string }[], slim: boolean) {
+  const arms = ENTITY_MODELS[mainModel]?.root.children;
+  const group = new THREE.Group();
+  const placed: { holder: THREE.Group; left: boolean; display: THREE.Matrix4 }[] = [];
+  for (const { left, item } of hands) {
+    const models = resolveItemModels(store, item, left ? 'thirdperson_lefthand' : 'thirdperson_righthand');
+    if (!models.length) continue;
+    const holder = new THREE.Group();
+    holder.matrixAutoUpdate = false;
+    for (const m of models) holder.add(await buildModelObject(store, m, 'none'));
+    const d = new THREE.Object3D();
+    applyDisplay(d, handDisplay(models[0].model.display, left));
+    d.updateMatrix();
+    placed.push({ holder, left, display: d.matrix.clone() });
+    group.add(holder);
+  }
+  const follow = (pose: Record<string, [number, number, number]>) => {
+    for (const { holder, left, display } of placed) {
+      const arm = arms?.[left ? 'left_arm' : 'right_arm']?.pose ?? [0, 0, 0, 0, 0, 0];
+      holder.matrix.copy(LAYER_SPACE.clone().multiply(handMatrix(arm, pose[left ? 'left_arm' : 'right_arm'] ?? [0, 0, 0], left, slim)).multiply(display));
+    }
+  };
+  return { group, follow };
+}
+
 /** Animates a mob built by `buildMobObject` (`ticks` at 20 per second). */
 export type MobAnimator = (ticks: number, motion: Motion) => void;
 
 export async function buildMobObject(store: AssetStore, mob: MobDef, options?: MobOptions): Promise<THREE.Group> {
+  // a player raises the arms that hold something, and a cape hangs a little away from the back
+  if (isPlayer(mob) && options) {
+    const extra: Record<string, [number, number, number]> = {};
+    if (options.mainHand) extra.right_arm = [HOLD_ARM, 0, 0];
+    if (options.offHand) extra.left_arm = [HOLD_ARM, 0, 0];
+    if (options.cape && !options.elytra) extra.cape = [-CAPE_TILT, 0, 0];
+    mob = { ...mob, pose: mergePoses(mob.pose, extra) };
+  }
   // Flip into world space so the mob stands on y = 0 looking at +z.
   const root = new THREE.Group();
   root.matrixAutoUpdate = false;
@@ -302,6 +366,15 @@ export async function buildMobObject(store: AssetStore, mob: MobDef, options?: M
   // mooshrooms carry their mushrooms unless they were sheared
   const mushrooms = options?.mushrooms !== false && mob.entity === 'mooshroom' && !mob.babyOf ? await buildMushrooms(store, mob, mob.layers[0].model) : undefined;
   if (mushrooms) wrapper.add(mushrooms.group);
+  const hands = [
+    ...(options?.mainHand ? [{ left: false, item: options.mainHand }] : []),
+    ...(options?.offHand ? [{ left: true, item: options.offHand }] : []),
+  ];
+  const held = isPlayer(mob) && hands.length ? await buildHeldItems(store, mob.layers[0].model, hands, isSlim(mob)) : undefined;
+  if (held) {
+    wrapper.add(held.group);
+    held.follow(mob.pose ?? {});
+  }
   const names = [...new Set(layers.flatMap((l) => partNames(l.model)))];
   let resting = true;
   const animate: MobAnimator = (ticks, motion) => {
@@ -312,6 +385,7 @@ export async function buildMobObject(store: AssetStore, mob: MobDef, options?: M
     const pose = mergePoses(mob.pose, moving);
     for (const r of reposers) r({ pose, hidden: mob.hidden });
     mushrooms?.follow(moving);
+    held?.follow(pose);
   };
   wrapper.userData.animate = animate;
   return wrapper;

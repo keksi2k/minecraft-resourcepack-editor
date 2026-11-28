@@ -3,6 +3,7 @@ import { parseRL } from '../models/resourceLocation';
 import type { MobDef, MobLayer } from './catalog';
 import models from './entityModels.json';
 import { DYE } from './specials';
+import { isPlayer, playerLayers, type PlayerOptions } from './player';
 
 /**
  * What a mob wears or carries in the preview: armour, body armour, saddle, collar, horse markings,
@@ -22,7 +23,7 @@ export const PROFESSIONS = [
 ] as const;
 export const PROFESSION_LEVELS = ['stone', 'iron', 'gold', 'emerald', 'diamond'] as const;
 
-export interface MobOptions {
+export interface MobOptions extends PlayerOptions {
   /** Equipment asset id (e.g. `minecraft:iron`) per armour slot. */
   armor?: Partial<Record<ArmorSlot, string>>;
   /** Equipment asset id for body armour, a llama's carpet or a happy ghast's harness. */
@@ -199,6 +200,7 @@ export function mobLayers(store: AssetStore, mob: MobDef, o: MobOptions | undefi
     const type = baby ? 'humanoid_baby' : slot === 'leggings' ? 'humanoid_leggings' : 'humanoid';
     layers.push(...equipmentLayers(store, id, type, `${base}#${slot}`));
   }
+  if (isPlayer(mob)) layers = playerLayers(layers, o, equipmentLayers(store, 'minecraft:elytra', 'wings', 'minecraft:elytra#main')[0]?.texture);
   if (caps.charged && o.charged) layers.push({ model: `${base}#armor`, texture: tex(mob.entity === 'creeper' ? 'creeper/creeper_armor' : 'wither/wither_armor'), emissive: true, tint: 0x808080 }); // the game draws the energy swirl at half brightness
   return layers;
 }

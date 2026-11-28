@@ -8,6 +8,7 @@ import { mobLayers, type MobOptions } from '../entities/equipment';
 import { MOTIONS, type Motion } from '../entities/motion';
 import { MobLookPanel } from './MobLookPanel';
 import { mobThumbnail } from '../render/thumbnails';
+import { isCustomTexture } from '../render/textures';
 import { useT, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { eventsLinkedTo } from '../sounds/soundLinks';
@@ -205,6 +206,8 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">{t('mobs.textures')}</h3>
         <div className="flex flex-col gap-3">
           {layers.map((layer, i) => {
+            // a skin or cape you loaded isn't part of the pack
+            if (isCustomTexture(layer.texture)) return null;
             const path = texturePath(layer.texture);
             const src = store.source(path);
             return (
