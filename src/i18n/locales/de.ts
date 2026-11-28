@@ -520,7 +520,7 @@ const de: Translation = {
     },
   },
   scenes: {
-    nav: { title: 'Titelbildschirm', hud: 'HUD & Inventare', tooltip: 'Tooltips', map: 'Karten', biomes: 'Biomfarben', fonts: 'Schrift', particles: 'Partikel', paintings: 'Gemälde', sandbox: 'Block-Sandkasten' },
+    nav: { title: 'Titelbildschirm', hud: 'HUD & Inventare', tooltip: 'Tooltips', map: 'Karten', biomes: 'Biomfarben', fonts: 'Schrift', particles: 'Partikel', paintings: 'Gemälde', sandbox: 'Block-Sandkasten', shaders: 'Shader' },
     title: {
       title: 'Titelbildschirm',
       hint: 'Das sich drehende Panorama hinter dem Hauptmenü, mit Logo, Splash-Text und Buttons, gezeichnet aus deinem Pack. Klick ins Menü für einen anderen Splash-Text.',
@@ -624,6 +624,27 @@ const de: Translation = {
       decorations: 'Markierungen',
       background: 'Kartenhintergrund',
       checkerboardHint: 'Der karierte Hintergrund wird im Kartentisch verwendet.',
+    },
+    shaders: {
+      title: 'Shader',
+      hint: 'Core-Shader zeichnen Welt, Items und Oberfläche; Post-Effekte (mit ihren Post-Shadern) färben den ganzen Bildschirm – was ein Zuschauer als Creeper, Spinne oder Enderman sieht, und die Menü-Unschärfe. Post-Effekte laufen auf dem Bild oben mit deinen Änderungen, gespeichert oder nicht.',
+      versionWarning: 'Shader ändern sich mit fast jeder Minecraft-Version. Die Shader eines Packs funktionieren nur in der Version, für die sie geschrieben wurden; lässt sich einer nicht übersetzen, zeigt das Spiel einen Fehler und lädt die Shader des Packs nicht.',
+      search: 'Shader-Dateien suchen …',
+      groups: { effect: 'Post-Effekte', post: 'Post-Shader', core: 'Core-Shader', include: 'Includes' },
+      unsaved: '● nicht gespeichert',
+      discard: 'Änderungen verwerfen',
+      preview: 'Vorschau: {effect}',
+      previewLabel: 'Vorschau des Post-Effekts',
+      before: 'Ohne den Effekt',
+      presets: 'Vorlagen',
+      apply: 'Anwenden',
+      presetUnavailable: 'Die Dateien, die diese Vorlage ändert, sehen in dieser Version anders aus.',
+      preset: {
+        noFog: { title: 'Kein Nebel', text: 'Ferne Landschaft bleibt klar, statt in die Himmelsfarbe zu verblassen (include/fog.glsl).' },
+        fullbright: { title: 'Fullbright', text: 'Alles ist voll beleuchtet, auch Höhlen und Nächte (core/lightmap.fsh).' },
+        grayCreeper: { title: 'Graue Creeper-Sicht', text: 'Als Zuschauer in einem Creeper ist die Welt grau, ohne die groben Pixel.' },
+        plainViews: { title: 'Normale Zuschauer-Sicht', text: 'Als Zuschauer in Creeper, Spinne oder Enderman sieht die Welt aus wie sonst.' },
+      },
     },
     sandbox: {
       light: 'Licht',

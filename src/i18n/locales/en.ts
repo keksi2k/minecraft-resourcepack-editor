@@ -521,7 +521,7 @@ const en = {
     },
   },
   scenes: {
-    nav: { title: 'Title screen', hud: 'HUD & inventories', tooltip: 'Tooltips', map: 'Maps', biomes: 'Biome colours', fonts: 'Font', particles: 'Particles', paintings: 'Paintings', sandbox: 'Block sandbox' },
+    nav: { title: 'Title screen', hud: 'HUD & inventories', tooltip: 'Tooltips', map: 'Maps', biomes: 'Biome colours', fonts: 'Font', particles: 'Particles', paintings: 'Paintings', sandbox: 'Block sandbox', shaders: 'Shaders' },
     title: {
       title: 'Title screen',
       hint: 'The turning panorama behind the main menu, with the logo, a splash text and the buttons, drawn from your pack. Click the menu for another splash text.',
@@ -625,6 +625,27 @@ const en = {
       decorations: 'Decorations',
       background: 'Map background',
       checkerboardHint: 'The checkerboard background is used in the cartography table.',
+    },
+    shaders: {
+      title: 'Shaders',
+      hint: 'Core shaders draw the world, items and the GUI; post effects (with their post shaders) colour the whole screen – what a spectator sees as a creeper, spider or enderman, and the menu blur. Post effects run on the picture above with your changes, saved or not.',
+      versionWarning: 'Shaders change with almost every Minecraft version. A pack’s shaders only work in the version they were written for; if one doesn’t compile, the game shows an error and won’t load the pack’s shaders.',
+      search: 'Search shader files …',
+      groups: { effect: 'Post effects', post: 'Post shaders', core: 'Core shaders', include: 'Includes' },
+      unsaved: '● not saved',
+      discard: 'Discard changes',
+      preview: 'Preview: {effect}',
+      previewLabel: 'Post effect preview',
+      before: 'Without the effect',
+      presets: 'Presets',
+      apply: 'Apply',
+      presetUnavailable: 'The files this preset changes look different in this version.',
+      preset: {
+        noFog: { title: 'No fog', text: 'Distant land stays clear instead of fading into the sky colour (include/fog.glsl).' },
+        fullbright: { title: 'Fullbright', text: 'Everything is fully lit, caves and nights included (core/lightmap.fsh).' },
+        grayCreeper: { title: 'Grey creeper view', text: 'Spectating a creeper shows the world in grey, without the coarse pixels.' },
+        plainViews: { title: 'Plain spectator views', text: 'Spectating a creeper, spider or enderman shows the world as it is.' },
+      },
     },
     sandbox: {
       light: 'Light',

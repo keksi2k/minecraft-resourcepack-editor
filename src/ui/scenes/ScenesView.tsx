@@ -12,8 +12,9 @@ import { PaintingsScreen } from './PaintingsScreen';
 import { SandboxScreen } from './SandboxScreen';
 import { TooltipScreen } from './TooltipScreen';
 import { MapScreen } from './MapScreen';
+import { ShadersScreen } from './ShadersScreen';
 
-export const SCENES = ['title', 'hud', 'tooltip', 'map', 'biomes', 'fonts', 'particles', 'paintings', 'sandbox'] as const;
+export const SCENES = ['title', 'hud', 'tooltip', 'map', 'biomes', 'fonts', 'particles', 'paintings', 'sandbox', 'shaders'] as const;
 export type Scene = (typeof SCENES)[number];
 
 /** Previews of what the pack changes outside items and mobs: menus, HUD, biomes, fonts … */
@@ -41,6 +42,7 @@ export function ScenesView() {
         {scene === 'particles' && <ParticlesScreen store={store} />}
         {scene === 'paintings' && <PaintingsScreen store={store} />}
         {scene === 'sandbox' && <SandboxScreen store={store} />}
+        {scene === 'shaders' && <ShadersScreen store={store} />}
       </div>
     </div>
   );
