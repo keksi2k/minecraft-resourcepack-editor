@@ -35,6 +35,10 @@ export default defineConfig({
       },
     },
   },
+  // the PNG optimiser finds its WebAssembly next to its own module, so it must not be pre-bundled;
+  // the worker that runs it loads the codec on demand, which needs module workers
+  optimizeDeps: { exclude: ['@jsquash/oxipng'] },
+  worker: { format: 'es' },
   server: { proxy: mcresProxy },
   preview: { proxy: mcresProxy },
   // e2e/ holds the Playwright tests, which run in a browser instead

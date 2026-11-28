@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { AssetStore } from '../assets/AssetStore';
 import { useT } from '../i18n';
-import { layerUVRects, type TexturePick } from '../render/entityMesh';
+import { entityTemplate, layerUVRects, type TexturePick } from '../render/entityMesh';
+import { UVTemplateExport } from './UVTemplateExport';
 import { TextureThumb } from './TexturesView';
 
 const COLORS = ['#ef4444', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6', '#a855f7', '#eab308'];
@@ -96,4 +97,10 @@ export function UVOverlay({ store, path, modelKey, pick }: { store: AssetStore; 
       </div>
     </div>
   );
+}
+
+/** The UV template of a mob layer's texture, when its model is known. */
+export function EntityUVTemplate({ store, model, texture }: { store: AssetStore; model: string; texture: string }) {
+  const template = useMemo(() => entityTemplate(model), [model]);
+  return template ? <UVTemplateExport store={store} template={template} texture={texture} name={texture.slice(texture.lastIndexOf('/') + 1)} /> : null;
 }

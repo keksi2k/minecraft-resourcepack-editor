@@ -54,6 +54,8 @@ const EMBEDDED = {
     { name: 'libogg', license: 'BSD-3-Clause', text: XIPH('libogg', '2002') },
     { name: 'libvorbis', license: 'BSD-3-Clause', text: XIPH('libvorbis', '2002-2020') },
   ],
+  // the PNG optimiser's WebAssembly is the oxipng Rust crate (MIT), wrapped by Squoosh (Apache-2.0)
+  '@jsquash/oxipng': [{ name: 'oxipng', license: 'MIT', text: () => MIT('2016 Joshua Holmer') }],
 };
 
 const MIT = (holder) => `Copyright (c) ${holder}
@@ -127,7 +129,7 @@ export function thirdPartyNotice(appName, root = '.') {
   for (const p of list) {
     parts.push(`${rule}\n${p.name} ${p.version} (${p.license})${p.homepage ? `\n${p.homepage}` : ''}\n${rule}\n\n${p.text ?? fallbackText(p)}`);
     for (const e of EMBEDDED[p.name] ?? []) {
-      parts.push(`${rule}\n${e.name} (${e.license}), compiled into ${p.name}\n${rule}\n\n${e.text}`);
+      parts.push(`${rule}\n${e.name} (${e.license}), compiled into ${p.name}\n${rule}\n\n${typeof e.text === 'function' ? e.text() : e.text}`);
     }
   }
   return parts.join('\n\n\n') + '\n';

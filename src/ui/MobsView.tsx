@@ -15,7 +15,7 @@ import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { ObjectViewer } from './ItemViewer';
 import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
-import { UVOverlay } from './UVOverlay';
+import { EntityUVTemplate, UVOverlay } from './UVOverlay';
 import { EditorPanel } from './EditorPanel';
 import { useEditing } from '../state/editorStore';
 
@@ -226,6 +226,7 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
                   </div>
                 </div>
                 {uvFor === i && <UVOverlay store={store} path={path} modelKey={layer.model} pick={pick?.layer === i ? pick : undefined} />}
+                {uvFor === i && <EntityUVTemplate store={store} model={layer.model} texture={layer.texture} />}
               </div>
             );
           })}
@@ -247,3 +248,4 @@ function MobDetail({ store, mob, onClose }: { store: AssetStore; mob: MobDef; on
     </div>
   );
 }
+

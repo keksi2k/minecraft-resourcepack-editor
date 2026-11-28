@@ -19,6 +19,7 @@ import { texturePermutation } from '../models/atlasPermutations';
 import { BlockVariantsSection, CustomNamesSection } from './ItemExtras';
 import { CustomModelSection } from './CustomModelSection';
 import { CitSection } from './CitSection';
+import { ModelUVTemplates } from './UVTemplateExport';
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -174,6 +175,12 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
           {textures.length === 0 && <div className="text-xs text-neutral-500">{t('items.noTextures')}</div>}
         </div>
       </Section>
+
+      {shown.models.some((m) => m.model.kind === 'elements') && (
+        <Section title={t('uvTemplate.title')}>
+          <ModelUVTemplates store={store} models={shown.models.map((m) => m.model)} name={item.id.split(':')[1]} revision={revision} />
+        </Section>
+      )}
 
       <CustomNamesSection store={store} item={item} />
       <CustomModelSection store={store} item={item} />

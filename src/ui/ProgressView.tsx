@@ -6,24 +6,34 @@ import { newSince, share, STYLE_THRESHOLD, textureProgress, type CategoryProgres
 import { useApp } from '../state/appStore';
 import { Btn } from './common';
 import { ComparePanel } from './ComparePanel';
+import { ShrinkPanel } from './ShrinkPanel';
+import { StackPanel } from './StackPanel';
 import { TextureThumb } from './TexturesView';
 
 const SHOWN = 120;
 
-/** Progress of the pack, and a comparison with another pack. */
+const SECTIONS = ['progress', 'compare', 'stack', 'shrink'] as const;
+
+/** Progress of the pack, and tools that work on the pack as a whole: compare, stack, shrink. */
 export function ProgressView() {
   const t = useT();
-  const [section, setSection] = useState<'progress' | 'compare'>('progress');
+  const [section, setSection] = useState<(typeof SECTIONS)[number]>('progress');
   return (
     <div className="flex h-full">
       <nav className="w-52 shrink-0 overflow-y-auto border-r border-neutral-800 p-2 text-sm">
-        {(['progress', 'compare'] as const).map((s) => (
+        {SECTIONS.map((s) => (
           <button key={s} onClick={() => setSection(s)} className={`block w-full rounded px-2 py-1 text-left ${section === s ? 'bg-neutral-700' : 'hover:bg-neutral-800'}`}>
             {t(`progress.sections.${s}`)}
           </button>
         ))}
       </nav>
-      <div className="min-w-0 flex-1">{section === 'progress' ? <PackProgress /> : <div className="h-full overflow-y-auto p-4 text-sm"><ComparePanel /></div>}</div>
+      <div className="min-w-0 flex-1">
+        {section === 'progress' ? (
+          <PackProgress />
+        ) : (
+          <div className="h-full overflow-y-auto p-4 text-sm">{section === 'compare' ? <ComparePanel /> : section === 'stack' ? <StackPanel /> : <ShrinkPanel />}</div>
+        )}
+      </div>
     </div>
   );
 }

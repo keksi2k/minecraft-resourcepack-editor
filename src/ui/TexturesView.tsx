@@ -8,7 +8,7 @@ import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge, useInView } from './common';
 import { mobName } from './MobsView';
 import { TextureMetaPanel } from './TextureMetaPanel';
-import { UVOverlay } from './UVOverlay';
+import { EntityUVTemplate, UVOverlay } from './UVOverlay';
 import { EditorPanel } from './EditorPanel';
 import { useEditing } from '../state/editorStore';
 import { permutationFiles, texturePermutation } from '../models/atlasPermutations';
@@ -265,7 +265,10 @@ function TextureDetail({ store, path, names, onClose }: { store: AssetStore; pat
         </button>
       </div>
       {users.length > 0 && showUV ? (
-        <UVOverlay store={store} path={path} modelKey={users[0].layer.model} />
+        <>
+          <UVOverlay store={store} path={path} modelKey={users[0].layer.model} />
+          <EntityUVTemplate store={store} model={users[0].layer.model} texture={users[0].layer.texture} />
+        </>
       ) : (
         <TextureThumb store={store} path={path} className="checker h-64 w-full rounded" />
       )}

@@ -30,10 +30,11 @@ describe('UV rects', () => {
     const head = rects.filter((r) => r.part === 'head');
     expect(head).toHaveLength(6);
     // face (north) at u+d, v+d = (8, 8), 8×8
-    expect(head).toContainEqual({ part: 'head', x0: 8, y0: 8, x1: 16, y1: 16 });
-    // top at (8, 0)
-    expect(head).toContainEqual({ part: 'head', x0: 8, y0: 0, x1: 16, y1: 8 });
-    expect(rects.filter((r) => r.part === 'body')).toContainEqual({ part: 'body', x0: 20, y0: 20, x1: 28, y1: 32 });
+    expect(head).toContainEqual(expect.objectContaining({ part: 'head', x0: 8, y0: 8, x1: 16, y1: 16 }));
+    // top at (8, 0), looking up on the standing mob
+    expect(head).toContainEqual({ part: 'head', face: 'up', x0: 8, y0: 0, x1: 16, y1: 8 });
+    expect(head.find((r) => r.x0 === 16 && r.y0 === 0)?.face).toBe('down');
+    expect(rects.filter((r) => r.part === 'body')).toContainEqual(expect.objectContaining({ part: 'body', x0: 20, y0: 20, x1: 28, y1: 32 }));
   });
 
   it('keeps every rect inside the texture', () => {
