@@ -6,6 +6,8 @@
 
 Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft. Pack laden, alle Items und Mobs in 3D ansehen, Sounds anhören, Texturen und Sounds herunterladen, ersetzen oder **direkt im Browser bearbeiten**, eigene Sounds aufnehmen und das Pack wieder als ZIP exportieren.
 
+![Jedes Item in 3D mit den Texturen des Packs, hier das Diamantschwert mit Verzauberungsglanz](docs/screenshots/items.png)
+
 ## Highlights
 
 | | |
@@ -19,6 +21,12 @@ Ein Editor für **Minecraft-Java-Resourcepacks**, der komplett im Browser läuft
 | 🔊 **Sounds** | Jeden Sound anhören, eigene aufnehmen, schneiden, verändern und ersetzen. |
 | 🛠️ **Pack-Werkzeuge** | Packs ab 1.8 in einem Schritt aktualisieren, mehrere Packs stapeln, verkleinern, auf Probleme prüfen, als ZIP exportieren. |
 | 🔒 **Privat von Grund auf** | Alles passiert in deinem Browser: kein Konto, kein Upload. |
+
+<table>
+<tr><td width="50%" valign="top"><a href="docs/screenshots/player.png"><img src="docs/screenshots/player.png" alt="Spieler-Vorschau"></a><br><sub>🧍 Der Spieler mit Skin, Diamantrüstung, Elytren, Schwert und Schild</sub></td><td width="50%" valign="top"><a href="docs/screenshots/texture-editor.png"><img src="docs/screenshots/texture-editor.png" alt="Textur-Editor"></a><br><sub>🎨 Textur-Editor mit Ebenen und einer Lospec-Palette</sub></td></tr>
+<tr><td width="50%" valign="top"><a href="docs/screenshots/blockstates.png"><img src="docs/screenshots/blockstates.png" alt="Blockzustand-Editor"></a><br><sub>🧱 Multipart-Zaun: jeder Fall mit Bedingung, der Block in 3D</sub></td><td width="50%" valign="top"><a href="docs/screenshots/shaders.png"><img src="docs/screenshots/shaders.png" alt="Shader-Editor"></a><br><sub>✨ Die Spinnen-Sicht läuft live, daneben die Datei des Effekts</sub></td></tr>
+<tr><td width="50%" valign="top"><a href="docs/screenshots/title-screen.png"><img src="docs/screenshots/title-screen.png" alt="Titelbildschirm"></a><br><sub>🖼️ Der Titelbildschirm, gezeichnet aus dem Pack</sub></td><td width="50%" valign="top"><a href="docs/screenshots/sandbox.png"><img src="docs/screenshots/sandbox.png" alt="Block-Sandkasten"></a><br><sub>🧊 Block-Sandkasten: Texturen nebeneinander, mit Lichtstufen</sub></td></tr>
+</table>
 
 **Neu in 1.22:** Ebenen, Auswahl und Paletten im Textur-Editor, die Spieler-Vorschau, Blockzustand- und Modell-Editor, Shader live, Tooltips, Karten und der Verzauberungsglanz. [Zum Release →](https://github.com/keksi2k/minecraft-resourcepack-editor/releases/latest)
 

@@ -6,6 +6,8 @@
 
 A browser-based editor for **Minecraft Java Edition resource packs**. Load a pack, view every item and mob in 3D, listen to sounds, download, replace or **edit textures and sounds right in the browser**, record your own sounds, and export the pack as a ZIP again.
 
+![Every item in 3D with the pack’s textures, here the diamond sword with the enchantment glint](docs/screenshots/items.png)
+
 ## Highlights
 
 | | |
@@ -19,6 +21,12 @@ A browser-based editor for **Minecraft Java Edition resource packs**. Load a pac
 | 🔊 **Sounds** | Listen to every sound, record your own, cut, tune and replace them. |
 | 🛠️ **Pack tools** | Upgrade packs from 1.8 onwards in one step, stack several packs, shrink them, check them for problems, export a ZIP. |
 | 🔒 **Private by design** | Everything happens in your browser: no account, no upload. |
+
+<table>
+<tr><td width="50%" valign="top"><a href="docs/screenshots/player.png"><img src="docs/screenshots/player.png" alt="Player preview"></a><br><sub>🧍 The player with a skin, diamond armour, elytra, sword and shield</sub></td><td width="50%" valign="top"><a href="docs/screenshots/texture-editor.png"><img src="docs/screenshots/texture-editor.png" alt="Texture editor"></a><br><sub>🎨 Texture editor with layers and a Lospec palette</sub></td></tr>
+<tr><td width="50%" valign="top"><a href="docs/screenshots/blockstates.png"><img src="docs/screenshots/blockstates.png" alt="Block state editor"></a><br><sub>🧱 Multipart fence: every case and its condition, the block in 3D</sub></td><td width="50%" valign="top"><a href="docs/screenshots/shaders.png"><img src="docs/screenshots/shaders.png" alt="Shader editor"></a><br><sub>✨ The spider view running live, with the effect’s file beside it</sub></td></tr>
+<tr><td width="50%" valign="top"><a href="docs/screenshots/title-screen.png"><img src="docs/screenshots/title-screen.png" alt="Title screen"></a><br><sub>🖼️ The title screen drawn from the pack</sub></td><td width="50%" valign="top"><a href="docs/screenshots/sandbox.png"><img src="docs/screenshots/sandbox.png" alt="Block sandbox"></a><br><sub>🧊 Block sandbox: textures side by side, with light levels</sub></td></tr>
+</table>
 
 **New in 1.22:** layers, selections and palettes in the texture editor, the player preview, block state and model editors, live shaders, tooltips, maps and the enchantment glint. [See the release →](https://github.com/keksi2k/minecraft-resourcepack-editor/releases/latest)
 
