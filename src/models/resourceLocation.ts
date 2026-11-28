@@ -30,6 +30,14 @@ export const texturePath = (id: string) => {
   return ns === FILE_NS ? path : `assets/${ns}/textures/${path}.png`;
 };
 
+/** A texture id as shown to the user: images outside `textures/` as `namespace:path/inside.png`. */
+export const textureLabel = (id: string) => {
+  const { ns, path } = parseRL(id);
+  if (ns !== FILE_NS) return id;
+  const m = /^assets\/([^/]+)\/(.+)$/.exec(path);
+  return m ? `${m[1]}:${m[2]}` : path;
+};
+
 export const itemDefinitionPath = (id: string) => {
   const { ns, path } = parseRL(id);
   return `assets/${ns}/items/${path}.json`;

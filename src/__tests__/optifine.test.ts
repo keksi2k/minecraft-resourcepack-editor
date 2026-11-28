@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AssetStore } from '../assets/AssetStore';
-import { texturePath } from '../models/resourceLocation';
+import { textureLabel, texturePath } from '../models/resourceLocation';
 import {
   blockOf,
   ctmTile,
@@ -39,6 +39,8 @@ describe('properties files', () => {
     expect(r.tiles).toHaveLength(47);
     expect(r.tiles[3]).toBe(tile(3));
     expect(texturePath(r.tiles[3] as string)).toBe(`${D}3.png`);
+    expect(textureLabel(r.tiles[3] as string)).toBe('minecraft:optifine/ctm/glass/3.png');
+    expect(textureLabel('minecraft:block/glass')).toBe('minecraft:block/glass');
     expect(blockOf('minecraft:oak_stairs:facing=east')).toBe('minecraft:oak_stairs');
     expect(parseCtmRule(`${D}x.properties`, { method: 'fixed', tiles: '<skip> <default> textures/block/stone minecraft:block/dirt' })!.tiles).toEqual([
       null,

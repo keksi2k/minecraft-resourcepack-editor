@@ -4,7 +4,7 @@ import { availablePatterns, availableSherds, DYE, PATTERNED, POT_SIDES, specialL
 import type { ItemState, StateSwitch } from '../models/itemDefinition';
 import { appearanceKey, itemStages, itemStateSwitches, itemVariant, type ItemEntry } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
-import { modelPath, texturePath } from '../models/resourceLocation';
+import { modelPath, textureLabel, texturePath } from '../models/resourceLocation';
 import { downloadBlob } from '../pack/exportPack';
 import { itemThumbnail } from '../render/thumbnails';
 import { eventsLinkedTo } from '../sounds/soundLinks';
@@ -216,7 +216,7 @@ export function TextureRow({ store, id }: { store: AssetStore; id: string }) {
         <TextureThumb store={store} path={path} className="checker h-10 w-10 shrink-0 rounded" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-mono text-xs">{id}</span>
+            <span className="truncate font-mono text-xs" title={path}>{textureLabel(id)}</span>
             {generated ? <span className="shrink-0 text-[10px] text-neutral-500">{t('items.generated')}</span> : <SourceBadge source={store.source(path)} />}
           </div>
           {generated ? (
