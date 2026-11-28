@@ -5,6 +5,7 @@ import type { ItemState, StateSwitch } from '../models/itemDefinition';
 import { appearanceKey, itemStages, itemStateSwitches, itemVariant, type ItemEntry } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { modelPath, textureLabel, texturePath } from '../models/resourceLocation';
+import { blockStatePath as blockStatePathOf } from '../scenes/sandbox';
 import { downloadBlob } from '../pack/exportPack';
 import { itemThumbnail } from '../render/thumbnails';
 import { eventsLinkedTo } from '../sounds/soundLinks';
@@ -199,6 +200,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
       <Section title={t('items.models')}>
         <div className="flex flex-col gap-3">
           <FileRow store={store} path={item.defPath} label={t('items.itemDefinition')} />
+          {store.has(blockStatePathOf(item.id)) && <FileRow store={store} path={blockStatePathOf(item.id)} label={t('items.blockstate')} />}
           {shown.models.map(({ ref, model }, i) => (
             <div key={i} className="rounded bg-neutral-900 p-2">
               <div className="mb-1 text-xs">

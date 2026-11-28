@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import { t } from '../i18n';
 import type { Tab } from './appStore';
 
-/** A texture or sound opened in its editor. */
+/** A texture, sound, blockstate or model opened in its editor. */
 export interface EditTarget {
-  kind: 'texture' | 'sound';
+  kind: 'texture' | 'sound' | 'blockstate' | 'model';
   path: string;
   /** Current bytes (vanilla sounds may need a network fetch). */
   load: () => Promise<Uint8Array | undefined>;

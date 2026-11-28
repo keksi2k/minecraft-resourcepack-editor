@@ -163,6 +163,8 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
   const edited = store?.edits.has(path) ?? false;
   const openEditor = useEditor((s) => s.open);
   const accept = kind === 'texture' ? 'image/*' : kind === 'sound' ? 'audio/*,.ogg' : '*/*';
+  // blockstate and model files open in their own editors
+  const editKind = kind !== 'file' ? kind : /^assets\/[^/]+\/blockstates\/.+\.json$/.test(path) ? 'blockstate' : /^assets\/[^/]+\/models\/.+\.json$/.test(path) ? 'model' : undefined;
 
   const run = (fn: () => Promise<void>) => async () => {
     setBusy(true);
@@ -203,8 +205,8 @@ export function AssetActions({ path, source, load, kind, vanillaAvailable, allow
   return (
     <div className="flex flex-wrap gap-1">
       <Btn onClick={download} disabled={busy || !source} title={t('actions.downloadTitle')}>{t('actions.download')}</Btn>
-      {kind !== 'file' && (
-        <Btn onClick={() => openEditor({ kind, path, load }, tab)} disabled={busy || !source} title={t('actions.editTitle')}>
+      {editKind && (
+        <Btn onClick={() => openEditor({ kind: editKind, path, load }, tab)} disabled={busy || !source} title={t('actions.editTitle')}>
           {t('actions.edit')}
         </Btn>
       )}

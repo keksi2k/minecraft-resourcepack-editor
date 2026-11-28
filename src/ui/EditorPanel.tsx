@@ -4,6 +4,8 @@ import { useEditor } from '../state/editorStore';
 import { Btn } from './common';
 import { SoundEditor } from './SoundEditor';
 import { TextureEditor } from './TextureEditor';
+import { BlockStateEditor } from './BlockStateEditor';
+import { ModelEditor } from './ModelEditor';
 
 /** The open texture or sound editor; a tab shows it in place of its main area. */
 export function EditorPanel() {
@@ -38,6 +40,10 @@ export function EditorPanel() {
         <div className="p-4 text-sm text-neutral-400">…</div>
       ) : target.kind === 'texture' ? (
         <TextureEditor key={target.path} path={target.path} bytes={bytes} onDone={close} />
+      ) : target.kind === 'blockstate' ? (
+        <BlockStateEditor key={target.path} path={target.path} bytes={bytes} onDone={close} />
+      ) : target.kind === 'model' ? (
+        <ModelEditor key={target.path} path={target.path} bytes={bytes} onDone={close} />
       ) : (
         <SoundEditor key={target.path} path={target.path} bytes={bytes} onSave={target.onSave} onDone={close} />
       )}
