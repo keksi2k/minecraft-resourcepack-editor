@@ -128,6 +128,8 @@ const en = {
     otherTexturesInfo: 'Used in states none of the stages shows.',
   },
   items: {
+    glint: 'Glint',
+    glintTitle: 'Shows the enchantment glint (textures/misc/enchanted_glint_item.png) moving over the item',
     search: 'Search items …',
     filterAll: 'All ({count})',
     filterPack: 'In pack ({count})',
@@ -518,7 +520,7 @@ const en = {
     },
   },
   scenes: {
-    nav: { title: 'Title screen', hud: 'HUD & inventories', biomes: 'Biome colours', fonts: 'Font', particles: 'Particles', paintings: 'Paintings', sandbox: 'Block sandbox' },
+    nav: { title: 'Title screen', hud: 'HUD & inventories', tooltip: 'Tooltips', map: 'Maps', biomes: 'Biome colours', fonts: 'Font', particles: 'Particles', paintings: 'Paintings', sandbox: 'Block sandbox' },
     title: {
       title: 'Title screen',
       hint: 'The turning panorama behind the main menu, with the logo, a splash text and the buttons, drawn from your pack. Click the menu for another splash text.',
@@ -603,7 +605,30 @@ const en = {
       misfit: 'stretched',
       misfitHint: 'This image doesn’t have the painting’s shape ({w}:{h}); the game stretches it to fit.',
     },
+    tooltip: {
+      title: 'Tooltips',
+      hint: 'An item tooltip drawn with the pack’s tooltip sprites and font. Packs can add styles of their own: sprites named tooltip/<name>_background and _frame, used by items with the tooltip_style component.',
+      style: 'Style',
+      defaultStyle: 'Default',
+      rarity: 'Name',
+      rarities: { common: 'Common (white)', uncommon: 'Uncommon (yellow)', rare: 'Rare (aqua)', epic: 'Epic (pink)' },
+      text: 'Tooltip text',
+      textHint: 'One line per row; the first is the item name. § codes give colours and formatting (§7 grey, §o italic …).',
+      background: 'Background sprite',
+      frame: 'Frame sprite',
+    },
+    map: {
+      title: 'Maps',
+      hint: 'A map as held in the hand: the pack’s map background and decorations over made-up land. The land colours come from the game’s code; packs can’t change them.',
+      newLand: '↻ Other land',
+      decorations: 'Decorations',
+      background: 'Map background',
+      checkerboardHint: 'The checkerboard background is used in the cartography table.',
+    },
     sandbox: {
+      light: 'Light',
+      lightTitle: 'Light level 0–15 on the blocks, darkened the way the game’s light map does it (default brightness). Emissive textures stay bright.',
+      lightPreset: { day: '☀ Day (15)', torch: '🔥 Near a torch (12)', moon: '🌙 Moonlight (4)', spawn: '👾 Mobs spawn (0)' },
       title: 'Block sandbox',
       hint: 'Place blocks next to each other to see how your textures look together and whether they tile. Blocks with random variants pick one per spot, like in a world. Your scene is kept in this browser.',
       controls: 'Click: place · Shift+click or right-click: remove · drag: turn · scroll: zoom',
@@ -762,7 +787,6 @@ const en = {
     sandboxHint: 'The pack has {rules} connected-texture rules (CTM) and emissive suffix {suffix}. Minecraft itself ignores them; OptiFine, Continuity and similar mods read them.',
     ctm: 'Connected textures',
     night: 'Night',
-    nightTitle: 'Darkens the blocks so emissive textures (glowing parts) stand out',
     itemNightTitle: 'Darkens the item so its emissive textures (glowing parts) stand out',
     notShown: 'this method isn’t drawn here',
     cit: {

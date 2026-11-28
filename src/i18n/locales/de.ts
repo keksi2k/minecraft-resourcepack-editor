@@ -127,6 +127,8 @@ const de: Translation = {
     otherTexturesInfo: 'Kommen in Zuständen vor, die keine der Stufen zeigt.',
   },
   items: {
+    glint: 'Glanz',
+    glintTitle: 'Zeigt den Verzauberungsglanz (textures/misc/enchanted_glint_item.png), der über das Item wandert',
     search: 'Items suchen …',
     filterAll: 'Alle ({count})',
     filterPack: 'Im Pack ({count})',
@@ -517,7 +519,7 @@ const de: Translation = {
     },
   },
   scenes: {
-    nav: { title: 'Titelbildschirm', hud: 'HUD & Inventare', biomes: 'Biomfarben', fonts: 'Schrift', particles: 'Partikel', paintings: 'Gemälde', sandbox: 'Block-Sandkasten' },
+    nav: { title: 'Titelbildschirm', hud: 'HUD & Inventare', tooltip: 'Tooltips', map: 'Karten', biomes: 'Biomfarben', fonts: 'Schrift', particles: 'Partikel', paintings: 'Gemälde', sandbox: 'Block-Sandkasten' },
     title: {
       title: 'Titelbildschirm',
       hint: 'Das sich drehende Panorama hinter dem Hauptmenü, mit Logo, Splash-Text und Buttons, gezeichnet aus deinem Pack. Klick ins Menü für einen anderen Splash-Text.',
@@ -602,7 +604,30 @@ const de: Translation = {
       misfit: 'gestreckt',
       misfitHint: 'Dieses Bild hat nicht die Form des Gemäldes ({w}:{h}); das Spiel streckt es passend.',
     },
+    tooltip: {
+      title: 'Tooltips',
+      hint: 'Ein Item-Tooltip mit den Tooltip-Sprites und der Schrift des Packs. Packs können eigene Stile mitbringen: Sprites namens tooltip/<name>_background und _frame, die Items mit der Komponente tooltip_style benutzen.',
+      style: 'Stil',
+      defaultStyle: 'Standard',
+      rarity: 'Name',
+      rarities: { common: 'Gewöhnlich (weiß)', uncommon: 'Ungewöhnlich (gelb)', rare: 'Selten (türkis)', epic: 'Episch (rosa)' },
+      text: 'Tooltip-Text',
+      textHint: 'Eine Zeile pro Reihe; die erste ist der Item-Name. §-Codes geben Farben und Formatierung (§7 grau, §o kursiv …).',
+      background: 'Hintergrund-Sprite',
+      frame: 'Rahmen-Sprite',
+    },
+    map: {
+      title: 'Karten',
+      hint: 'Eine Karte in der Hand: Kartenhintergrund und Markierungen des Packs über ausgedachtem Land. Die Landfarben kommen aus dem Code des Spiels; Packs können sie nicht ändern.',
+      newLand: '↻ Anderes Land',
+      decorations: 'Markierungen',
+      background: 'Kartenhintergrund',
+      checkerboardHint: 'Der karierte Hintergrund wird im Kartentisch verwendet.',
+    },
     sandbox: {
+      light: 'Licht',
+      lightTitle: 'Lichtstufe 0–15 auf den Blöcken, abgedunkelt so, wie es die Lightmap des Spiels macht (Standard-Helligkeit). Leuchtende Texturen bleiben hell.',
+      lightPreset: { day: '☀ Tag (15)', torch: '🔥 Nahe Fackel (12)', moon: '🌙 Mondlicht (4)', spawn: '👾 Mobs spawnen (0)' },
       title: 'Block-Sandkasten',
       hint: 'Setze Blöcke nebeneinander, um zu sehen, wie deine Texturen zusammen wirken und ob sie sich kacheln. Blöcke mit zufälligen Varianten wählen pro Stelle eine, wie in einer Welt. Deine Szene bleibt in diesem Browser gespeichert.',
       controls: 'Klick: setzen · Umschalt+Klick oder Rechtsklick: entfernen · Ziehen: drehen · Mausrad: zoomen',
@@ -761,7 +786,6 @@ const de: Translation = {
     sandboxHint: 'Das Pack hat {rules} Regeln für verbundene Texturen (CTM) und das Emissive-Suffix {suffix}. Minecraft selbst ignoriert sie; OptiFine, Continuity und ähnliche Mods lesen sie.',
     ctm: 'Verbundene Texturen',
     night: 'Nacht',
-    nightTitle: 'Dunkelt die Blöcke ab, damit leuchtende Texturen (Emissive) hervortreten',
     itemNightTitle: 'Dunkelt das Item ab, damit seine leuchtenden Texturen (Emissive) hervortreten',
     notShown: 'diese Methode wird hier nicht gezeichnet',
     cit: {

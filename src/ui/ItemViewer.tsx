@@ -9,7 +9,7 @@ import type { ItemEntry } from '../models/items';
 import { resolveItemModels } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { buildItemObject, disposeObject } from '../render/buildMesh';
-import { addLayer, setNight } from '../render/layers';
+import { addGlint, addLayer, setNight } from '../render/layers';
 import { emissiveModels } from '../scenes/sandbox';
 import { emissiveSuffix } from '../optifine/optifine';
 
@@ -106,7 +106,7 @@ export function itemGlows(store: AssetStore, item: ItemEntry, state: ItemState =
   return !!emissiveModels(store, itemModels(store, item, 'gui', state), emissiveSuffix(store));
 }
 
-export function ItemViewer({ store, item, context, options, state = {}, night }: {
+export function ItemViewer({ store, item, context, options, state = {}, night, glint }: {
   store: AssetStore;
   item: ItemEntry;
   context: DisplayContext;
@@ -114,18 +114,30 @@ export function ItemViewer({ store, item, context, options, state = {}, night }:
   state?: ItemState;
   /** Dark, so emissive textures stand out. */
   night?: boolean;
+  /** With the enchantment glint. */
+  glint?: boolean;
 }) {
+  const glintRev = useGlintRev(store, glint);
   return (
     <ObjectViewer
-      buildKey={`${item.id}|${item.depsKey}|${context}|${JSON.stringify(options ?? {})}|${JSON.stringify(state)}|${night}`}
+      buildKey={`${item.id}|${item.depsKey}|${context}|${JSON.stringify(options ?? {})}|${JSON.stringify(state)}|${night}|${glint ? glintRev : ''}`}
       build={async () => {
         const models = itemModels(store, item, context, state);
         const obj = await buildItemObject(store, models, context, options);
         const glow = emissiveModels(store, models, emissiveSuffix(store));
         if (glow) await addLayer(store, obj, glow, context, true);
         setNight(obj, !!night);
+        if (glint) obj.userData.glint = await addGlint(store, obj);
         return obj;
       }}
+      animate={glint ? (obj, seconds) => obj.userData.glint?.(seconds * 1000) : undefined}
     />
   );
+}
+
+const GLINT = 'assets/minecraft/textures/misc/enchanted_glint_item.png';
+
+/** Changes when the glint texture is edited, so the view picks it up. */
+function useGlintRev(store: AssetStore, on?: boolean): string {
+  return on ? `${store.rev(GLINT)}.${store.rev(`${GLINT}.mcmeta`)}` : '';
 }

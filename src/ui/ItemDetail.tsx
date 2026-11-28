@@ -40,6 +40,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
   const [options, setOptions] = useState<SpecialOptions>({});
   const [playing, setPlaying] = useState(false);
   const [night, setNight] = useState(false);
+  const [glint, setGlint] = useState(false);
   // OptiFine emissive textures: the viewer can show them glowing in the dark
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const glows = useMemo(() => itemGlows(store, item, state), [store, item, state, revision]);
@@ -97,7 +98,7 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
       <div className="px-3">
         <div className="h-72">
           {/* night is left out without glowing textures, so adding one rebuilds the view */}
-          <ItemViewer store={store} item={item} context={context} options={opts} state={state} night={glows ? night : undefined} />
+          <ItemViewer store={store} item={item} context={context} options={opts} state={state} night={glows ? night : undefined} glint={glint} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1">
           {CONTEXTS.map((id) => (
@@ -118,6 +119,14 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
               🌙 {t('optifine.night')}
             </button>
           )}
+          <button
+            onClick={() => setGlint(!glint)}
+            title={t('items.glintTitle')}
+            aria-pressed={glint}
+            className={`rounded px-2 py-0.5 text-[11px] ${glint ? 'bg-fuchsia-800' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+          >
+            ✨ {t('items.glint')}
+          </button>
           <span className="ml-auto">
             <Btn onClick={() => void downloadRender()} title={t('items.renderTitle')}>
               {t('actions.render')}

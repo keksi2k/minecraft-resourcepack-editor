@@ -8,7 +8,7 @@ import { modelTextures, resolveModel } from '../../models/modelResolver';
 import { parseRL } from '../../models/resourceLocation';
 import type { Pixels } from '../../render/pixelEdit';
 import { buildItemObject, disposeObject } from '../../render/buildMesh';
-import { addLayer, setNight } from '../../render/layers';
+import { addLayer, lightBrightness, setBrightness } from '../../render/layers';
 import { biomeColors, colormapPath, COLORMAPS, listBiomes, type Colormap } from '../../scenes/colormap';
 import {
   blockModels,
@@ -70,7 +70,8 @@ interface OptiFine {
   rules: CtmRule[];
   world: CtmWorld;
   suffix?: string;
-  night: boolean;
+  /** Light level 0…15 */
+  light: number;
 }
 
 function Block({
@@ -127,10 +128,10 @@ function Block({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cache, key]);
-  // night (materials are shared, so this is cheap)
+  // light level (materials are shared, so this is cheap); glowing textures stay bright
   useEffect(() => {
-    if (obj) setNight(obj, optifine.night);
-  }, [obj, optifine.night]);
+    if (obj) setBrightness(obj, lightBrightness(optifine.light));
+  }, [obj, optifine.light]);
   if (!obj) return null;
   return (
     <primitive
@@ -155,6 +156,19 @@ function Block({
   );
 }
 
+/** Light levels worth a click: daylight, a torch nearby, moonlight, where mobs spawn, darkness. */
+const LIGHT_PRESETS = [
+  ['day', 15],
+  ['torch', 12],
+  ['moon', 4],
+  ['spawn', 0],
+] as const;
+
+/** The sky behind the blocks: blue by day, dark blue at night. */
+function skyColor(light: number): string {
+  return `#${new THREE.Color('#0b1024').lerp(new THREE.Color('#79a6ff'), Math.max(0, (light - 4) / 11)).getHexString()}`;
+}
+
 /** A little world to place blocks in and see how the textures look side by side. */
 export function SandboxScreen({ store }: { store: AssetStore }) {
   const t = useT();
@@ -167,7 +181,7 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
   const [hover, setHover] = useState<string>();
   const [biome, setBiome] = useState('minecraft:plains');
   const [useCtm, setUseCtm] = useState(true);
-  const [night, setNight] = useState(false);
+  const [light, setLight] = useState(15);
   const cache = useMemo(() => new BlockCache(), [store]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => cache.dispose(), [cache]);
 
@@ -220,8 +234,8 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
     };
   }, [store, revision]);
   const optifine: OptiFine = useMemo(
-    () => ({ rules: useCtm ? ctmRules : [], world: { blockAt: (p) => cells.get(cellKey(...p)), texturesOf }, suffix, night }),
-    [useCtm, ctmRules, cells, texturesOf, suffix, night],
+    () => ({ rules: useCtm ? ctmRules : [], world: { blockAt: (p) => cells.get(cellKey(...p)), texturesOf }, suffix, light }),
+    [useCtm, ctmRules, cells, texturesOf, suffix, light],
   );
 
   // a file change (an edit, a new random variant) rebuilds the blocks
@@ -273,7 +287,7 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
       main={
         <div className="absolute inset-0" onContextMenu={(e) => e.preventDefault()}>
           <Canvas camera={{ position: [9, 8, 11], fov: 45, near: 0.05, far: 300 }} onCreated={({ gl }) => (gl.outputColorSpace = THREE.SRGBColorSpace)}>
-            <color attach="background" args={[night ? '#0b1024' : '#79a6ff']} />
+            <color attach="background" args={[skyColor(light)]} />
             {[...cells].map(([cell, b]) => (
               <Block key={cell} cache={cache} store={store} cell={cell} block={b} tints={tints} revision={rebuild} optifine={optifine} onPick={pick} onHover={setHover} />
             ))}
@@ -336,6 +350,20 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
                 {t('scenes.sandbox.clear')}
               </Btn>
             </div>
+            <label className="mt-3 flex items-center gap-2 text-xs" title={t('scenes.sandbox.lightTitle')}>
+              <span className="text-neutral-400">{t('scenes.sandbox.light')}</span>
+              <input type="range" min={0} max={15} value={light} onChange={(e) => setLight(Number(e.target.value))} className="min-w-0 flex-1" />
+              <span className="w-24 text-right">
+                {light} · {Math.round(lightBrightness(light) * 100)}%
+              </span>
+            </label>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {LIGHT_PRESETS.map(([key, level]) => (
+                <button key={key} onClick={() => setLight(level)} className={`rounded px-2 py-0.5 text-[11px] ${light === level ? 'bg-emerald-700' : 'bg-neutral-800 hover:bg-neutral-700'}`}>
+                  {t(`scenes.sandbox.lightPreset.${key}`)}
+                </button>
+              ))}
+            </div>
             <label className="mt-3 flex items-center gap-2 text-xs">
               <span className="text-neutral-400">{t('scenes.sandbox.biome')}</span>
               <select value={biome} onChange={(e) => setBiome(e.target.value)} className="min-w-0 flex-1 rounded bg-neutral-800 px-1 py-0.5">
@@ -358,10 +386,6 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
                     {t('optifine.ctm')}
                   </label>
                 )}
-                <label className="flex items-center gap-1" title={t('optifine.nightTitle')}>
-                  <input type="checkbox" checked={night} onChange={(e) => setNight(e.target.checked)} />
-                  {t('optifine.night')}
-                </label>
               </div>
             </div>
           )}

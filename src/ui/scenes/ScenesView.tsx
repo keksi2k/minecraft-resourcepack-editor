@@ -10,8 +10,10 @@ import { FontsScreen } from './FontsScreen';
 import { ParticlesScreen } from './ParticlesScreen';
 import { PaintingsScreen } from './PaintingsScreen';
 import { SandboxScreen } from './SandboxScreen';
+import { TooltipScreen } from './TooltipScreen';
+import { MapScreen } from './MapScreen';
 
-export const SCENES = ['title', 'hud', 'biomes', 'fonts', 'particles', 'paintings', 'sandbox'] as const;
+export const SCENES = ['title', 'hud', 'tooltip', 'map', 'biomes', 'fonts', 'particles', 'paintings', 'sandbox'] as const;
 export type Scene = (typeof SCENES)[number];
 
 /** Previews of what the pack changes outside items and mobs: menus, HUD, biomes, fonts … */
@@ -32,6 +34,8 @@ export function ScenesView() {
       <div className="min-w-0 flex-1">
         {scene === 'title' && <TitleScreen store={store} />}
         {scene === 'hud' && <HudScreen store={store} />}
+        {scene === 'tooltip' && <TooltipScreen store={store} />}
+        {scene === 'map' && <MapScreen store={store} />}
         {scene === 'biomes' && <BiomesScreen store={store} />}
         {scene === 'fonts' && <FontsScreen store={store} />}
         {scene === 'particles' && <ParticlesScreen store={store} />}
