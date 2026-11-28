@@ -1,6 +1,6 @@
 import type { AssetStore } from '../assets/AssetStore';
 import type { FaceDir } from '../models/modelResolver';
-import { fileTextureId, normalizeRL } from '../models/resourceLocation';
+import { fileTextureId, mixTextureId, normalizeRL } from '../models/resourceLocation';
 
 /**
  * OptiFine's resource pack extras, which Continuity, CIT Resewn and others read too: connected and
@@ -52,7 +52,23 @@ export function resolveImage(name: string, propertiesPath: string): string {
 
 /* CTM -------------------------------------------------------------------------------------------- */
 
-export type CtmMethod = 'ctm' | 'ctm_compact' | 'horizontal' | 'vertical' | 'horizontal+vertical' | 'vertical+horizontal' | 'top' | 'random' | 'repeat' | 'fixed' | string;
+export type CtmMethod =
+  | 'ctm'
+  | 'ctm_compact'
+  | 'horizontal'
+  | 'vertical'
+  | 'horizontal+vertical'
+  | 'vertical+horizontal'
+  | 'top'
+  | 'random'
+  | 'repeat'
+  | 'fixed'
+  | 'overlay'
+  | 'overlay_ctm'
+  | 'overlay_random'
+  | 'overlay_repeat'
+  | 'overlay_fixed'
+  | string;
 
 export interface CtmRule {
   file: string;
@@ -68,10 +84,37 @@ export interface CtmRule {
   width: number;
   height: number;
   innerSeams: boolean;
+  /** Overlays: the neighbours they connect to (blocks, or blocks showing one of these textures). */
+  connectBlocks?: Set<string>;
+  connectTiles?: Set<string>;
+  /** Overlays: tinted like `tintBlock` when `tintIndex` is 0 or more. */
+  tintIndex: number;
+  tintBlock?: string;
+  /** ctm_compact: whole tiles for some of the 47 cases (`ctm.<case>=<tile>`). */
+  compactTiles?: Map<number, number>;
 }
 
-/** Methods the sandbox can show; others (overlays, compact) are listed but not drawn. */
-export const SHOWN_METHODS = new Set(['ctm', 'horizontal', 'vertical', 'top', 'random', 'repeat', 'fixed']);
+/** Methods the sandbox draws; others are listed but not drawn. */
+export const SHOWN_METHODS = new Set([
+  'ctm',
+  'ctm_compact',
+  'horizontal',
+  'vertical',
+  'horizontal+vertical',
+  'vertical+horizontal',
+  'top',
+  'random',
+  'repeat',
+  'fixed',
+  'overlay',
+  'overlay_ctm',
+  'overlay_random',
+  'overlay_repeat',
+  'overlay_fixed',
+]);
+
+/** Overlay methods draw on top of a face instead of replacing its texture. */
+export const isOverlay = (rule: CtmRule) => rule.method.startsWith('overlay');
 
 /** `oak_stairs`, `minecraft:oak_stairs`, `minecraft:oak_stairs:facing=east` → `minecraft:oak_stairs`. */
 export function blockOf(token: string): string {
@@ -121,6 +164,11 @@ export function parseCtmRule(path: string, props: Record<string, string>): CtmRu
   }
   const faces = props.faces ? new Set(words(props.faces).flatMap((f) => FACES[f] ?? [])) : undefined;
   const connect = (['block', 'tile', 'state'].includes(props.connect) ? props.connect : matchBlocks && !matchTiles ? 'block' : 'tile') as CtmRule['connect'];
+  const compactTiles = new Map<number, number>();
+  for (const [k, v] of Object.entries(props)) {
+    const m = /^ctm\.(\d+)$/.exec(k);
+    if (m && /^\d+$/.test(v)) compactTiles.set(+m[1], +v);
+  }
   return {
     file: path,
     method: props.method.trim(),
@@ -134,6 +182,11 @@ export function parseCtmRule(path: string, props: Record<string, string>): CtmRu
     width: Number(props.width) || 1,
     height: Number(props.height) || 1,
     innerSeams: props.innerSeams === 'true',
+    connectBlocks: props.connectBlocks !== undefined ? new Set(words(props.connectBlocks).map(blockOf)) : undefined,
+    connectTiles: props.connectTiles !== undefined ? new Set(words(props.connectTiles).map((w) => tileOf(w, path))) : undefined,
+    tintIndex: /^-?\d+$/.test(props.tintIndex ?? '') ? Number(props.tintIndex) : -1,
+    tintBlock: props.tintBlock ? blockOf(props.tintBlock) : undefined,
+    compactTiles: compactTiles.size ? compactTiles : undefined,
   };
 }
 
@@ -151,15 +204,23 @@ export function loadCtmRules(store: AssetStore): CtmRule[] {
   return rules.sort((a, b) => Number(!a.matchTiles) - Number(!b.matchTiles) || b.weight - a.weight || baseName(a.file).localeCompare(baseName(b.file)));
 }
 
-/** The first rule for a block face showing `texture`. */
+const applies = (r: CtmRule, block: string, texture: string, face: FaceDir) =>
+  (!r.faces || r.faces.has(face)) && (r.matchTiles ? r.matchTiles.has(texture) : !!r.matchBlocks?.has(block));
+
+/** The first rule that replaces the texture of a block face showing `texture` (overlays aside). */
 export function ruleFor(rules: CtmRule[], block: string, texture: string, face: FaceDir): CtmRule | undefined {
-  return rules.find((r) => (!r.faces || r.faces.has(face)) && (r.matchTiles ? r.matchTiles.has(texture) : r.matchBlocks?.has(block)));
+  return rules.find((r) => !isOverlay(r) && applies(r, block, texture, face));
 }
 
-type V3 = [number, number, number];
-const NORMAL: Record<FaceDir, V3> = { up: [0, 1, 0], down: [0, -1, 0], north: [0, 0, -1], south: [0, 0, 1], east: [1, 0, 0], west: [-1, 0, 0] };
-/** Left and up of each face's texture, as seen from outside. */
-const AXES: Record<FaceDir, [left: V3, up: V3]> = {
+/** The overlay rules for a block face, in order; each may draw a layer on top of the face. */
+export function overlayRulesFor(rules: CtmRule[], block: string, texture: string, face: FaceDir): CtmRule[] {
+  return rules.filter((r) => isOverlay(r) && applies(r, block, texture, face));
+}
+
+export type V3 = [number, number, number];
+export const NORMAL: Record<FaceDir, V3> = { up: [0, 1, 0], down: [0, -1, 0], north: [0, 0, -1], south: [0, 0, 1], east: [1, 0, 0], west: [-1, 0, 0] };
+/** Left and up of each face's texture, as seen from outside (for a face drawn without rotation). */
+export const AXES: Record<FaceDir, [left: V3, up: V3]> = {
   north: [[1, 0, 0], [0, 1, 0]],
   south: [[-1, 0, 0], [0, 1, 0]],
   east: [[0, 0, 1], [0, 1, 0]],
@@ -189,6 +250,9 @@ export interface CtmWorld {
   texturesOf(block: string): Set<string>;
 }
 
+/** ctm_compact's five tiles, used per quarter of the face. */
+const COMPACT = { none: 0, all: 1, vertical: 2, horizontal: 3, corners: 4 };
+
 /** A number per position that looks random; the same position always gives the same one. */
 function hash(x: number, y: number, z: number, salt: number): number {
   let h = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791) ^ Math.imul(salt, 2654435761)) | 0;
@@ -198,9 +262,13 @@ function hash(x: number, y: number, z: number, salt: number): number {
 
 /**
  * The tile a rule gives a face at `pos` (a texture id), or undefined to keep the block's own
- * texture (no rule, `<default>`, `<skip>`, or a method the sandbox doesn't draw).
+ * texture (no rule, `<default>`, `<skip>`, or a method the sandbox doesn't draw). `axes` are the
+ * left and up of the face's texture in the world, when the model turns the texture.
+ * Overlay methods give the tile to draw on top of the face instead.
  */
-export function ctmTile(rule: CtmRule, world: CtmWorld, pos: V3, face: FaceDir, block: string, texture: string): string | undefined {
+export function ctmTile(rule: CtmRule, world: CtmWorld, pos: V3, face: FaceDir, block: string, texture: string, axes = AXES[face]): string | undefined {
+  if (rule.method === 'overlay') return overlayTile(rule, world, pos, face, block, axes);
+  const method = rule.method.replace(/^overlay_/, '');
   const matches = (p: V3) => {
     const other = world.blockAt(p);
     if (!other) return false;
@@ -212,36 +280,64 @@ export function ctmTile(rule: CtmRule, world: CtmWorld, pos: V3, face: FaceDir, 
     const p = add(pos, offset);
     return matches(p) && (rule.innerSeams || !matches(add(p, normal)));
   };
-  const [left, up] = AXES[face];
+  const [left, up] = axes;
   const right = neg(left);
   const down = neg(up);
+  const horizontal = () => {
+    const l = connected(left);
+    const r = connected(right);
+    return l && r ? 1 : r ? 0 : l ? 2 : 3;
+  };
+  const vertical = () => {
+    const u = connected(up);
+    const d = connected(down);
+    return u && d ? 1 : u ? 0 : d ? 2 : 3;
+  };
   let index: number | undefined;
-  switch (rule.method) {
-    case 'ctm': {
+  switch (method) {
+    case 'ctm':
+    case 'ctm_compact': {
       const U = connected(up);
       const R = connected(right);
       const D = connected(down);
       const L = connected(left);
-      const corners = [
-        U && L && connected(add(up, left)) && 'ul',
-        U && R && connected(add(up, right)) && 'ur',
-        D && R && connected(add(down, right)) && 'dr',
-        D && L && connected(add(down, left)) && 'dl',
-      ].filter(Boolean);
+      const ul = U && L && connected(add(up, left));
+      const ur = U && R && connected(add(up, right));
+      const dr = D && R && connected(add(down, right));
+      const dl = D && L && connected(add(down, left));
+      const corners = [ul && 'ul', ur && 'ur', dr && 'dr', dl && 'dl'].filter(Boolean);
       const edges = `${U ? 'U' : ''}${R ? 'R' : ''}${D ? 'D' : ''}${L ? 'L' : ''}`;
       index = CTM_INDEX.get(corners.length ? `${edges}|${corners.join(',')}` : edges);
+      if (method === 'ctm') break;
+      // compact: a whole tile where the pack names one for this case, else the face in four quarters
+      const whole = index === undefined ? undefined : rule.compactTiles?.get(index);
+      if (whole !== undefined) {
+        index = whole;
+        break;
+      }
+      const quarter = (v: boolean, h: boolean, corner: boolean) =>
+        v && h ? (corner ? COMPACT.all : COMPACT.corners) : h ? COMPACT.horizontal : v ? COMPACT.vertical : COMPACT.none;
+      const tiles = [quarter(U, L, ul), quarter(U, R, ur), quarter(D, L, dl), quarter(D, R, dr)].map((i) => rule.tiles[i]);
+      if (tiles.some((t) => !t || t === 'default')) return undefined;
+      return mixTextureId(tiles.map((t, q) => ({ texture: t as string, quarter: q as 0 | 1 | 2 | 3 })));
+    }
+    case 'horizontal':
+      index = horizontal();
+      break;
+    case 'vertical':
+      index = vertical();
+      break;
+    case 'horizontal+vertical': {
+      // horizontal first; a face without horizontal neighbours connects vertically with tiles 4–6
+      const h = horizontal();
+      const v = h === 3 ? vertical() : 3;
+      index = h !== 3 ? h : v === 3 ? 3 : v + 4;
       break;
     }
-    case 'horizontal': {
-      const l = connected(left);
-      const r = connected(right);
-      index = l && r ? 1 : r ? 0 : l ? 2 : 3;
-      break;
-    }
-    case 'vertical': {
-      const u = connected(up);
-      const d = connected(down);
-      index = u && d ? 1 : u ? 0 : d ? 2 : 3;
+    case 'vertical+horizontal': {
+      const v = vertical();
+      const h = v === 3 ? horizontal() : 3;
+      index = v !== 3 ? v : h === 3 ? 3 : h + 4;
       break;
     }
     case 'top':
@@ -277,6 +373,58 @@ export function ctmTile(rule: CtmRule, world: CtmWorld, pos: V3, face: FaceDir, 
   }
   const tile = index === undefined ? undefined : rule.tiles[index];
   return tile && tile !== 'default' ? tile : undefined;
+}
+
+/**
+ * method=overlay: a fringe drawn on a face next to blocks it connects to (`connectBlocks` /
+ * `connectTiles`, else any other block), e.g. grass spilling onto the dirt beside it. The 17 tiles
+ * form OptiFine's overlay template; which ones a face gets follows the neighbours to its left,
+ * down, right and up, plus the diagonal ones (as Continuity does it). Several tiles are stacked.
+ */
+function overlayTile(rule: CtmRule, world: CtmWorld, pos: V3, face: FaceDir, block: string, axes: [V3, V3]): string | undefined {
+  const normal = NORMAL[face];
+  const [left, up] = axes;
+  // left, down, right, up: mask bits 1, 2, 4, 8
+  const dirs: V3[] = [left, neg(up), neg(left), up];
+  const source = (p: V3) => {
+    const other = world.blockAt(p);
+    if (!other || other === block) return false;
+    if (rule.connectBlocks && !rule.connectBlocks.has(other)) return false;
+    if (rule.connectTiles && ![...world.texturesOf(other)].some((t) => rule.connectTiles!.has(t))) return false;
+    // its face on this side must be visible
+    return !world.blockAt(add(p, normal));
+  };
+  const same = (p: V3) => world.blockAt(p) === block && !world.blockAt(add(p, normal));
+  const edge = dirs.map((d) => source(add(pos, d)));
+  // a corner tile: the diagonal block connects, and both sides next to it continue this face
+  const corner = (i: number) => {
+    const j = (i + 1) % 4;
+    return !edge[i] && !edge[j] && source(add(pos, dirs[i], dirs[j])) && same(add(pos, dirs[i])) && same(add(pos, dirs[j]));
+  };
+  const CORNER_TILE = [2, 0, 14, 16]; // between dirs i and i+1
+  const mask = edge.reduce((m, e, i) => m | (e ? 1 << i : 0), 0);
+  const EDGE_TILES: Record<number, number[]> = {
+    0b1111: [8],
+    0b0111: [5],
+    0b1011: [6],
+    0b1101: [13],
+    0b1110: [12],
+    0b0101: [9, 7],
+    0b1010: [1, 15],
+    0b0011: [4],
+    0b0110: [3],
+    0b1100: [10],
+    0b1001: [11],
+    0b0001: [9],
+    0b0010: [1],
+    0b0100: [7],
+    0b1000: [15],
+    0b0000: [],
+  };
+  const indices = [...EDGE_TILES[mask], ...[0, 1, 2, 3].filter(corner).map((i) => CORNER_TILE[i])];
+  const tiles = indices.map((i) => rule.tiles[i]).filter((t): t is string => !!t && t !== 'default');
+  if (!tiles.length) return undefined;
+  return tiles.length === 1 ? tiles[0] : mixTextureId(tiles.map((texture) => ({ texture })));
 }
 
 /* emissive ---------------------------------------------------------------------------------------- */

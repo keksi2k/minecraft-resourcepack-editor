@@ -9,6 +9,9 @@ import type { ItemEntry } from '../models/items';
 import { resolveItemModels } from '../models/items';
 import type { DisplayContext } from '../models/modelResolver';
 import { buildItemObject, disposeObject } from '../render/buildMesh';
+import { addLayer, setNight } from '../render/layers';
+import { emissiveModels } from '../scenes/sandbox';
+import { emissiveSuffix } from '../optifine/optifine';
 
 /** Display contexts offered in the viewer; labels are translated as `items.contexts.<context>`. */
 export const CONTEXTS: DisplayContext[] = ['gui', 'none', 'ground', 'fixed', 'head', 'thirdperson_righthand', 'firstperson_righthand'];
@@ -94,18 +97,35 @@ function Animate({ obj, animate }: { obj: THREE.Object3D; animate: (obj: THREE.O
   return null;
 }
 
-export function ItemViewer({ store, item, context, options, state = {} }: {
+/** The item's models in a context (GUI-context resolution may differ from in-hand, e.g. trident). */
+const itemModels = (store: AssetStore, item: ItemEntry, context: DisplayContext, state: ItemState) =>
+  resolveItemModels(store, item.id, context === 'none' ? 'gui' : context, state);
+
+/** Whether the item has OptiFine emissive textures (parts that glow in the dark). */
+export function itemGlows(store: AssetStore, item: ItemEntry, state: ItemState = {}): boolean {
+  return !!emissiveModels(store, itemModels(store, item, 'gui', state), emissiveSuffix(store));
+}
+
+export function ItemViewer({ store, item, context, options, state = {}, night }: {
   store: AssetStore;
   item: ItemEntry;
   context: DisplayContext;
   options?: SpecialOptions;
   state?: ItemState;
+  /** Dark, so emissive textures stand out. */
+  night?: boolean;
 }) {
   return (
     <ObjectViewer
-      buildKey={`${item.id}|${item.depsKey}|${context}|${JSON.stringify(options ?? {})}|${JSON.stringify(state)}`}
-      // GUI-context resolution may differ from in-hand (e.g. trident), so resolve per context.
-      build={() => buildItemObject(store, resolveItemModels(store, item.id, context === 'none' ? 'gui' : context, state), context, options)}
+      buildKey={`${item.id}|${item.depsKey}|${context}|${JSON.stringify(options ?? {})}|${JSON.stringify(state)}|${night}`}
+      build={async () => {
+        const models = itemModels(store, item, context, state);
+        const obj = await buildItemObject(store, models, context, options);
+        const glow = emissiveModels(store, models, emissiveSuffix(store));
+        if (glow) await addLayer(store, obj, glow, context, true);
+        setNight(obj, !!night);
+        return obj;
+      }}
     />
   );
 }

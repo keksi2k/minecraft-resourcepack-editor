@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { AssetStore } from '../assets/AssetStore';
-import { texturePath } from '../models/resourceLocation';
+import { parseMixTexture, texturePath, type MixLayer } from '../models/resourceLocation';
 import { drawAnimationFrame, frameAt, parseAnimation, subscribeTicks, type TextureAnimation } from './animation';
 import { permutationFiles, recolor, texturePermutation, type TexturePermutation } from '../models/atlasPermutations';
 
@@ -105,7 +105,35 @@ async function decodePermutation(store: AssetStore, { template, key, palette }: 
   return decodeBitmap(bmp, store.json(`${template}.mcmeta`));
 }
 
+/** A texture put together from others (see `mixTextureId`), in the size of the first layer. */
+async function decodeMix(store: AssetStore, layers: MixLayer[]): Promise<TexInfo> {
+  const infos = await Promise.all(layers.map((l) => loadTexture(store, l.texture)));
+  const first = infos.find((i) => !i.missing);
+  if (!first) return missingTexture();
+  const { width: w, height: h } = first;
+  const canvas = canvasOf(w, h);
+  const g = canvas.getContext('2d', { willReadFrequently: true })!;
+  g.imageSmoothingEnabled = false;
+  layers.forEach((l, i) => {
+    const src = infos[i];
+    if (src.missing) return;
+    if (l.quarter === undefined) return g.drawImage(src.canvas, 0, 0, w, h);
+    const [qx, qy] = [l.quarter % 2, l.quarter >> 1];
+    g.drawImage(src.canvas, (qx * src.width) / 2, (qy * src.height) / 2, src.width / 2, src.height / 2, (qx * w) / 2, (qy * h) / 2, w / 2, h / 2);
+  });
+  const pixels = g.getImageData(0, 0, w, h).data;
+  return { canvas, width: w, height: h, pixels, translucent: hasTranslucency(pixels), frames: 1, missing: false };
+}
+
 export function loadTexture(store: AssetStore, textureId: string): Promise<TexInfo> {
+  const mix = parseMixTexture(textureId);
+  if (mix) {
+    // cached per id and the revisions of the textures it's made of
+    const key = `${textureId}|${mix.map((l) => store.rev(texturePath(l.texture))).join('|')}`;
+    let p = cache.get(key);
+    if (!p) cache.set(key, (p = decodeMix(store, mix).catch(() => missingTexture())));
+    return p;
+  }
   const path = texturePath(textureId);
   const permutation = store.has(path) ? undefined : texturePermutation(store, textureId);
   const files = permutation ? permutationFiles(permutation) : [path, `${path}.mcmeta`];

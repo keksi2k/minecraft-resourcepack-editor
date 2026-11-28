@@ -8,11 +8,13 @@ import { modelTextures, resolveModel } from '../../models/modelResolver';
 import { parseRL } from '../../models/resourceLocation';
 import type { Pixels } from '../../render/pixelEdit';
 import { buildItemObject, disposeObject } from '../../render/buildMesh';
+import { addLayer, setNight } from '../../render/layers';
 import { biomeColors, colormapPath, COLORMAPS, listBiomes, type Colormap } from '../../scenes/colormap';
 import {
   blockModels,
   blockParts,
   blockStatePath,
+  blockTint,
   cellKey,
   ctmModels,
   DEFAULT_TINTS,
@@ -28,8 +30,8 @@ import {
   type Tints,
 } from '../../scenes/sandbox';
 import { useApp } from '../../state/appStore';
-import { emissiveSuffix, loadCtmRules, ruleFor, SHOWN_METHODS, type CtmRule, type CtmWorld } from '../../optifine/optifine';
-import { resolveFaceTexture } from '../../models/modelResolver';
+import { emissiveSuffix, loadCtmRules, overlayRulesFor, ruleFor, SHOWN_METHODS, type CtmRule, type CtmWorld } from '../../optifine/optifine';
+import { resolveFaceTexture, type FaceDir } from '../../models/modelResolver';
 import { Btn } from '../common';
 import { Section, TextureRow } from '../ItemDetail';
 import { ItemThumb } from '../ItemsView';
@@ -97,7 +99,16 @@ function Block({
   const seed = positionSeed(x, y, z);
   const choice = parts.map((v) => pickVariant(v, seed));
   // connected textures depend on the neighbours, so the tiles are part of what makes blocks alike
-  const { models, key: tiles } = ctmModels(blockModels(store, block, parts, choice, tints), parts, choice, optifine.rules, optifine.world, [x, y, z], block);
+  const { models, overlays, key: tiles } = ctmModels(
+    blockModels(store, block, parts, choice, tints),
+    parts,
+    choice,
+    optifine.rules,
+    optifine.world,
+    [x, y, z],
+    block,
+    (b) => blockTint(b, tints),
+  );
   const glow = emissiveModels(store, models, optifine.suffix);
   const key = `${block}|${choice.join('.')}|${tints.grass}.${tints.foliage}.${tints.water}|${revision}|${tiles}|${glow ? 'g' : ''}`;
   const [obj, setObj] = useState<THREE.Object3D>();
@@ -105,20 +116,9 @@ function Block({
     let alive = true;
     const build = async () => {
       const o = await buildItemObject(store, models, 'none');
-      if (glow) {
-        // emissive overlays: drawn on top, never darkened
-        const g = await buildItemObject(store, glow, 'none');
-        g.traverse((m) => {
-          if (m instanceof THREE.Mesh) {
-            const mat = m.material as THREE.MeshBasicMaterial;
-            mat.userData.glow = true;
-            mat.polygonOffset = true;
-            mat.polygonOffsetFactor = -1;
-            mat.polygonOffsetUnits = -4;
-          }
-        });
-        o.add(g);
-      }
+      // overlay tiles on top of the faces, then emissive textures that never darken
+      if (overlays) await addLayer(store, o, overlays, 'none', false);
+      if (glow) await addLayer(store, o, glow, 'none', true);
       return o;
     };
     void cache.get(key, build).then((o) => alive && setObj(o.clone(true)));
@@ -127,14 +127,9 @@ function Block({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cache, key]);
-  // night: everything dark except emissive overlays (materials are shared, so this is cheap)
+  // night (materials are shared, so this is cheap)
   useEffect(() => {
-    obj?.traverse((m) => {
-      if (m instanceof THREE.Mesh) {
-        const mat = m.material as THREE.MeshBasicMaterial;
-        mat.color.setScalar(optifine.night && !mat.userData.glow ? 0.18 : 1);
-      }
-    });
+    if (obj) setNight(obj, optifine.night);
   }, [obj, optifine.night]);
   if (!obj) return null;
   return (
@@ -264,8 +259,10 @@ export function SandboxScreen({ store }: { store: AssetStore }) {
         for (const el of m.elements)
           for (const [dir, face] of Object.entries(el.faces)) {
             const tex = face && resolveFaceTexture(m.textures, face.texture);
-            const r = tex && ruleFor(ctmRules, block, tex, dir as Parameters<typeof ruleFor>[3]);
+            if (!tex) continue;
+            const r = ruleFor(ctmRules, block, tex, dir as FaceDir);
             if (r) out.add(r);
+            for (const o of overlayRulesFor(ctmRules, block, tex, dir as FaceDir)) out.add(o);
           }
       }
     return [...out];

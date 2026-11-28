@@ -12,7 +12,7 @@ import { useT, type MessageKey, type TFunction } from '../i18n';
 import { useApp } from '../state/appStore';
 import { AssetActions, Btn, SourceBadge } from './common';
 import { ItemThumb } from './ItemsView';
-import { CONTEXTS, ItemViewer } from './ItemViewer';
+import { CONTEXTS, itemGlows, ItemViewer } from './ItemViewer';
 import { SoundEventRow, useSoundLinks } from './SoundsView';
 import { TextureThumb } from './TexturesView';
 import { texturePermutation } from '../models/atlasPermutations';
@@ -30,7 +30,7 @@ export function Section({ title, children }: { title: string; children: React.Re
 }
 
 export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry }) {
-  const { soundEvents, select } = useApp();
+  const { soundEvents, select, revision } = useApp();
   const t = useT();
   const [context, setContext] = useState<DisplayContext>('gui');
   const links = useSoundLinks();
@@ -38,6 +38,10 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
   const [state, setState] = useState<ItemState>({});
   const [options, setOptions] = useState<SpecialOptions>({});
   const [playing, setPlaying] = useState(false);
+  const [night, setNight] = useState(false);
+  // OptiFine emissive textures: the viewer can show them glowing in the dark
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const glows = useMemo(() => itemGlows(store, item, state), [store, item, state, revision]);
   useEffect(() => {
     setState({});
     setOptions({});
@@ -91,7 +95,8 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
 
       <div className="px-3">
         <div className="h-72">
-          <ItemViewer store={store} item={item} context={context} options={opts} state={state} />
+          {/* night is left out without glowing textures, so adding one rebuilds the view */}
+          <ItemViewer store={store} item={item} context={context} options={opts} state={state} night={glows ? night : undefined} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1">
           {CONTEXTS.map((id) => (
@@ -103,6 +108,15 @@ export function ItemDetail({ store, item }: { store: AssetStore; item: ItemEntry
               {t(`items.contexts.${id}`)}
             </button>
           ))}
+          {glows && (
+            <button
+              onClick={() => setNight(!night)}
+              title={t('optifine.itemNightTitle')}
+              className={`rounded px-2 py-0.5 text-[11px] ${night ? 'bg-indigo-700' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+            >
+              🌙 {t('optifine.night')}
+            </button>
+          )}
           <span className="ml-auto">
             <Btn onClick={() => void downloadRender()} title={t('items.renderTitle')}>
               {t('actions.render')}

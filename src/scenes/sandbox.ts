@@ -1,10 +1,10 @@
 import type { AssetStore } from '../assets/AssetStore';
 import { FOLIAGE, GRASS } from '../models/itemDefinition';
 import type { ResolvedItemModel } from '../models/items';
-import { resolveFaceTexture, resolveModel, type FaceDir } from '../models/modelResolver';
-import { ctmTile, emissiveOf, ruleFor, SHOWN_METHODS, type CtmRule, type CtmWorld } from '../optifine/optifine';
+import { resolveFaceTexture, resolveModel, type FaceDir, type ModelElement, type ModelFace } from '../models/modelResolver';
+import { AXES, ctmTile, emissiveOf, overlayRulesFor, ruleFor, SHOWN_METHODS, type CtmRule, type CtmWorld, type V3 } from '../optifine/optifine';
 import { placement } from '../models/plants';
-import { normalizeRL, parseRL } from '../models/resourceLocation';
+import { mixTextureId, normalizeRL, parseRL } from '../models/resourceLocation';
 
 /**
  * The block sandbox: blocks placed on a small grid, each shown in its usual state. Where the
@@ -206,17 +206,46 @@ export function parseCells(text: string): Cells {
 /** Where a model face points once the blockstate turns the model (x first, then y, in 90° steps). */
 const TURN_X: Record<FaceDir, FaceDir> = { north: 'down', down: 'south', south: 'up', up: 'north', east: 'east', west: 'west' };
 const TURN_Y: Record<FaceDir, FaceDir> = { north: 'east', east: 'south', south: 'west', west: 'north', up: 'up', down: 'down' };
+const steps = (deg = 0) => (((deg / 90) % 4) + 4) % 4;
 export function turnedFace(dir: FaceDir, x = 0, y = 0): FaceDir {
-  for (let i = ((x / 90) % 4 + 4) % 4; i > 0; i--) dir = TURN_X[dir];
-  for (let i = ((y / 90) % 4 + 4) % 4; i > 0; i--) dir = TURN_Y[dir];
+  for (let i = steps(x); i > 0; i--) dir = TURN_X[dir];
+  for (let i = steps(y); i > 0; i--) dir = TURN_Y[dir];
   return dir;
 }
 
+/** The same turn for a vector (x first, then y). */
+function turnedVector(v: V3, x = 0, y = 0): V3 {
+  for (let i = steps(x); i > 0; i--) v = [v[0], v[2], -v[1]];
+  for (let i = steps(y); i > 0; i--) v = [-v[2], v[1], v[0]];
+  return v;
+}
+
 /**
- * The block's models with each face's texture swapped for the CTM tile its neighbours call for.
- * Like OptiFine, the tile is chosen for the direction a face points in the world (rotated variants
- * included) and keeps the face's own UV mapping.
- * `key` names the chosen tiles, so blocks that look the same can share one built object.
+ * Left and up of a face's texture in the world: the face's UV (mirrored, turned) and the variant's
+ * turn both move them, and connected textures must look for neighbours where the tile's edges are.
+ */
+export function faceAxes(dir: FaceDir, face: ModelFace, x = 0, y = 0): [V3, V3] {
+  let [left, up] = AXES[dir];
+  const neg = (a: V3): V3 => [-a[0], -a[1], -a[2]];
+  if (face.uv && face.uv[0] > face.uv[2]) left = neg(left);
+  if (face.uv && face.uv[1] > face.uv[3]) up = neg(up);
+  // a UV rotation turns the picture clockwise: its left edge ends up on top
+  for (let i = steps(face.rotation); i > 0; i--) [left, up] = [up, neg(left)];
+  return [turnedVector(left, x, y), turnedVector(up, x, y)];
+}
+
+/** Overlays for the faces of a block, drawn on top of it: models with only those faces. */
+export interface CtmResult {
+  models: ResolvedItemModel[];
+  overlays?: ResolvedItemModel[];
+  /** Names the chosen tiles, so blocks that look the same can share one built object. */
+  key: string;
+}
+
+/**
+ * The block's models with each face's texture swapped for the CTM tile its neighbours call for,
+ * and the overlay tiles to draw on top. Like OptiFine, a face's tile is chosen for where the face
+ * points in the world and how its texture is turned there, and keeps the face's UV mapping.
  */
 export function ctmModels(
   models: ResolvedItemModel[],
@@ -226,41 +255,81 @@ export function ctmModels(
   world: CtmWorld,
   pos: [number, number, number],
   block: string,
-): { models: ResolvedItemModel[]; key: string } {
+  tintOf: (block: string) => number | undefined = () => undefined,
+): CtmResult {
   if (!rules.length) return { models, key: '' };
   const keys: string[] = [];
+  const overlays: ResolvedItemModel[] = [];
   const out = models.map((m, i) => {
     const v = parts[i]?.[choice[i] ?? 0];
     if (!v || m.model.kind !== 'elements') return m;
     const textures = { ...m.model.textures };
+    const overTextures: Record<string, string> = {};
     let n = 0;
+    let k = 0;
+    let tint: number | undefined;
+    const overElements: ModelElement[] = [];
     const elements = m.model.elements.map((el) => {
       const faces = { ...el.faces };
+      const overFaces: ModelElement['faces'] = {};
       for (const dir of Object.keys(faces) as FaceDir[]) {
-        const face = faces[dir];
-        const tex = face && resolveFaceTexture(m.model.textures, face.texture);
+        const face = faces[dir]!;
+        const tex = resolveFaceTexture(m.model.textures, face.texture);
+        if (!tex) continue;
         const seen = turnedFace(dir, v.x, v.y);
-        const rule = tex ? ruleFor(rules, block, tex, seen) : undefined;
-        const tile = rule && SHOWN_METHODS.has(rule.method) ? ctmTile(rule, world, pos, seen, block, tex!) : undefined;
-        if (!tile) continue;
-        const name = `ctm_${n++}`;
-        textures[name] = tile;
-        faces[dir] = { ...face!, texture: `#${name}` };
-        keys.push(`${dir}:${tile}`);
+        const axes = faceAxes(dir, face, v.x, v.y);
+        const rule = ruleFor(rules, block, tex, seen);
+        const tile = rule && SHOWN_METHODS.has(rule.method) ? ctmTile(rule, world, pos, seen, block, tex, axes) : undefined;
+        if (tile) {
+          const name = `ctm_${n++}`;
+          textures[name] = tile;
+          faces[dir] = { ...face, texture: `#${name}` };
+          keys.push(`${dir}:${tile}`);
+        }
+        // overlays stack on the face, the first rule at the bottom
+        const layers = overlayRulesFor(rules, block, tex, seen)
+          .filter((r) => SHOWN_METHODS.has(r.method))
+          .map((r) => ({ r, tile: ctmTile(r, world, pos, seen, block, tex, axes) }))
+          .filter((l): l is { r: CtmRule; tile: string } => !!l.tile);
+        if (!layers.length) continue;
+        const name = `overlay_${k++}`;
+        overTextures[name] = layers.length === 1 ? layers[0].tile : mixTextureId(layers.map((l) => ({ texture: l.tile })));
+        const tinted = layers.find((l) => l.r.tintIndex >= 0)?.r;
+        if (tinted) tint ??= tintOf(tinted.tintBlock ?? block);
+        overFaces[dir] = { ...face, texture: `#${name}`, tintindex: tinted ? 0 : undefined };
+        keys.push(`${dir}+${overTextures[name]}`);
       }
+      if (Object.keys(overFaces).length) overElements.push({ ...el, faces: overFaces });
       return { ...el, faces };
     });
+    if (overElements.length) {
+      overlays.push({
+        ref: { ...m.ref, tints: tint === undefined ? [] : [tint] },
+        model: { ...m.model, textures: { ...m.model.textures, ...overTextures }, elements: overElements },
+      });
+    }
     return n ? { ...m, model: { ...m.model, textures, elements } } : m;
   });
-  return { models: out, key: keys.join(',') };
+  return { models: out, overlays: overlays.length ? overlays : undefined, key: keys.join(',') };
 }
 
-/** Only the faces that have an emissive overlay, showing that overlay; undefined if there are none. */
+/**
+ * Only what glows: the faces (or item layers) that have an emissive texture, showing that texture;
+ * undefined if there are none.
+ */
 export function emissiveModels(store: AssetStore, models: ResolvedItemModel[], suffix: string | undefined): ResolvedItemModel[] | undefined {
   if (!suffix) return undefined;
   let any = false;
+  const nothing = (m: ResolvedItemModel): ResolvedItemModel => ({ ...m, model: { ...m.model, kind: 'elements', elements: [], layers: [] } });
   const out = models.map((m) => {
-    if (m.model.kind !== 'elements') return { ...m, model: { ...m.model, elements: [] } };
+    if (m.model.kind === 'generated') {
+      // flat items: each layer's glow, drawn over the layer (never tinted)
+      const layers = m.model.layers.map((l) => emissiveOf(store, l, suffix)).filter((l): l is string => !!l);
+      if (!layers.length) return nothing(m);
+      any = true;
+      return { ...m, ref: { ...m.ref, tints: [] }, model: { ...m.model, layers } };
+    }
+    if (m.model.kind !== 'elements') return nothing(m);
     const textures = { ...m.model.textures };
     let n = 0;
     const elements = m.model.elements

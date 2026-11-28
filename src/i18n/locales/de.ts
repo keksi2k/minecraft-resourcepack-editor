@@ -695,6 +695,7 @@ const de: Translation = {
     ctm: 'Verbundene Texturen',
     night: 'Nacht',
     nightTitle: 'Dunkelt die Blöcke ab, damit leuchtende Texturen (Emissive) hervortreten',
+    itemNightTitle: 'Dunkelt das Item ab, damit seine leuchtenden Texturen (Emissive) hervortreten',
     notShown: 'diese Methode wird hier nicht gezeichnet',
     cit: {
       title: { one: 'OptiFine-CIT ({count} Regel)', other: 'OptiFine-CIT ({count} Regeln)' },

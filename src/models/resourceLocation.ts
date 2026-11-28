@@ -25,6 +25,29 @@ export const modelPath = (id: string) => {
 export const FILE_NS = '__file';
 export const fileTextureId = (path: string) => `${FILE_NS}:${path}`;
 
+/**
+ * Pseudo namespace for textures put together from others while drawing (OptiFine's compact CTM
+ * quarters, stacked overlay tiles): `__mix:` and the layers, bottom first, each `<quarter>@<id>`
+ * with `*` for the whole image or 0–3 for top left, top right, bottom left, bottom right.
+ */
+export const MIX_NS = '__mix';
+export interface MixLayer {
+  texture: string;
+  quarter?: 0 | 1 | 2 | 3;
+}
+export const mixTextureId = (layers: MixLayer[]) => `${MIX_NS}:${layers.map((l) => `${l.quarter ?? '*'}@${l.texture}`).join(';')}`;
+export function parseMixTexture(id: string): MixLayer[] | undefined {
+  if (!id.startsWith(`${MIX_NS}:`)) return undefined;
+  return id
+    .slice(MIX_NS.length + 1)
+    .split(';')
+    .map((part) => {
+      const at = part.indexOf('@');
+      const q = part.slice(0, at);
+      return { texture: part.slice(at + 1), quarter: q === '*' ? undefined : (Number(q) as MixLayer['quarter']) };
+    });
+}
+
 export const texturePath = (id: string) => {
   const { ns, path } = parseRL(id);
   return ns === FILE_NS ? path : `assets/${ns}/textures/${path}.png`;

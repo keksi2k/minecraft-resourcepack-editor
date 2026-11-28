@@ -1,20 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { AssetStore } from '../assets/AssetStore';
-import { textureLabel, texturePath } from '../models/resourceLocation';
+import { mixTextureId, parseMixTexture, textureLabel, texturePath } from '../models/resourceLocation';
 import {
   blockOf,
   ctmTile,
   emissiveOf,
   emissiveSuffix,
+  isOverlay,
   loadCitRules,
   loadCtmRules,
   parseCtmRule,
+  overlayRulesFor,
   parseProperties,
   ruleFor,
   type CtmWorld,
 } from '../optifine/optifine';
 import type { ResolvedItemModel } from '../models/items';
-import { ctmModels, turnedFace } from '../scenes/sandbox';
+import { ctmModels, emissiveModels, faceAxes, turnedFace } from '../scenes/sandbox';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const D = 'assets/minecraft/optifine/ctm/glass/';
@@ -173,5 +175,139 @@ describe('connected textures in the sandbox', () => {
     expect(tileOf(0)).toBe(ctmTile(h, row, [0, 0, 0], 'north', 'minecraft:bookshelf', 'minecraft:block/bookshelf'));
     expect(tileOf(180)).toBe(ctmTile(h, row, [0, 0, 0], 'south', 'minecraft:bookshelf', 'minecraft:block/bookshelf'));
     expect(tileOf(0)).not.toBe(tileOf(180));
+  });
+});
+
+describe('more connected-texture methods', () => {
+  const G = 'minecraft:block/glass';
+  const g = 'minecraft:glass';
+  const quarters = (id: string | undefined) => parseMixTexture(id!)!.map((l) => l.texture);
+
+  it('puts compact tiles together from quarters, or takes a whole tile where the pack names one', () => {
+    const c = parseCtmRule(`${D}glass.properties`, { method: 'ctm_compact', tiles: '0-4' })!;
+    const row = world([[-1, 0, 0], [0, 0, 0], [1, 0, 0]]);
+    // the middle connects left and right: every quarter shows the horizontal tile
+    expect(ctmTile(c, row, [0, 0, 0], 'north', g, G)).toBe(mixTextureId([0, 1, 2, 3].map((q) => ({ texture: tile(3), quarter: q as 0 | 1 | 2 | 3 }))));
+    // seen from the north the end at +x connects only to its right: left quarters unconnected
+    expect(quarters(ctmTile(c, row, [1, 0, 0], 'north', g, G))).toEqual([tile(0), tile(3), tile(0), tile(3)]);
+    // the top left block of a 2×2 wall: connected right and down with the corner between them
+    const wall = world([[0, 0, 0], [-1, 0, 0], [0, -1, 0], [-1, -1, 0]]);
+    expect(quarters(ctmTile(c, wall, [0, 0, 0], 'north', g, G))).toEqual([tile(0), tile(3), tile(2), tile(1)]);
+    // without the corner block the bottom right quarter shows the unconnected corner
+    const ring = world([[0, 0, 0], [-1, 0, 0], [0, -1, 0]]);
+    expect(quarters(ctmTile(c, ring, [0, 0, 0], 'north', g, G))[3]).toBe(tile(4));
+    // ctm.1 (connected to the right only) as a whole tile
+    const o = parseCtmRule(`${D}glass.properties`, { method: 'ctm_compact', tiles: '0-4', 'ctm.1': '4' })!;
+    expect(ctmTile(o, row, [1, 0, 0], 'north', g, G)).toBe(tile(4));
+  });
+
+  it('connects horizontally first, then vertically (and the other way round)', () => {
+    const hv = parseCtmRule(`${D}glass.properties`, { method: 'horizontal+vertical', tiles: '0-6' })!;
+    const vh = parseCtmRule(`${D}glass.properties`, { method: 'vertical+horizontal', tiles: '0-6' })!;
+    const col = world([[0, 0, 0], [0, 1, 0]]);
+    expect(ctmTile(hv, col, [0, 0, 0], 'south', g, G)).toBe(tile(4)); // vertical bottom (0) + 4
+    expect(ctmTile(vh, col, [0, 0, 0], 'south', g, G)).toBe(tile(0));
+    const row = world([[0, 0, 0], [1, 0, 0]]);
+    expect(ctmTile(hv, row, [1, 0, 0], 'north', g, G)).toBe(tile(0));
+    expect(ctmTile(vh, row, [1, 0, 0], 'north', g, G)).toBe(tile(4));
+    expect(ctmTile(hv, world([[0, 0, 0]]), [0, 0, 0], 'north', g, G)).toBe(tile(3));
+  });
+
+  describe('overlays', () => {
+    const rule = parseCtmRule(`${D}stone.properties`, {
+      method: 'overlay',
+      tiles: '0-16',
+      matchBlocks: 'stone',
+      connectBlocks: 'grass_block',
+      tintIndex: '0',
+      tintBlock: 'grass_block',
+    })!;
+    const at = (cells: Record<string, string | undefined>): CtmWorld => ({ blockAt: (p) => cells[p.join(',')], texturesOf: () => new Set() });
+    const S = 'minecraft:stone';
+    const grass = 'minecraft:grass_block';
+
+    it('reads what overlays connect to and how they are tinted', () => {
+      expect(rule.connectBlocks).toEqual(new Set([grass]));
+      expect(rule).toMatchObject({ tintIndex: 0, tintBlock: grass });
+      expect(isOverlay(rule)).toBe(true);
+      expect(ruleFor([rule], S, 'minecraft:block/stone', 'north')).toBeUndefined();
+      expect(overlayRulesFor([rule], S, 'minecraft:block/stone', 'north')).toEqual([rule]);
+    });
+
+    it('picks the fringe from the neighbours to the left, down, right and up', () => {
+      // seen from the north, +x is on the left
+      expect(ctmTile(rule, at({ '0,0,0': S, '1,0,0': grass }), [0, 0, 0], 'north', S, 'x')).toBe(tile(9));
+      expect(ctmTile(rule, at({ '0,0,0': S, '0,1,0': grass }), [0, 0, 0], 'north', S, 'x')).toBe(tile(15));
+      // grass on both sides: two tiles stacked
+      expect(ctmTile(rule, at({ '0,0,0': S, '1,0,0': grass, '-1,0,0': grass }), [0, 0, 0], 'north', S, 'x')).toBe(
+        mixTextureId([{ texture: tile(9) }, { texture: tile(7) }]),
+      );
+      // only blocks it connects to, and only where their face shows
+      expect(ctmTile(rule, at({ '0,0,0': S, '1,0,0': 'minecraft:dirt' }), [0, 0, 0], 'north', S, 'x')).toBeUndefined();
+      expect(ctmTile(rule, at({ '0,0,0': S, '1,0,0': grass, '1,0,-1': S }), [0, 0, 0], 'north', S, 'x')).toBeUndefined();
+    });
+
+    it('draws a corner when the grass is diagonal and the face goes on beside it', () => {
+      const cells = { '0,0,0': S, '1,0,0': S, '0,1,0': S, '1,1,0': grass };
+      expect(ctmTile(rule, at(cells), [0, 0, 0], 'north', S, 'x')).toBe(tile(16));
+      expect(ctmTile(rule, at({ ...cells, '1,0,0': undefined }), [0, 0, 0], 'north', S, 'x')).toBeUndefined();
+    });
+
+    it('gives the sandbox an extra tinted layer for overlaid faces', () => {
+      const face = { texture: '#all' };
+      const model = {
+        ref: { model: 'minecraft:block/stone', tints: [] },
+        model: { kind: 'elements', textures: { all: 'minecraft:block/stone' }, elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: { north: face, up: face } }] },
+      } as unknown as ResolvedItemModel;
+      const res = ctmModels([model], [[{ model: 'minecraft:block/stone' }]], [0], [rule], at({ '0,0,0': S, '1,0,0': grass }), [0, 0, 0], S, (b) =>
+        b === grass ? 0x55aa33 : undefined,
+      );
+      expect(res.models[0]).toBe(model);
+      const over = res.overlays![0];
+      expect(over.ref.tints).toEqual([0x55aa33]);
+      const m = over.model as unknown as { textures: Record<string, string>; elements: { faces: Record<string, { texture: string; tintindex?: number }> }[] };
+      // the top borders the grass block's top too
+      expect(Object.keys(m.elements[0].faces)).toEqual(['north', 'up']);
+      expect(m.textures[m.elements[0].faces.north.texture.slice(1)]).toBe(tile(9));
+      expect(m.elements[0].faces.north.tintindex).toBe(0);
+    });
+  });
+
+  it('follows the texture when a variant or the UV turns it', () => {
+    const clean = (v: number[][]) => v.map((a) => a.map((n) => n + 0)); // no -0
+    expect(clean(faceAxes('up', { texture: '#all' }, 0, 180))).toEqual([[1, 0, 0], [0, 0, 1]]);
+    expect(clean(faceAxes('north', { texture: '#all', rotation: 90 }))).toEqual([[0, 1, 0], [-1, 0, 0]]);
+    expect(clean(faceAxes('north', { texture: '#all', uv: [16, 0, 0, 16] }))[0]).toEqual([-1, 0, 0]);
+    // the top of a turned block: the tile's ends follow the turned texture
+    const h = parseCtmRule(`${D}glass.properties`, { method: 'horizontal', tiles: '0-3' })!;
+    const row = world([[0, 0, 0], [1, 0, 0]]);
+    expect(ctmTile(h, row, [0, 0, 0], 'up', g, G)).toBe(tile(0));
+    expect(ctmTile(h, row, [0, 0, 0], 'up', g, G, faceAxes('up', { texture: '#all' }, 0, 180))).toBe(tile(2));
+  });
+});
+
+describe('emissive items', () => {
+  it('lets the layers of flat items glow', () => {
+    const store = new AssetStore(
+      new Map(),
+      new Map([
+        ['assets/minecraft/optifine/emissive.properties', enc('suffix.emissive=_e')],
+        ['assets/minecraft/textures/item/apple_e.png', enc('png')],
+      ]),
+    );
+    const apple = {
+      ref: { model: 'minecraft:item/apple', tints: [0xff0000] },
+      model: { kind: 'generated', layers: ['minecraft:item/apple', 'minecraft:item/leaf'], elements: [], textures: {} },
+    } as unknown as ResolvedItemModel;
+    const [glow] = emissiveModels(store, [apple], emissiveSuffix(store))!;
+    expect(glow.model.layers).toEqual(['minecraft:item/apple_e']);
+    expect(glow.ref.tints).toEqual([]);
+    expect(emissiveModels(store, [{ ...apple, model: { ...apple.model, layers: ['minecraft:item/leaf'] } }], '_e')).toBeUndefined();
+  });
+
+  it('names mixed textures and reads them back', () => {
+    const layers = [{ texture: '__file:assets/minecraft/optifine/ctm/a/0.png', quarter: 2 as const }, { texture: 'minecraft:block/stone' }];
+    expect(parseMixTexture(mixTextureId(layers))).toEqual([layers[0], { texture: 'minecraft:block/stone', quarter: undefined }]);
+    expect(parseMixTexture('minecraft:block/stone')).toBeUndefined();
   });
 });

@@ -696,6 +696,7 @@ const en = {
     ctm: 'Connected textures',
     night: 'Night',
     nightTitle: 'Darkens the blocks so emissive textures (glowing parts) stand out',
+    itemNightTitle: 'Darkens the item so its emissive textures (glowing parts) stand out',
     notShown: 'this method isn’t drawn here',
     cit: {
       title: { one: 'OptiFine CIT ({count} rule)', other: 'OptiFine CIT ({count} rules)' },
