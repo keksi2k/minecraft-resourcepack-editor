@@ -13,6 +13,8 @@ import {
   ruleFor,
   type CtmWorld,
 } from '../optifine/optifine';
+import type { ResolvedItemModel } from '../models/items';
+import { ctmModels, turnedFace } from '../scenes/sandbox';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const D = 'assets/minecraft/optifine/ctm/glass/';
@@ -142,5 +144,32 @@ describe('emissive textures and CIT', () => {
       ['nbt.display.Name', 'ipattern:*wand*'],
       ['damage', '0'],
     ]);
+  });
+});
+
+describe('connected textures in the sandbox', () => {
+  it('chooses tiles for where the faces of rotated variants point', () => {
+    expect(turnedFace('north', 0, 90)).toBe('east');
+    expect(turnedFace('north', 0, 180)).toBe('south');
+    expect(turnedFace('north', 90, 0)).toBe('down');
+    expect(turnedFace('up', 90, 90)).toBe('east');
+    expect(turnedFace('west', 0, -90)).toBe('south');
+
+    // a bookshelf row along x; the variant is turned 180°, so its model's north face is seen from the south
+    const h = parseCtmRule(`${D}block_bookshelf.properties`, { method: 'horizontal', tiles: '0-3' })!;
+    const row = world([[0, 0, 0], [1, 0, 0]], 'minecraft:bookshelf');
+    const face = { texture: '#all', uv: [0, 0, 16, 16] };
+    const model = {
+      ref: { model: 'minecraft:block/bookshelf', tints: [] },
+      model: { kind: 'elements', textures: { all: 'minecraft:block/bookshelf' }, elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: { north: face } }] },
+    } as unknown as ResolvedItemModel;
+    const tileOf = (y: number) => {
+      const { models } = ctmModels([model], [[{ model: 'minecraft:block/bookshelf', y }]], [0], [h], row, [0, 0, 0], 'minecraft:bookshelf');
+      const m = models[0].model as unknown as { textures: Record<string, string>; elements: { faces: { north: { texture: string } } }[] };
+      return m.textures[m.elements[0].faces.north.texture.slice(1)];
+    };
+    expect(tileOf(0)).toBe(ctmTile(h, row, [0, 0, 0], 'north', 'minecraft:bookshelf', 'minecraft:block/bookshelf'));
+    expect(tileOf(180)).toBe(ctmTile(h, row, [0, 0, 0], 'south', 'minecraft:bookshelf', 'minecraft:block/bookshelf'));
+    expect(tileOf(0)).not.toBe(tileOf(180));
   });
 });

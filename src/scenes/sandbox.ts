@@ -203,9 +203,19 @@ export function parseCells(text: string): Cells {
 
 /* OptiFine: connected textures and emissive overlays ------------------------------------------- */
 
+/** Where a model face points once the blockstate turns the model (x first, then y, in 90° steps). */
+const TURN_X: Record<FaceDir, FaceDir> = { north: 'down', down: 'south', south: 'up', up: 'north', east: 'east', west: 'west' };
+const TURN_Y: Record<FaceDir, FaceDir> = { north: 'east', east: 'south', south: 'west', west: 'north', up: 'up', down: 'down' };
+export function turnedFace(dir: FaceDir, x = 0, y = 0): FaceDir {
+  for (let i = ((x / 90) % 4 + 4) % 4; i > 0; i--) dir = TURN_X[dir];
+  for (let i = ((y / 90) % 4 + 4) % 4; i > 0; i--) dir = TURN_Y[dir];
+  return dir;
+}
+
 /**
  * The block's models with each face's texture swapped for the CTM tile its neighbours call for.
- * Rotated variants keep their textures (their model faces don't point where they are drawn).
+ * Like OptiFine, the tile is chosen for the direction a face points in the world (rotated variants
+ * included) and keeps the face's own UV mapping.
  * `key` names the chosen tiles, so blocks that look the same can share one built object.
  */
 export function ctmModels(
@@ -221,7 +231,7 @@ export function ctmModels(
   const keys: string[] = [];
   const out = models.map((m, i) => {
     const v = parts[i]?.[choice[i] ?? 0];
-    if (!v || v.x || v.y || m.model.kind !== 'elements') return m;
+    if (!v || m.model.kind !== 'elements') return m;
     const textures = { ...m.model.textures };
     let n = 0;
     const elements = m.model.elements.map((el) => {
@@ -229,8 +239,9 @@ export function ctmModels(
       for (const dir of Object.keys(faces) as FaceDir[]) {
         const face = faces[dir];
         const tex = face && resolveFaceTexture(m.model.textures, face.texture);
-        const rule = tex ? ruleFor(rules, block, tex, dir) : undefined;
-        const tile = rule && SHOWN_METHODS.has(rule.method) ? ctmTile(rule, world, pos, dir, block, tex!) : undefined;
+        const seen = turnedFace(dir, v.x, v.y);
+        const rule = tex ? ruleFor(rules, block, tex, seen) : undefined;
+        const tile = rule && SHOWN_METHODS.has(rule.method) ? ctmTile(rule, world, pos, seen, block, tex!) : undefined;
         if (!tile) continue;
         const name = `ctm_${n++}`;
         textures[name] = tile;
